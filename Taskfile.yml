@@ -2,8 +2,7 @@
 
 version: "3"
 
-vars:
-  GREETING: Hello, World!
+dotenv: [".env"]
 
 tasks:
   default:
@@ -13,3 +12,6 @@ tasks:
   build:
     cmds:
       - cargo build
+  run:
+    cmds:
+      - cargo run
