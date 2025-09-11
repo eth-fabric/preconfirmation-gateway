@@ -12,7 +12,10 @@ mod rpc;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let filter = tracing_subscriber::EnvFilter::try_from_default_env()?
-		.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?);
+		.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?)?
+		.add_directive("jsonrpsee[method_call{name = \"commitmentResult\"}]=trace".parse()?)?
+		.add_directive("jsonrpsee[method_call{name = \"slots\"}]=trace".parse()?)?
+		.add_directive("jsonrpsee[method_call{name = \"fee\"}]=trace".parse()?);
 
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
