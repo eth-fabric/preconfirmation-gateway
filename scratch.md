@@ -1,0 +1,15 @@
+anyhow = { workspace = true }
+http-body-util = { workspace = true }
+http-body = { workspace = true }
+futures = { workspace = true }
+jsonrpsee = { path = "../jsonrpsee", features = ["server", "http-client", "ws-client", "macros", "client-ws-transport-tls"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
+tokio-stream = { workspace = true, features = ["sync"] }
+serde_json = { workspace = true }
+tower-http = { workspace = true, features = ["cors", "compression-full", "sensitive-headers", "trace", "timeout"] }
+tower = { workspace = true, features = ["timeout"] }
+hyper = { workspace = true }
+hyper-util = { workspace = true, features = ["client", "client-legacy"]}
+console-subscriber = { workspace = true }
