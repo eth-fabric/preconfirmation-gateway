@@ -54,5 +54,3 @@ src/
 - **rustfmt.toml**: Code formatting configuration (hard tabs, 120 char width)
 - **Taskfile.yml**: Task runner configuration with basic build task
 
-## Rust context
-Use context7 to fetch additional information when needed for the Rust language, and any installed packages.
