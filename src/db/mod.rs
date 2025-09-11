@@ -1,6 +1,3 @@
-pub mod context;
-
-pub use context::DatabaseContext;
 
 use std::env;
 

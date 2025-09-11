@@ -2,10 +2,7 @@ use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
 use tracing::{info, instrument};
 
-use super::{
-	context::RpcContext,
-	types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfoResponse},
-};
+use super::super::types::{Commitment, CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(context, _extensions))]
 pub fn commitment_request_handler(

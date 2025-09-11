@@ -1,4 +1,4 @@
-use crate::db::DatabaseContext;
+use super::database::DatabaseContext;
 
 /// RPC context that provides access to shared resources for all RPC handlers
 #[derive(Clone, Debug)]

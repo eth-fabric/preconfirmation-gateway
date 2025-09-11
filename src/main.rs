@@ -5,6 +5,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 mod db;
 mod rpc;
+mod types;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -19,17 +20,17 @@ async fn main() -> anyhow::Result<()> {
 	// Initialize database connection
 	let db_client = db::create_connection().await?;
 	db::test_connection(&db_client).await?;
-	let db_context = db::DatabaseContext::new(db_client);
+	let db_context = types::DatabaseContext::new(db_client);
 
 	// Create RPC context with database context
-	let rpc_context = rpc::RpcContext::new(db_context);
+	let rpc_context = types::RpcContext::new(db_context);
 
 	run_server(rpc_context).await?;
 
 	Ok(())
 }
 
-async fn run_server(rpc_context: rpc::RpcContext) -> anyhow::Result<()> {
+async fn run_server(rpc_context: types::RpcContext) -> anyhow::Result<()> {
 	let server = Server::builder().build("127.0.0.1:8080".parse::<SocketAddr>()?).await?;
 	let module = rpc::setup_rpc_methods(rpc_context)?;
 

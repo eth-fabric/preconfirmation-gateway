@@ -1,6 +1,7 @@
 use jsonrpsee::server::RpcModule;
 
-use super::{context::RpcContext, handlers};
+use super::super::types::RpcContext;
+use super::handlers;
 
 pub fn setup_rpc_methods(rpc_context: RpcContext) -> anyhow::Result<RpcModule<RpcContext>> {
 	let mut module = RpcModule::new(rpc_context);

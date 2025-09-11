@@ -38,12 +38,6 @@ pub struct SlotInfo {
 	pub offerings: Vec<Offering>,
 }
 
-/// Response containing slot information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SlotInfoResponse {
-	pub slots: Vec<SlotInfo>,
-}
-
 /// Fee information for a commitment request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeeInfo {
