@@ -3,35 +3,34 @@ use std::net::SocketAddr;
 use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
+mod config;
 mod db;
 mod rpc;
 mod types;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	let mut filter = tracing_subscriber::EnvFilter::try_from_default_env()?;
-	filter = filter.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?);
-	filter = filter.add_directive("jsonrpsee[method_call{name = \"commitmentResult\"}]=trace".parse()?);
-	filter = filter.add_directive("jsonrpsee[method_call{name = \"slots\"}]=trace".parse()?);
-	filter = filter.add_directive("jsonrpsee[method_call{name = \"fee\"}]=trace".parse()?);
+	// Load configuration
+	let config = config::Config::load()?;
 
-	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
+	// Setup logging with configuration
+	setup_logging(&config)?;
 
 	// Initialize database connection pool
-	let db_pool = db::create_pool().await?;
+	let db_pool = db::create_pool(&config).await?;
 	db::test_connection(&db_pool).await?;
 	let db_context = types::DatabaseContext::new(db_pool);
 
 	// Create RPC context with database context
 	let rpc_context = types::RpcContext::new(db_context);
 
-	run_server(rpc_context).await?;
+	run_server(rpc_context, &config).await?;
 
 	Ok(())
 }
 
-async fn run_server(rpc_context: types::RpcContext) -> anyhow::Result<()> {
-	let server = Server::builder().build("127.0.0.1:8080".parse::<SocketAddr>()?).await?;
+async fn run_server(rpc_context: types::RpcContext, config: &config::Config) -> anyhow::Result<()> {
+	let server = Server::builder().build(config.server_address().parse::<SocketAddr>()?).await?;
 	let module = rpc::setup_rpc_methods(rpc_context)?;
 
 	let addr = server.local_addr()?;
@@ -41,5 +40,20 @@ async fn run_server(rpc_context: types::RpcContext) -> anyhow::Result<()> {
 	// Run the server indefinitely, waiting for incoming requests
 	handle.stopped().await;
 
+	Ok(())
+}
+
+fn setup_logging(config: &config::Config) -> anyhow::Result<()> {
+	let mut filter = tracing_subscriber::EnvFilter::try_from_default_env()
+		.unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(&config.logging.level));
+
+	if config.logging.enable_method_tracing {
+		for method in &config.logging.traced_methods {
+			let directive = format!("jsonrpsee[method_call{{name = \"{}\"}}]=trace", method);
+			filter = filter.add_directive(directive.parse()?);
+		}
+	}
+
+	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 	Ok(())
 }

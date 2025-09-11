@@ -5,10 +5,13 @@ use anyhow::{Context, Result};
 use deadpool_postgres::{Config, Pool, Runtime};
 use tokio_postgres::NoTls;
 
+use crate::config;
+
 /// Create a PostgreSQL connection pool
-pub async fn create_pool() -> Result<Pool> {
-	let database_url =
-		env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://localhost/preconfirmation_gateway".to_string());
+pub async fn create_pool(config: &config::Config) -> Result<Pool> {
+	// Environment variable takes precedence over config file
+	let database_url = env::var("DATABASE_URL")
+		.unwrap_or_else(|_| config.database_url().to_string());
 
 	let mut cfg = Config::new();
 	cfg.url = Some(database_url.clone());
