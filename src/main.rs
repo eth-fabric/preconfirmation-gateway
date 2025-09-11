@@ -11,7 +11,7 @@ mod rpc;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let filter = tracing_subscriber::EnvFilter::try_from_default_env()?
-		.add_directive("jsonrpsee[method_call{name = \"say_hello\"}]=trace".parse()?);
+		.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?);
 
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
 
 	let client = HttpClient::builder().build(url)?;
 	let params = rpc_params![1_u64, 2, 3];
-	let response: Result<String, _> = client.request("say_hello", params).await;
+	let response: Result<String, _> = client.request("commitmentRequest", params).await;
 	tracing::info!("r: {:?}", response);
 
 	Ok(())

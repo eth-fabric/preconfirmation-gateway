@@ -915,6 +915,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "jsonrpsee",
+ "serde",
  "tokio",
  "tracing",
  "tracing-subscriber",
