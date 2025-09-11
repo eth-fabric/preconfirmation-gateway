@@ -1,15 +1,19 @@
 use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
 
+use crate::db::DatabaseContext;
+
 use super::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfoResponse};
 
 pub fn commitment_request_handler(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &(),
+	context: &DatabaseContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	let request: CommitmentRequest = params.parse()?;
 
+	// Database is now available via context
+	// Example usage: context.with_client(|client| { /* database operations */ })?;
 	// TODO: Implement actual commitment logic
 	let commitment = Commitment {
 		commitment_type: request.commitment_type,
@@ -28,7 +32,7 @@ pub fn commitment_request_handler(
 
 pub fn commitment_result_handler(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &(),
+	context: &DatabaseContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	let request_hash: String = params.one()?;
@@ -51,7 +55,7 @@ pub fn commitment_result_handler(
 
 pub fn slots_handler(
 	_params: jsonrpsee::types::Params<'_>,
-	_context: &(),
+	context: &DatabaseContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
 	// TODO: Implement actual slots logic
@@ -62,7 +66,7 @@ pub fn slots_handler(
 
 pub fn fee_handler(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &(),
+	context: &DatabaseContext,
 	_extensions: &Extensions,
 ) -> RpcResult<FeeInfo> {
 	let request: CommitmentRequest = params.parse()?;

@@ -6,6 +6,7 @@ use jsonrpsee::rpc_params;
 use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
+mod db;
 mod rpc;
 
 #[tokio::main]
@@ -15,7 +16,12 @@ async fn main() -> anyhow::Result<()> {
 
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
-	let server_addr = run_server().await?;
+	// Initialize database connection
+	let mut db_client = db::create_connection()?;
+	db::test_connection(&mut db_client)?;
+	let db_context = db::DatabaseContext::new(db_client);
+
+	let server_addr = run_server(db_context).await?;
 	let url = format!("http://{}", server_addr);
 
 	let client = HttpClient::builder().build(url)?;
@@ -26,9 +32,9 @@ async fn main() -> anyhow::Result<()> {
 	Ok(())
 }
 
-async fn run_server() -> anyhow::Result<SocketAddr> {
+async fn run_server(db_context: db::DatabaseContext) -> anyhow::Result<SocketAddr> {
 	let server = Server::builder().build("127.0.0.1:0".parse::<SocketAddr>()?).await?;
-	let module = rpc::setup_rpc_methods()?;
+	let module = rpc::setup_rpc_methods(db_context)?;
 
 	let addr = server.local_addr()?;
 	let handle = server.start(module);
