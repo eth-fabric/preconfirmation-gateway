@@ -1,8 +1,5 @@
 use std::net::SocketAddr;
 
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::http_client::HttpClient;
-use jsonrpsee::rpc_params;
 use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -11,43 +8,41 @@ mod rpc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	let filter = tracing_subscriber::EnvFilter::try_from_default_env()?
-		.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?)?
-		.add_directive("jsonrpsee[method_call{name = \"commitmentResult\"}]=trace".parse()?)?
-		.add_directive("jsonrpsee[method_call{name = \"slots\"}]=trace".parse()?)?
-		.add_directive("jsonrpsee[method_call{name = \"fee\"}]=trace".parse()?);
+	let mut filter = tracing_subscriber::EnvFilter::try_from_default_env()?;
+	filter = filter.add_directive("jsonrpsee[method_call{name = \"commitmentRequest\"}]=trace".parse()?);
+	filter = filter.add_directive("jsonrpsee[method_call{name = \"commitmentResult\"}]=trace".parse()?);
+	filter = filter.add_directive("jsonrpsee[method_call{name = \"slots\"}]=trace".parse()?);
+	filter = filter.add_directive("jsonrpsee[method_call{name = \"fee\"}]=trace".parse()?);
 
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
 	// Initialize database connection
-	let mut db_client = db::create_connection()?;
-	db::test_connection(&mut db_client)?;
+	let db_client = tokio::task::spawn_blocking(|| {
+		let mut client = db::create_connection()?;
+		db::test_connection(&mut client)?;
+		Ok::<_, anyhow::Error>(client)
+	})
+	.await??;
 	let db_context = db::DatabaseContext::new(db_client);
 
 	// Create RPC context with database context
 	let rpc_context = rpc::RpcContext::new(db_context);
 
-	let server_addr = run_server(rpc_context).await?;
-	let url = format!("http://{}", server_addr);
-
-	let client = HttpClient::builder().build(url)?;
-	let params = rpc_params![1_u64, 2, 3];
-	let response: Result<String, _> = client.request("commitmentRequest", params).await;
-	tracing::info!("r: {:?}", response);
+	run_server(rpc_context).await?;
 
 	Ok(())
 }
 
-async fn run_server(rpc_context: rpc::RpcContext) -> anyhow::Result<SocketAddr> {
-	let server = Server::builder().build("127.0.0.1:0".parse::<SocketAddr>()?).await?;
+async fn run_server(rpc_context: rpc::RpcContext) -> anyhow::Result<()> {
+	let server = Server::builder().build("127.0.0.1:8080".parse::<SocketAddr>()?).await?;
 	let module = rpc::setup_rpc_methods(rpc_context)?;
 
 	let addr = server.local_addr()?;
+	tracing::info!("Starting RPC server on {}", addr);
 	let handle = server.start(module);
 
-	// In this example we don't care about doing shutdown so let's it run forever.
-	// You may use the `ServerHandle` to shut it down or manage it yourself.
-	tokio::spawn(handle.stopped());
+	// Run the server indefinitely, waiting for incoming requests
+	handle.stopped().await;
 
-	Ok(addr)
+	Ok(())
 }
