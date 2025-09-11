@@ -8,6 +8,5 @@ pub mod types;
 pub use db::{create_pool, test_connection};
 pub use rpc::handlers::{commitment_request_handler, commitment_result_handler, fee_handler, slots_handler};
 pub use types::{
-	Commitment, CommitmentRequest, DatabaseContext, FeeInfo, RpcContext, SignedCommitment,
-	SlotInfoResponse,
+	Commitment, CommitmentRequest, DatabaseContext, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse,
 };

@@ -1,4 +1,3 @@
-
 use std::env;
 
 use anyhow::{Context, Result};
@@ -10,12 +9,11 @@ use crate::config;
 /// Create a PostgreSQL connection pool
 pub async fn create_pool(config: &config::Config) -> Result<Pool> {
 	// Environment variable takes precedence over config file
-	let database_url = env::var("DATABASE_URL")
-		.unwrap_or_else(|_| config.database_url().to_string());
+	let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| config.database_url().to_string());
 
 	let mut cfg = Config::new();
 	cfg.url = Some(database_url.clone());
-	
+
 	let pool = cfg
 		.create_pool(Some(Runtime::Tokio1), NoTls)
 		.with_context(|| format!("Failed to create connection pool for database: {}", database_url))?;
@@ -26,7 +24,7 @@ pub async fn create_pool(config: &config::Config) -> Result<Pool> {
 /// Test the database connection pool
 pub async fn test_connection(pool: &Pool) -> Result<()> {
 	let client = pool.get().await.with_context(|| "Failed to get connection from pool")?;
-	
+
 	client.simple_query("SELECT 1").await.with_context(|| "Failed to execute test query")?;
 
 	tracing::info!("Database connection test successful");

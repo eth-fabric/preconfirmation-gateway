@@ -30,28 +30,19 @@ pub struct LoggingConfig {
 
 impl Default for Config {
 	fn default() -> Self {
-		Self {
-			server: ServerConfig::default(),
-			database: DatabaseConfig::default(),
-			logging: LoggingConfig::default(),
-		}
+		Self { server: ServerConfig::default(), database: DatabaseConfig::default(), logging: LoggingConfig::default() }
 	}
 }
 
 impl Default for ServerConfig {
 	fn default() -> Self {
-		Self {
-			host: "127.0.0.1".to_string(),
-			port: 8080,
-		}
+		Self { host: "127.0.0.1".to_string(), port: 8080 }
 	}
 }
 
 impl Default for DatabaseConfig {
 	fn default() -> Self {
-		Self {
-			url: "postgresql://localhost/preconfirmation_gateway".to_string(),
-		}
+		Self { url: "postgresql://localhost/preconfirmation_gateway".to_string() }
 	}
 }
 
@@ -77,7 +68,7 @@ impl Config {
 
 	pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
 		let config_path = path.as_ref();
-		
+
 		if !config_path.exists() {
 			tracing::warn!("Configuration file {} not found, using defaults", config_path.display());
 			return Ok(Self::default());

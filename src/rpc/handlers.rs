@@ -13,7 +13,7 @@ pub fn commitment_request_handler(
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.parse()?;
 
-	// Database is now available via _context.database  
+	// Database is now available via _context.database
 	// Example usage: _context.database.with_client(|client| { /* database operations */ }).await?;
 	// Or use the convenience method: _context.with_database(|client| { /* database operations */ }).await?;
 	// Or get direct client access: _context.database_client();

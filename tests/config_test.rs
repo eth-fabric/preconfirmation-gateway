@@ -1,28 +1,23 @@
+use preconfirmation_gateway::config::{Config, DatabaseConfig, LoggingConfig, ServerConfig};
 use std::io::Write;
 use tempfile::NamedTempFile;
-use preconfirmation_gateway::config::{Config, ServerConfig, DatabaseConfig, LoggingConfig};
 
 #[test]
 fn test_config_load_from_existing_file() {
 	let config = Config::load_from_file("config.toml").expect("Should load existing config file");
-	
+
 	assert_eq!(config.server.host, "127.0.0.1");
 	assert_eq!(config.server.port, 8080);
 	assert_eq!(config.database.url, "postgresql://localhost/preconfirmation_gateway");
 	assert_eq!(config.logging.level, "info");
 	assert_eq!(config.logging.enable_method_tracing, true);
-	assert_eq!(config.logging.traced_methods, vec![
-		"commitmentRequest",
-		"commitmentResult",
-		"slots",
-		"fee"
-	]);
+	assert_eq!(config.logging.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
 }
 
 #[test]
 fn test_config_load_nonexistent_file_uses_defaults() {
 	let config = Config::load_from_file("nonexistent.toml").expect("Should use defaults when file doesn't exist");
-	
+
 	let expected_default = Config::default();
 	assert_eq!(config.server.host, expected_default.server.host);
 	assert_eq!(config.server.port, expected_default.server.port);
@@ -36,7 +31,7 @@ fn test_config_load_nonexistent_file_uses_defaults() {
 fn test_config_load_invalid_toml() {
 	let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
 	temp_file.write_all(b"invalid toml content [[[").expect("Failed to write to temp file");
-	
+
 	let result = Config::load_from_file(temp_file.path());
 	assert!(result.is_err());
 	assert!(result.unwrap_err().to_string().contains("Failed to parse configuration file"));
@@ -45,7 +40,7 @@ fn test_config_load_invalid_toml() {
 #[test]
 fn test_config_load_empty_file() {
 	let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-	
+
 	let result = Config::load_from_file(temp_file.path());
 	assert!(result.is_err());
 }
@@ -54,7 +49,7 @@ fn test_config_load_empty_file() {
 fn test_config_load_partial_server_config() {
 	let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
 	temp_file.write_all(b"[server]\nhost = \"0.0.0.0\"\n").expect("Failed to write to temp file");
-	
+
 	let result = Config::load_from_file(temp_file.path());
 	assert!(result.is_err());
 }
@@ -76,9 +71,9 @@ enable_method_tracing = false
 traced_methods = ["test_method"]
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
-	
+
 	let config = Config::load_from_file(temp_file.path()).expect("Should load valid config");
-	
+
 	assert_eq!(config.server.host, "0.0.0.0");
 	assert_eq!(config.server.port, 9090);
 	assert_eq!(config.database.url, "postgresql://test/testdb");
@@ -90,18 +85,13 @@ traced_methods = ["test_method"]
 #[test]
 fn test_config_default_values() {
 	let config = Config::default();
-	
+
 	assert_eq!(config.server.host, "127.0.0.1");
 	assert_eq!(config.server.port, 8080);
 	assert_eq!(config.database.url, "postgresql://localhost/preconfirmation_gateway");
 	assert_eq!(config.logging.level, "info");
 	assert_eq!(config.logging.enable_method_tracing, true);
-	assert_eq!(config.logging.traced_methods, vec![
-		"commitmentRequest",
-		"commitmentResult",
-		"slots",
-		"fee"
-	]);
+	assert_eq!(config.logging.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
 }
 
 #[test]
@@ -122,19 +112,14 @@ fn test_logging_config_default() {
 	let logging_config = LoggingConfig::default();
 	assert_eq!(logging_config.level, "info");
 	assert_eq!(logging_config.enable_method_tracing, true);
-	assert_eq!(logging_config.traced_methods, vec![
-		"commitmentRequest",
-		"commitmentResult",
-		"slots",
-		"fee"
-	]);
+	assert_eq!(logging_config.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
 }
 
 #[test]
 fn test_config_database_url_accessor() {
 	let config = Config::default();
 	assert_eq!(config.database_url(), "postgresql://localhost/preconfirmation_gateway");
-	
+
 	let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
 	let config_content = r#"
 [server]
@@ -150,7 +135,7 @@ enable_method_tracing = true
 traced_methods = []
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
-	
+
 	let config = Config::load_from_file(temp_file.path()).expect("Should load config");
 	assert_eq!(config.database_url(), "postgresql://custom/db");
 }
@@ -164,7 +149,7 @@ host = "127.0.0.1"
 port = 8080
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
-	
+
 	let result = Config::load_from_file(temp_file.path());
 	assert!(result.is_err());
 }
@@ -187,7 +172,7 @@ enable_method_tracing = true
 traced_methods = ["fee"]
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
-	
+
 	let config = Config::load_from_file(temp_file.path()).expect("Should load config ignoring extra fields");
 	assert_eq!(config.server.host, "127.0.0.1");
 	assert_eq!(config.server.port, 8080);
