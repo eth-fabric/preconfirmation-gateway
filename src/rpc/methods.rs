@@ -1,11 +1,9 @@
 use jsonrpsee::server::RpcModule;
 
-use crate::db::DatabaseContext;
+use super::{context::RpcContext, handlers};
 
-use super::handlers;
-
-pub fn setup_rpc_methods(db_context: DatabaseContext) -> anyhow::Result<RpcModule<DatabaseContext>> {
-	let mut module = RpcModule::new(db_context);
+pub fn setup_rpc_methods(rpc_context: RpcContext) -> anyhow::Result<RpcModule<RpcContext>> {
+	let mut module = RpcModule::new(rpc_context);
 
 	module.register_method("commitmentRequest", handlers::commitment_request_handler)?;
 	module.register_method("commitmentResult", handlers::commitment_result_handler)?;

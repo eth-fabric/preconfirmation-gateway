@@ -21,7 +21,10 @@ async fn main() -> anyhow::Result<()> {
 	db::test_connection(&mut db_client)?;
 	let db_context = db::DatabaseContext::new(db_client);
 
-	let server_addr = run_server(db_context).await?;
+	// Create RPC context with database context
+	let rpc_context = rpc::RpcContext::new(db_context);
+
+	let server_addr = run_server(rpc_context).await?;
 	let url = format!("http://{}", server_addr);
 
 	let client = HttpClient::builder().build(url)?;
@@ -32,9 +35,9 @@ async fn main() -> anyhow::Result<()> {
 	Ok(())
 }
 
-async fn run_server(db_context: db::DatabaseContext) -> anyhow::Result<SocketAddr> {
+async fn run_server(rpc_context: rpc::RpcContext) -> anyhow::Result<SocketAddr> {
 	let server = Server::builder().build("127.0.0.1:0".parse::<SocketAddr>()?).await?;
-	let module = rpc::setup_rpc_methods(db_context)?;
+	let module = rpc::setup_rpc_methods(rpc_context)?;
 
 	let addr = server.local_addr()?;
 	let handle = server.start(module);
