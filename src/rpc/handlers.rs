@@ -16,9 +16,10 @@ pub fn commitment_request_handler(
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.parse()?;
 
-	// Database is now available via context.database
-	// Example usage: context.database.with_client(|client| { /* database operations */ })?;
-	// Or use the convenience method: context.with_database(|client| { /* database operations */ })?;
+	// Database is now available via context.database  
+	// Example usage: context.database.with_client(|client| { /* database operations */ }).await?;
+	// Or use the convenience method: context.with_database(|client| { /* database operations */ }).await?;
+	// Or get direct client access: context.database_client();
 	// TODO: Implement actual commitment logic
 	let commitment = Commitment {
 		commitment_type: request.commitment_type,

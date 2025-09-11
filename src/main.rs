@@ -17,12 +17,8 @@ async fn main() -> anyhow::Result<()> {
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
 	// Initialize database connection
-	let db_client = tokio::task::spawn_blocking(|| {
-		let mut client = db::create_connection()?;
-		db::test_connection(&mut client)?;
-		Ok::<_, anyhow::Error>(client)
-	})
-	.await??;
+	let db_client = db::create_connection().await?;
+	db::test_connection(&db_client).await?;
 	let db_context = db::DatabaseContext::new(db_client);
 
 	// Create RPC context with database context
