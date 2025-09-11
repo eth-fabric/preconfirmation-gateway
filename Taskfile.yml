@@ -20,3 +20,7 @@ tasks:
   format:
     cmds:
       - cargo fmt --all
+
+  test:
+    cmds:
+      - cargo test

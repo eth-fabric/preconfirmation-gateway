@@ -7,20 +7,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a Rust-based preconfirmation gateway that implements a JSON-RPC server using the `jsonrpsee` crate. The project is in early development and currently contains a simple RPC server example with a "say_hello" method.
 
 ## Development Commands
+This project uses taskfile as the task runner.
 
 ### Building
-- `cargo build` - Build the project
-- `task build` - Alternative build command using Taskfile
+- `task build` - Run the build command using Taskfile
 
 ### Running
-- `cargo run` - Run the main application (starts RPC server and client demo)
+- `task run` - Run the main application (starts RPC server and client demo)
 
 ### Code Formatting
-- `cargo fmt` - Format code using rustfmt with project-specific settings
+- `task format` - Format code using rustfmt with project-specific settings
 - Uses hard tabs, 120 character line width, and Rust 2024 edition formatting rules
 
 ### Testing
-- `cargo test` - Run tests (when tests are added)
+- `task test` - Run tests (when tests are added)
 
 ### Linting
 - `cargo clippy` - Run Clippy linter for code quality checks
