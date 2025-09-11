@@ -17,10 +17,10 @@ async fn main() -> anyhow::Result<()> {
 
 	tracing_subscriber::FmtSubscriber::builder().with_env_filter(filter).finish().try_init()?;
 
-	// Initialize database connection
-	let db_client = db::create_connection().await?;
-	db::test_connection(&db_client).await?;
-	let db_context = types::DatabaseContext::new(db_client);
+	// Initialize database connection pool
+	let db_pool = db::create_pool().await?;
+	db::test_connection(&db_pool).await?;
+	let db_context = types::DatabaseContext::new(db_pool);
 
 	// Create RPC context with database context
 	let rpc_context = types::RpcContext::new(db_context);

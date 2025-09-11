@@ -1,38 +1,37 @@
-use std::sync::Arc;
-
 use anyhow::Result;
-use tokio_postgres::Client;
+use deadpool_postgres::Pool;
 
-/// Database context that provides access to the PostgreSQL connection
-/// tokio-postgres::Client is designed to be used concurrently via Arc
+/// Database context that provides access to the PostgreSQL connection pool
 #[derive(Clone)]
 pub struct DatabaseContext {
-	client: Arc<Client>,
+	pool: Pool,
 }
 
 impl DatabaseContext {
-	/// Create a new DatabaseContext with the given client
-	pub fn new(client: Client) -> Self {
-		Self { client: Arc::new(client) }
+	/// Create a new DatabaseContext with the given pool
+	pub fn new(pool: Pool) -> Self {
+		Self { pool }
 	}
 
-	/// Execute a query with the database client
-	/// This is a convenience method that provides access to the client
-	pub async fn with_client<F, R>(&self, f: F) -> Result<R>
+	/// Execute a function with a database client from the pool
+	pub async fn with_client<F, Fut, R>(&self, f: F) -> Result<R>
 	where
-		F: FnOnce(&Client) -> R,
+		F: FnOnce(deadpool_postgres::Client) -> Fut,
+		Fut: std::future::Future<Output = Result<R>>,
 	{
-		Ok(f(&self.client))
+		let client = self.pool.get().await?;
+		f(client).await
 	}
 
-	/// Get a reference to the database client
-	pub fn client(&self) -> &Client {
-		&self.client
+	/// Get a client from the connection pool
+	pub async fn client(&self) -> Result<deadpool_postgres::Client> {
+		Ok(self.pool.get().await?)
 	}
 
 	/// Test the database connection
 	pub async fn test_connection(&self) -> Result<()> {
-		self.client.simple_query("SELECT 1").await?;
+		let client = self.pool.get().await?;
+		client.simple_query("SELECT 1").await?;
 		Ok(())
 	}
 }

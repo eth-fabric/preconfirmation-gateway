@@ -7,4 +7,4 @@ pub mod rpc;
 pub use context::RpcContext;
 pub use database::DatabaseContext;
 pub use responses::SlotInfoResponse;
-pub use rpc::{Commitment, CommitmentRequest, FeeInfo, Offering, SignedCommitment, SlotInfo};
+pub use rpc::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};

@@ -15,15 +15,16 @@ impl RpcContext {
 
 	/// Convenience method for database operations
 	/// This delegates to the underlying DatabaseContext's with_client method
-	pub async fn with_database<F, R>(&self, f: F) -> anyhow::Result<R>
+	pub async fn with_database<F, Fut, R>(&self, f: F) -> anyhow::Result<R>
 	where
-		F: FnOnce(&tokio_postgres::Client) -> R,
+		F: FnOnce(deadpool_postgres::Client) -> Fut,
+		Fut: std::future::Future<Output = anyhow::Result<R>>,
 	{
 		self.database.with_client(f).await
 	}
 
-	/// Get a reference to the database client
-	pub fn database_client(&self) -> &tokio_postgres::Client {
-		self.database.client()
+	/// Get a database client from the connection pool
+	pub async fn database_client(&self) -> anyhow::Result<deadpool_postgres::Client> {
+		self.database.client().await
 	}
 }

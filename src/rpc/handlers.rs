@@ -4,19 +4,19 @@ use tracing::{info, instrument};
 
 use super::super::types::{Commitment, CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 
-#[instrument(name = "commitment_request", skip(context, _extensions))]
+#[instrument(name = "commitment_request", skip(_context, _extensions))]
 pub fn commitment_request_handler(
 	params: jsonrpsee::types::Params<'_>,
-	context: &RpcContext,
+	_context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.parse()?;
 
-	// Database is now available via context.database  
-	// Example usage: context.database.with_client(|client| { /* database operations */ }).await?;
-	// Or use the convenience method: context.with_database(|client| { /* database operations */ }).await?;
-	// Or get direct client access: context.database_client();
+	// Database is now available via _context.database  
+	// Example usage: _context.database.with_client(|client| { /* database operations */ }).await?;
+	// Or use the convenience method: _context.with_database(|client| { /* database operations */ }).await?;
+	// Or get direct client access: _context.database_client();
 	// TODO: Implement actual commitment logic
 	let commitment = Commitment {
 		commitment_type: request.commitment_type,
@@ -34,10 +34,10 @@ pub fn commitment_request_handler(
 	Ok(signed_commitment)
 }
 
-#[instrument(name = "commitment_result", skip(context, _extensions))]
+#[instrument(name = "commitment_result", skip(_context, _extensions))]
 pub fn commitment_result_handler(
 	params: jsonrpsee::types::Params<'_>,
-	context: &RpcContext,
+	_context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment result request");
@@ -60,10 +60,10 @@ pub fn commitment_result_handler(
 	Ok(signed_commitment)
 }
 
-#[instrument(name = "slots", skip(context, _extensions))]
+#[instrument(name = "slots", skip(_context, _extensions))]
 pub fn slots_handler(
 	_params: jsonrpsee::types::Params<'_>,
-	context: &RpcContext,
+	_context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
 	info!("Processing slots request");
@@ -74,10 +74,10 @@ pub fn slots_handler(
 	Ok(response)
 }
 
-#[instrument(name = "fee", skip(context, _extensions))]
+#[instrument(name = "fee", skip(_context, _extensions))]
 pub fn fee_handler(
 	params: jsonrpsee::types::Params<'_>,
-	context: &RpcContext,
+	_context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<FeeInfo> {
 	info!("Processing fee request");
