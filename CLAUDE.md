@@ -21,6 +21,8 @@ This project uses taskfile as the task runner.
 
 ### Testing
 - `task test` - Run tests (when tests are added)
+- Tests are located in the `tests/` directory
+- Test files must follow the naming convention: `test-name.spec.rs`
 
 ### Linting
 - `cargo clippy` - Run Clippy linter for code quality checks
