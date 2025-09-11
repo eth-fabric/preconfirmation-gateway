@@ -12,6 +12,11 @@ tasks:
   build:
     cmds:
       - cargo build
+
   run:
     cmds:
       - cargo run
+
+  format:
+    cmds:
+      - cargo fmt --all
