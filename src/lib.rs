@@ -1,6 +1,7 @@
 pub mod config;
 pub mod db;
 pub mod rpc;
+pub mod server;
 pub mod types;
 
 // Re-export commonly used types and functions for easier access

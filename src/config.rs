@@ -93,10 +93,6 @@ impl Config {
 		Ok(config)
 	}
 
-	pub fn server_address(&self) -> String {
-		format!("{}:{}", self.server.host, self.server.port)
-	}
-
 	pub fn database_url(&self) -> &str {
 		&self.database.url
 	}
