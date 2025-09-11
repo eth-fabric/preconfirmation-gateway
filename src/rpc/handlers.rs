@@ -1,16 +1,19 @@
 use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
+use tracing::{info, instrument};
 
 use super::{
 	context::RpcContext,
 	types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfoResponse},
 };
 
+#[instrument(name = "commitment_request", skip(context, _extensions))]
 pub fn commitment_request_handler(
 	params: jsonrpsee::types::Params<'_>,
 	context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
+	info!("Processing commitment request");
 	let request: CommitmentRequest = params.parse()?;
 
 	// Database is now available via context.database
@@ -29,14 +32,17 @@ pub fn commitment_request_handler(
 		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
 	};
 
+	info!("Commitment request processed successfully");
 	Ok(signed_commitment)
 }
 
+#[instrument(name = "commitment_result", skip(context, _extensions))]
 pub fn commitment_result_handler(
 	params: jsonrpsee::types::Params<'_>,
 	context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
+	info!("Processing commitment result request");
 	let request_hash: String = params.one()?;
 
 	// TODO: Implement actual commitment retrieval logic
@@ -52,29 +58,36 @@ pub fn commitment_result_handler(
 		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
 	};
 
+	info!("Commitment result request processed successfully");
 	Ok(signed_commitment)
 }
 
+#[instrument(name = "slots", skip(context, _extensions))]
 pub fn slots_handler(
 	_params: jsonrpsee::types::Params<'_>,
 	context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
+	info!("Processing slots request");
 	// TODO: Implement actual slots logic
 	let response = SlotInfoResponse { slots: vec![] };
 
+	info!("Slots request processed successfully");
 	Ok(response)
 }
 
+#[instrument(name = "fee", skip(context, _extensions))]
 pub fn fee_handler(
 	params: jsonrpsee::types::Params<'_>,
 	context: &RpcContext,
 	_extensions: &Extensions,
 ) -> RpcResult<FeeInfo> {
+	info!("Processing fee request");
 	let request: CommitmentRequest = params.parse()?;
 
 	// TODO: Implement actual fee calculation logic
 	let fee_info = FeeInfo { fee_payload: vec![0u8; 32], commitment_type: request.commitment_type };
 
+	info!("Fee request processed successfully");
 	Ok(fee_info)
 }
