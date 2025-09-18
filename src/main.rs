@@ -1,44 +1,26 @@
-use std::net::SocketAddr;
-
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::http_client::HttpClient;
-use jsonrpsee::rpc_params;
-use jsonrpsee::server::{RpcModule, Server};
-use tracing_subscriber::util::SubscriberInitExt;
+mod config;
+mod db;
+mod rpc;
+mod server;
+mod types;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let filter = tracing_subscriber::EnvFilter::try_from_default_env()?
-        .add_directive("jsonrpsee[method_call{name = \"say_hello\"}]=trace".parse()?);
-    tracing_subscriber::FmtSubscriber::builder()
-        .with_env_filter(filter)
-        .finish()
-        .try_init()?;
+	// Load configuration
+	let config = config::Config::load()?;
 
-    let server_addr = run_server().await?;
-    let url = format!("http://{}", server_addr);
+	// Setup logging with configuration
+	server::setup_logging(&config)?;
 
-    let client = HttpClient::builder().build(url)?;
-    let params = rpc_params![1_u64, 2, 3];
-    let response: Result<String, _> = client.request("say_hello", params).await;
-    tracing::info!("r: {:?}", response);
+	// Initialize database connection pool
+	let db_pool = db::create_pool(&config).await?;
+	db::test_connection(&db_pool).await?;
+	let db_context = types::DatabaseContext::new(db_pool);
 
-    Ok(())
-}
+	// Create RPC context with database context
+	let rpc_context = types::RpcContext::new(db_context);
 
-async fn run_server() -> anyhow::Result<SocketAddr> {
-    let server = Server::builder()
-        .build("127.0.0.1:0".parse::<SocketAddr>()?)
-        .await?;
-    let mut module = RpcModule::new(());
-    module.register_method("say_hello", |_, _, _| "lo")?;
+	server::run_server(rpc_context, &config).await?;
 
-    let addr = server.local_addr()?;
-    let handle = server.start(module);
-
-    // In this example we don't care about doing shutdown so let's it run forever.
-    // You may use the `ServerHandle` to shut it down or manage it yourself.
-    tokio::spawn(handle.stopped());
-
-    Ok(addr)
+	Ok(())
 }

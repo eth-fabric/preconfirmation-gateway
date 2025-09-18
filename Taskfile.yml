@@ -1,0 +1,30 @@
+# https://taskfile.dev
+
+version: "3"
+
+dotenv: [".env"]
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+
+  build:
+    cmds:
+      - cargo build
+
+  run:
+    cmds:
+      - cargo run
+
+  format:
+    cmds:
+      - cargo fmt --all
+
+  test:
+    cmds:
+      - cargo test
+
+  lint:
+    cmds:
+      - cargo clippy
