@@ -5,12 +5,14 @@ use super::database::DatabaseContext;
 pub struct RpcContext {
 	/// Database context for PostgreSQL operations
 	pub database: DatabaseContext,
+	/// Private key for signing commitments (hex string)
+	pub private_key: String, //todo temporary
 }
 
 impl RpcContext {
-	/// Create a new RPC context with the given database context
-	pub fn new(database: DatabaseContext) -> Self {
-		Self { database }
+	/// Create a new RPC context with the given database context and private key
+	pub fn new(database: DatabaseContext, private_key: String) -> Self {
+		Self { database, private_key }
 	}
 
 	/// Convenience method for database operations

@@ -1,5 +1,45 @@
-use serde::{Deserialize, Serialize};
 use alloy::primitives::{Address, B256, Bytes, Signature};
+use alloy::sol_types::SolValue;
+use eyre::{Result, WrapErr};
+use serde::{Deserialize, Serialize};
+
+/// Payload for commitments/constraints
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InclusionPayload {
+	pub slot: u64,
+	pub signed_tx: Bytes,
+}
+
+impl InclusionPayload {
+	/// ABI-encodes the InclusionPayload struct
+	pub fn abi_encode(&self) -> Result<Bytes> {
+		alloy::sol! {
+			struct SolInclusionPayload {
+				uint64 slot;
+				bytes signed_tx;
+			}
+		}
+
+		Ok(Bytes::from(SolInclusionPayload::abi_encode(&SolInclusionPayload {
+			slot: self.slot,
+			signed_tx: self.signed_tx.clone(),
+		})))
+	}
+
+	/// ABI-decodes an InclusionPayload from bytes
+	pub fn abi_decode(data: &Bytes) -> Result<Self> {
+		alloy::sol! {
+			struct SolInclusionPayload {
+				uint64 slot;
+				bytes signed_tx;
+			}
+		}
+
+		let decoded = SolInclusionPayload::abi_decode(data).wrap_err("Failed to decode InclusionPayload")?;
+
+		Ok(InclusionPayload { slot: decoded.slot, signed_tx: decoded.signed_tx })
+	}
+}
 
 /// Request for a new SignedCommitment
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,6 +49,44 @@ pub struct CommitmentRequest {
 	pub slasher: Address,
 }
 
+impl CommitmentRequest {
+	/// ABI-encodes the CommitmentRequest struct
+	pub fn abi_encode(&self) -> Result<Bytes> {
+		alloy::sol! {
+			struct SolCommitmentRequest {
+				uint64 commitment_type;
+				bytes payload;
+				address slasher;
+			}
+		}
+
+		Ok(Bytes::from(SolCommitmentRequest::abi_encode(&SolCommitmentRequest {
+			commitment_type: self.commitment_type,
+			payload: self.payload.clone(),
+			slasher: self.slasher,
+		})))
+	}
+
+	/// ABI-decodes a CommitmentRequest from bytes
+	pub fn abi_decode(data: &Bytes) -> Result<Self> {
+		alloy::sol! {
+			struct SolCommitmentRequest {
+				uint64 commitment_type;
+				bytes payload;
+				address slasher;
+			}
+		}
+
+		let decoded = SolCommitmentRequest::abi_decode(data).wrap_err("Failed to decode CommitmentRequest")?;
+
+		Ok(CommitmentRequest {
+			commitment_type: decoded.commitment_type,
+			payload: decoded.payload,
+			slasher: decoded.slasher,
+		})
+	}
+}
+
 /// Core commitment data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commitment {
@@ -16,6 +94,48 @@ pub struct Commitment {
 	pub payload: Bytes,
 	pub request_hash: B256,
 	pub slasher: Address,
+}
+
+impl Commitment {
+	/// ABI-encodes the Commitment struct
+	pub fn abi_encode(&self) -> Result<Bytes> {
+		alloy::sol! {
+			struct SolCommitment {
+				uint64 commitment_type;
+				bytes payload;
+				bytes32 request_hash;
+				address slasher;
+			}
+		}
+
+		Ok(Bytes::from(SolCommitment::abi_encode(&SolCommitment {
+			commitment_type: self.commitment_type,
+			payload: self.payload.clone(),
+			request_hash: self.request_hash,
+			slasher: self.slasher,
+		})))
+	}
+
+	/// ABI-decodes a Commitment from bytes
+	pub fn abi_decode(data: &Bytes) -> Result<Self> {
+		alloy::sol! {
+			struct SolCommitment {
+				uint64 commitment_type;
+				bytes payload;
+				bytes32 request_hash;
+				address slasher;
+			}
+		}
+
+		let decoded = SolCommitment::abi_decode(data).wrap_err("Failed to decode Commitment")?;
+
+		Ok(Commitment {
+			commitment_type: decoded.commitment_type,
+			payload: decoded.payload,
+			request_hash: decoded.request_hash,
+			slasher: decoded.slasher,
+		})
+	}
 }
 
 /// A commitment with its ECDSA signature

@@ -17,8 +17,10 @@ async fn main() -> anyhow::Result<()> {
 	db::test_connection(&db_pool).await?;
 	let db_context = types::DatabaseContext::new(db_pool);
 
-	// Create RPC context with database context
-	let rpc_context = types::RpcContext::new(db_context);
+	// Create RPC context with database context and private key
+	// TODO: Load private key from config or environment variable
+	let private_key = "0x1234567890123456789012345678901234567890123456789012345678901234".to_string();
+	let rpc_context = types::RpcContext::new(db_context, private_key);
 
 	server::run_server(rpc_context, &config).await?;
 

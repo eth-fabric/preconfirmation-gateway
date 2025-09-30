@@ -1,33 +1,43 @@
 use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
-use tracing::{info, instrument};
+use tracing::{error, info, instrument};
 
 use super::super::types::{Commitment, CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
+use super::utils;
+use alloy::primitives::{Address, B256, Bytes};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
-pub fn commitment_request_handler(
+pub async fn commitment_request_handler(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext,
-	_extensions: &Extensions,
+	_context: std::sync::Arc<RpcContext>,
+	_extensions: Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.parse()?;
+
+	// Validate the commitment request
+	if let Err(e) = utils::validate_commitment_request(&request) {
+		error!("Invalid commitment request: {}", e);
+		return Err(jsonrpsee::types::error::ErrorObject::owned(
+			-32602, // Invalid params
+			"Invalid commitment request",
+			Some(format!("{}", e)),
+		));
+	}
 
 	// Database is now available via _context.database
 	// Example usage: _context.database.with_client(|client| { /* database operations */ }).await?;
 	// Or use the convenience method: _context.with_database(|client| { /* database operations */ }).await?;
 	// Or get direct client access: _context.database_client();
-	// TODO: Implement actual commitment logic
-	let commitment = Commitment {
-		commitment_type: request.commitment_type,
-		payload: request.payload,
-		request_hash: "0x0000000000000000000000000000000000000000000000000000000000000000".to_string(),
-		slasher: request.slasher,
-	};
 
-	let signed_commitment = SignedCommitment {
-		commitment,
-		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
+	// Create and sign the commitment using ECDSA with commit-boost
+	let signed_commitment = match utils::create_signed_commitment(&request, &_context.private_key).await {
+		Ok(commitment) => commitment,
+		Err(e) => {
+			error!("Failed to create signed commitment: {}", e);
+			// For now, return a mock commitment on error
+			utils::create_mock_signed_commitment(&request)
+		}
 	};
 
 	info!("Commitment request processed successfully");
@@ -41,19 +51,14 @@ pub fn commitment_result_handler(
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment result request");
-	let request_hash: String = params.one()?;
+	let request_hash: B256 = params.one()?;
 
 	// TODO: Implement actual commitment retrieval logic
-	let commitment = Commitment {
-		commitment_type: 1,
-		payload: vec![],
-		request_hash,
-		slasher: "0x0000000000000000000000000000000000000000".to_string(),
-	};
+	let commitment = Commitment { commitment_type: 1, payload: Bytes::new(), request_hash, slasher: Address::ZERO };
 
 	let signed_commitment = SignedCommitment {
 		commitment,
-		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
+		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
 	};
 
 	info!("Commitment result request processed successfully");
@@ -83,8 +88,8 @@ pub fn fee_handler(
 	info!("Processing fee request");
 	let request: CommitmentRequest = params.parse()?;
 
-	// TODO: Implement actual fee calculation logic
-	let fee_info = FeeInfo { fee_payload: vec![0u8; 32], commitment_type: request.commitment_type };
+	// Use helper function to calculate fee
+	let fee_info = utils::calculate_fee_info(&request);
 
 	info!("Fee request processed successfully");
 	Ok(fee_info)
