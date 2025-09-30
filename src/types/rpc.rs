@@ -1,27 +1,28 @@
 use serde::{Deserialize, Serialize};
+use alloy::primitives::{Address, B256, Bytes, Signature};
 
 /// Request for a new SignedCommitment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitmentRequest {
 	pub commitment_type: u64,
-	pub payload: Vec<u8>,
-	pub slasher: String, // address as hex string
+	pub payload: Bytes,
+	pub slasher: Address,
 }
 
 /// Core commitment data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Commitment {
 	pub commitment_type: u64,
-	pub payload: Vec<u8>,
-	pub request_hash: String, // bytes32 as hex string
-	pub slasher: String,      // address as hex string
+	pub payload: Bytes,
+	pub request_hash: B256,
+	pub slasher: Address,
 }
 
 /// A commitment with its ECDSA signature
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedCommitment {
 	pub commitment: Commitment,
-	pub signature: String, // ECDSA signature as hex string
+	pub signature: Signature,
 }
 
 /// Information about offerings for a specific chain
@@ -41,6 +42,6 @@ pub struct SlotInfo {
 /// Fee information for a commitment request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeeInfo {
-	pub fee_payload: Vec<u8>, // opaque fee payload
+	pub fee_payload: Bytes, // opaque fee payload
 	pub commitment_type: u64,
 }
