@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use alloy::primitives::{Address, B256, b256, hex};
 use commit_boost::prelude::*;
 use cb_common::{
-	commit::{constants::GENERATE_PROXY_KEY_PATH, request::{EncryptionScheme, GenerateProxyRequest}},
-	config::{load_module_signing_configs, ModuleSigningConfig, StartSignerConfig},
+	commit::request::EncryptionScheme,
+	config::load_module_signing_configs,
 	types::ModuleId,
-	utils::create_jwt,
 };
 use eyre::Result;
 
@@ -18,9 +17,13 @@ const PUBKEY: [u8; 48] = hex!(
     "883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 );
 
-/// Starts the signer module server on a separate task and returns its configs
-pub async fn start_local_signer_server() -> Result<(StartSignerConfig, ModuleSigningConfig)> {
+
+/// Alternative function that starts a local signer server and reconstructs a StartCommitModuleConfig
+/// This allows testing call_proxy_ecdsa_signer against the local signer
+pub async fn start_local_signer_server_with_commit_config() -> Result<StartCommitModuleConfig<()>> {
 	use cb_tests::{signer_service, utils};
+	use cb_common::commit::client::SignerClient;
+	use cb_common::types::Jwt;
 
 	utils::setup_test_env();
 	
@@ -37,7 +40,24 @@ pub async fn start_local_signer_server() -> Result<(StartSignerConfig, ModuleSig
 	let start_config = signer_service::start_server(PORT, &mod_cfgs, ADMIN_SECRET.to_string(), false).await?;
 	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
 
-	Ok((start_config, jwt_config.clone()))
+	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
+	let signer_url = format!("http://{}", start_config.endpoint).parse()
+		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
+	
+	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
+	
+	// Create SignerClient with the same parameters as the local signer
+	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
+	
+	// Use the chain from the config
+	let chain = cfg.chain;
+
+	Ok(StartCommitModuleConfig {
+		id: module_id,
+		chain,
+		signer_client,
+		extra: (),
+	})
 }
 
 /// Helper function to generate a proxy key using a local signer service
@@ -46,37 +66,24 @@ pub async fn generate_proxy_key_with_local_signer(
 	bls_pubkey: BlsPublicKey,
 	scheme: EncryptionScheme,
 ) -> Result<String> {
-	let (start_config, jwt_config) = start_local_signer_server().await?;
+	// Use the new function to get the commit config
+	let mut commit_config = start_local_signer_server_with_commit_config().await?;
 
-	let request = GenerateProxyRequest { 
-		consensus_pubkey: bls_pubkey, 
-		scheme 
+	// Use the appropriate SignerClient method based on the scheme
+	let proxy_address = match scheme {
+		EncryptionScheme::Ecdsa => {
+			let signed_delegation = commit_config.signer_client.generate_proxy_key_ecdsa(bls_pubkey).await
+				.map_err(|e| eyre::eyre!("Failed to generate ECDSA proxy key: {}", e))?;
+			signed_delegation.message.proxy.to_string()
+		},
+		EncryptionScheme::Bls => {
+			let signed_delegation = commit_config.signer_client.generate_proxy_key_bls(bls_pubkey).await
+				.map_err(|e| eyre::eyre!("Failed to generate BLS proxy key: {}", e))?;
+			signed_delegation.message.proxy.to_string()
+		},
 	};
-	let payload_bytes = serde_json::to_vec(&request)?;
 
-	let jwt = create_jwt(
-		&ModuleId(MODULE_ID.to_string()),
-		&jwt_config.jwt_secret,
-		GENERATE_PROXY_KEY_PATH,
-		Some(&payload_bytes),
-	)?;
-	
-	let client = reqwest::Client::new();
-	let url = format!("http://{}{}", start_config.endpoint, GENERATE_PROXY_KEY_PATH);
-	let response = client.post(&url).json(&request).bearer_auth(&jwt).send().await?;
-
-	// Verify the response is successful
-	if !response.status().is_success() {
-		return Err(eyre::eyre!("Proxy key generation failed with status: {}", response.status()));
-	}
-
-	// Parse the response and extract the proxy address
-	let response_json = response.json::<serde_json::Value>().await?;
-	let proxy_address = response_json["message"]["proxy"]
-		.as_str()
-		.ok_or_else(|| eyre::eyre!("Failed to extract proxy address from response"))?;
-
-	Ok(proxy_address.to_string())
+	Ok(proxy_address)
 }
 
 #[tokio::test]
@@ -102,26 +109,20 @@ async fn test_generate_proxy_key_helper_function() -> Result<()> {
 	// Test ECDSA scheme
 	let ecdsa_proxy = generate_proxy_key_with_local_signer(test_bls_pubkey.clone(), EncryptionScheme::Ecdsa).await?;
 	assert!(!ecdsa_proxy.is_empty(), "ECDSA proxy address should not be empty");
-	println!("✅ ECDSA proxy address: {}", ecdsa_proxy);
-	
-	// Verify the proxy address looks like a valid Ethereum address
-	assert!(ecdsa_proxy.starts_with("0x"), "Proxy address should start with 0x");
-	assert_eq!(ecdsa_proxy.len(), 42, "Proxy address should be 42 characters long (0x + 40 hex chars)");
 	
 	// Decode the ECDSA proxy address into an Address type
 	let ecdsa_address = ecdsa_proxy.parse::<Address>()
 		.map_err(|e| eyre::eyre!("Failed to parse ECDSA proxy address: {}", e))?;
-	println!("✅ Decoded ECDSA Address: {}", ecdsa_address);
+	println!("Decoded ECDSA Address: {}", ecdsa_address);
 	
 	// Test that we can generate multiple proxy keys (they should be different)
 	let ecdsa_proxy2 = generate_proxy_key_with_local_signer(test_bls_pubkey.clone(), EncryptionScheme::Ecdsa).await?;
 	assert_ne!(ecdsa_proxy, ecdsa_proxy2, "Multiple proxy keys should be different");
-	println!("✅ Second ECDSA proxy address: {}", ecdsa_proxy2);
 	
 	// Decode the second ECDSA proxy address
 	let ecdsa_address2 = ecdsa_proxy2.parse::<Address>()
 		.map_err(|e| eyre::eyre!("Failed to parse second ECDSA proxy address: {}", e))?;
-	println!("✅ Decoded second ECDSA Address: {}", ecdsa_address2);
+	println!("Decoded second ECDSA Address: {}", ecdsa_address2);
 	
 	// Verify the addresses are different
 	assert_ne!(ecdsa_address, ecdsa_address2, "Decoded addresses should be different");
@@ -129,23 +130,57 @@ async fn test_generate_proxy_key_helper_function() -> Result<()> {
 	// Test BLS scheme
 	let bls_proxy = generate_proxy_key_with_local_signer(test_bls_pubkey.clone(), EncryptionScheme::Bls).await?;
 	assert!(!bls_proxy.is_empty(), "BLS proxy address should not be empty");
-	println!("✅ BLS proxy address: {}", bls_proxy);
-	
-	// For BLS, the response should be a BLS public key (96 characters: 0x + 96 hex chars)
-	assert!(bls_proxy.starts_with("0x"), "BLS proxy should start with 0x");
-	assert_eq!(bls_proxy.len(), 98, "BLS proxy should be 98 characters long (0x + 96 hex chars)");
+	println!("BLS proxy address: {}", bls_proxy);
 	
 	// Decode the BLS proxy into a BlsPublicKey
 	let bls_pubkey = bls_proxy.parse::<BlsPublicKey>()
 		.map_err(|e| eyre::eyre!("Failed to parse BLS proxy public key: {}", e))?;
-	println!("✅ Decoded BLS PublicKey: {}", bls_pubkey);
+	println!("Decoded BLS PublicKey: {}", bls_pubkey);
 	
 	// Verify the BLS public key is different from the original
 	assert_ne!(bls_pubkey, test_bls_pubkey, "Generated BLS proxy should be different from original");
 	
-	println!("✅ Helper function test completed successfully");
-	println!("✅ ECDSA scheme: Generated and decoded {} addresses", 2);
-	println!("✅ BLS scheme: Generated and decoded 1 BLS public key");
+	Ok(())
+}
+
+#[tokio::test]
+async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
+	use preconfirmation_gateway::signing::call_proxy_ecdsa_signer;
+	use alloy::primitives::{Address, b256};
+	use cb_common::commit::request::EncryptionScheme;
+
+	// Start the local signer server and get the reconstructed StartCommitModuleConfig
+	let mut commit_config = start_local_signer_server_with_commit_config().await?;
+	
+	// First, generate a proxy key for the committer
+	let test_bls_pubkey = BlsPublicKey::deserialize(&PUBKEY).unwrap();
+	let proxy_address = generate_proxy_key_with_local_signer(test_bls_pubkey, EncryptionScheme::Ecdsa).await?;
+	
+	// Parse the proxy address as the committer
+	let committer = proxy_address.parse::<Address>()
+		.map_err(|e| eyre::eyre!("Failed to parse proxy address: {}", e))?;
+	
+	// Create a test commitment hash
+	let commitment_hash = b256!("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef");
+	
+	println!("Testing call_proxy_ecdsa_signer with local signer");
+	println!("   Commitment hash: {:?}", commitment_hash);
+	println!("   Committer (proxy): {}", committer);
+	
+	// Call the proxy_ecdsa signer function
+	let response = call_proxy_ecdsa_signer(&mut commit_config, commitment_hash, committer).await?;
+	
+	// Verify the response
+	assert!(response.nonce > 0, "Nonce should be greater than 0");
+	assert_eq!(response.module_signing_id, SIGNING_ID, "Module signing ID should match");
+	
+	// Just verify that we got a response (the signature verification is done in the signing function)
+	println!("   Signature received: {:?}", response.signature);
+	
+	println!("Successfully called proxy_ecdsa signer with local signer");
+	println!("   Signature: {:?}", response.signature);
+	println!("   Nonce: {}", response.nonce);
+	println!("   Module signing ID: {:?}", response.module_signing_id);
 	
 	Ok(())
 }
