@@ -1471,7 +1471,7 @@ dependencies = [
  "bitflags 2.9.4",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -1822,6 +1822,29 @@ dependencies = [
  "tracing",
  "tree_hash",
  "uuid 1.18.1",
+]
+
+[[package]]
+name = "cb-tests"
+version = "0.8.1-rc.1"
+source = "git+https://github.com/Commit-Boost/commit-boost-client?branch=fabric#e606273dd8796a91fa197ef75b39c2e2897dfb7f"
+dependencies = [
+ "alloy",
+ "axum 0.8.6",
+ "cb-common",
+ "cb-pbs",
+ "cb-signer",
+ "eyre",
+ "jsonwebtoken",
+ "rcgen",
+ "reqwest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "tree_hash",
+ "url",
 ]
 
 [[package]]
@@ -4099,7 +4122,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07033963ba89ebaf1584d767badaa2e8fcec21aedea6b8c0346d487d49c28667"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.53.4",
 ]
 
 [[package]]
@@ -4657,6 +4680,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "3.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38af38e8470ac9dee3ce1bae1af9c1671fffc44ddfd8bd1d0a3445bf349a8ef3"
+dependencies = [
+ "base64 0.22.1",
+ "serde",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4852,6 +4885,9 @@ dependencies = [
  "alloy",
  "alloy-primitives 1.4.0",
  "anyhow",
+ "cb-common",
+ "cb-signer",
+ "cb-tests",
  "commit-boost",
  "config",
  "deadpool-postgres",
@@ -4860,6 +4896,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "jsonrpsee",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",
@@ -4984,7 +5021,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -5004,7 +5041,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.10.5",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.106",
@@ -5097,7 +5134,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.0",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5219,6 +5256,19 @@ checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "rcgen"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75e669e5202259b5314d1ea5397316ad400819437857b90861765f24c4cf80a2"
+dependencies = [
+ "pem",
+ "ring",
+ "rustls-pki-types",
+ "time",
+ "yasna",
 ]
 
 [[package]]
@@ -7848,6 +7898,15 @@ dependencies = [
  "arraydeque",
  "encoding_rs",
  "hashlink 0.10.0",
+]
+
+[[package]]
+name = "yasna"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17bb3549cc1321ae1296b9cdc2698e2b6cb1992adfa19a8c72e5b7a738f44cd"
+dependencies = [
+ "time",
 ]
 
 [[package]]

@@ -8,6 +8,7 @@ pub struct Config {
 	pub server: ServerConfig,
 	pub database: DatabaseConfig,
 	pub logging: LoggingConfig,
+	pub committer: CommitterConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,9 +29,19 @@ pub struct LoggingConfig {
 	pub traced_methods: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitterConfig {
+	pub address: String,
+}
+
 impl Default for Config {
 	fn default() -> Self {
-		Self { server: ServerConfig::default(), database: DatabaseConfig::default(), logging: LoggingConfig::default() }
+		Self { 
+			server: ServerConfig::default(), 
+			database: DatabaseConfig::default(), 
+			logging: LoggingConfig::default(),
+			committer: CommitterConfig::default(),
+		}
 	}
 }
 
@@ -57,6 +68,14 @@ impl Default for LoggingConfig {
 				"slots".to_string(),
 				"fee".to_string(),
 			],
+		}
+	}
+}
+
+impl Default for CommitterConfig {
+	fn default() -> Self {
+		Self {
+			address: "0x0000000000000000000000000000000000000000".to_string(),
 		}
 	}
 }

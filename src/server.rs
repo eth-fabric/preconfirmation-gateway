@@ -6,7 +6,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::{config, rpc, types};
 
-pub async fn run_server(rpc_context: types::RpcContext, config: &config::Config) -> Result<()> {
+pub async fn run_server<T: Send + Sync + 'static>(rpc_context: types::RpcContext<T>, config: &config::Config) -> Result<()> {
 	let server = Server::builder().build(server_address(config).parse::<SocketAddr>()?).await?;
 	let module = rpc::setup_rpc_methods(rpc_context)?;
 

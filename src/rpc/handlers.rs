@@ -7,9 +7,9 @@ use super::utils;
 use alloy::primitives::{Address, B256, Bytes};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
-pub async fn commitment_request_handler(
+pub async fn commitment_request_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: std::sync::Arc<RpcContext>,
+	_context: std::sync::Arc<RpcContext<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment request");
@@ -31,7 +31,9 @@ pub async fn commitment_request_handler(
 	// Or get direct client access: _context.database_client();
 
 	// Create and sign the commitment using ECDSA with commit-boost
-	let signed_commitment = match utils::create_signed_commitment(&request, &_context.private_key).await {
+	let commit_config = _context.commit_config.clone();
+	let committer_address = _context.committer_address;
+	let signed_commitment = match utils::create_signed_commitment(&request, commit_config, committer_address).await {
 		Ok(commitment) => commitment,
 		Err(e) => {
 			error!("Failed to create signed commitment: {}", e);
@@ -45,9 +47,9 @@ pub async fn commitment_request_handler(
 }
 
 #[instrument(name = "commitment_result", skip(_context, _extensions))]
-pub fn commitment_result_handler(
+pub fn commitment_result_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext,
+	_context: &RpcContext<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment result request");
@@ -58,7 +60,9 @@ pub fn commitment_result_handler(
 
 	let signed_commitment = SignedCommitment {
 		commitment,
-		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap(),
+		nonce: 0, // Mock nonce
+		signing_id: B256::from_slice(&[0u8; 32]), // Mock signing_id
+		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap()
 	};
 
 	info!("Commitment result request processed successfully");
@@ -66,9 +70,9 @@ pub fn commitment_result_handler(
 }
 
 #[instrument(name = "slots", skip(_context, _extensions))]
-pub fn slots_handler(
+pub fn slots_handler<T>(
 	_params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext,
+	_context: &RpcContext<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
 	info!("Processing slots request");
@@ -80,9 +84,9 @@ pub fn slots_handler(
 }
 
 #[instrument(name = "fee", skip(_context, _extensions))]
-pub fn fee_handler(
+pub fn fee_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext,
+	_context: &RpcContext<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<FeeInfo> {
 	info!("Processing fee request");

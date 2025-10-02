@@ -24,3 +24,5 @@ target
 
 plan.md
 scratch.md
+logs/
+run-signer.sh

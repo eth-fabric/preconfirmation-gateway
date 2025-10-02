@@ -23,3 +23,10 @@ traced_methods = [
     "slots",
     "fee"
 ]
+
+[committer]
+# Committer address for signing operations
+address = "0x0000000000000000000000000000000000000000"
+
+[signer]
+port = 20000

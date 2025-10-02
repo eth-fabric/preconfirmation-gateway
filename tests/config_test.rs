@@ -69,6 +69,9 @@ url = "postgresql://test/testdb"
 level = "debug"
 enable_method_tracing = false
 traced_methods = ["test_method"]
+
+[committer]
+address = "0x1234567890123456789012345678901234567890"
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
 
@@ -133,6 +136,9 @@ url = "postgresql://custom/db"
 level = "info"
 enable_method_tracing = true
 traced_methods = []
+
+[committer]
+address = "0x0000000000000000000000000000000000000000"
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
 
@@ -170,6 +176,9 @@ url = "postgresql://localhost/preconfirmation_gateway"
 level = "info"
 enable_method_tracing = true
 traced_methods = ["fee"]
+
+[committer]
+address = "0x0000000000000000000000000000000000000000"
 "#;
 	temp_file.write_all(config_content.as_bytes()).expect("Failed to write to temp file");
 

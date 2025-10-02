@@ -142,6 +142,8 @@ impl Commitment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SignedCommitment {
 	pub commitment: Commitment,
+	pub nonce: u64,
+	pub signing_id: B256,
 	pub signature: Signature,
 }
 
@@ -165,3 +167,142 @@ pub struct FeeInfo {
 	pub fee_payload: Bytes, // opaque fee payload
 	pub commitment_type: u64,
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use alloy::primitives::keccak256;
+
+	#[test]
+	fn test_abi_encode_commitment_request() -> Result<()> {
+		let commitment_request = CommitmentRequest { 
+			commitment_type: 1, 
+			payload: Bytes::new(), 
+			slasher: Address::ZERO 
+		};
+
+		let encoded = commitment_request.abi_encode()?;
+
+		// Verify the encoded data is not empty
+		assert!(!encoded.is_empty());
+
+		// Verify the structure contains our data
+		let encoded_bytes = encoded.as_ref();
+		assert!(encoded_bytes.len() > 0);
+
+		assert_eq!(keccak256(&encoded).to_string(), "0xf61a6130b6ebfffcb3738e03fe820e4b883b623ec3ab7657ffbf385b2e94edba");
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_encode_commitment() -> Result<()> {
+		let commitment = Commitment { 
+			commitment_type: 1, 
+			payload: Bytes::new(), 
+			request_hash: B256::ZERO, 
+			slasher: Address::ZERO 
+		};
+
+		let encoded = commitment.abi_encode()?;
+
+		// Verify the encoded data is not empty
+		assert!(!encoded.is_empty());
+
+		// Verify the structure contains our data
+		let encoded_bytes = encoded.as_ref();
+		assert!(encoded_bytes.len() > 0);
+
+		assert_eq!(keccak256(&encoded).to_string(), "0x53c39bc1f3870634c4f9a8b63b2e4e3a914acc9da71f4d0093df91eabd9247a9");
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_encode_inclusion_payload() -> Result<()> {
+		let payload = InclusionPayload { 
+			slot: 12345, 
+			signed_tx: Bytes::new()
+		};
+
+		let encoded = payload.abi_encode()?;
+
+		// Verify the encoded data is not empty
+		assert!(!encoded.is_empty());
+
+		assert_eq!(keccak256(&encoded).to_string(), "0x0ccee42883ae08bce4f8725891b2e9cc65a260876b55b23d4b7d94d60fad8211");
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_decode_inclusion_payload() -> Result<()> {
+		let original_payload = InclusionPayload { 
+			slot: 67890, 
+			signed_tx: Bytes::from(vec![0x05, 0x06, 0x07, 0x08, 0x09]) 
+		};
+
+		// Encode first
+		let encoded = original_payload.abi_encode()?;
+
+		// Then decode
+		let decoded = InclusionPayload::abi_decode(&encoded)?;
+
+		// Verify they match
+		assert_eq!(decoded.slot, original_payload.slot);
+		assert_eq!(decoded.signed_tx, original_payload.signed_tx);
+
+		println!("Original: {:?}", original_payload);
+		println!("Decoded: {:?}", decoded);
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_decode_commitment_request() -> Result<()> {
+		let original_request = CommitmentRequest {
+			commitment_type: 2,
+			payload: Bytes::from(vec![0xaa, 0xbb, 0xcc]),
+			slasher: "0x1234567890123456789012345678901234567890".parse()?,
+		};
+
+		// Encode first
+		let encoded = original_request.abi_encode()?;
+
+		// Then decode
+		let decoded = CommitmentRequest::abi_decode(&encoded)?;
+
+		// Verify they match
+		assert_eq!(decoded.commitment_type, original_request.commitment_type);
+		assert_eq!(decoded.payload, original_request.payload);
+		assert_eq!(decoded.slasher, original_request.slasher);
+
+		println!("Original: {:?}", original_request);
+		println!("Decoded: {:?}", decoded);
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_decode_commitment() -> Result<()> {
+		let original_commitment = Commitment {
+			commitment_type: 3,
+			payload: Bytes::from(vec![0xdd, 0xee, 0xff]),
+			request_hash: B256::from_slice(&[0x11; 32]),
+			slasher: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd".parse()?,
+		};
+
+		// Encode first
+		let encoded = original_commitment.abi_encode()?;
+
+		// Then decode
+		let decoded = Commitment::abi_decode(&encoded)?;
+
+		// Verify they match
+		assert_eq!(decoded.commitment_type, original_commitment.commitment_type);
+		assert_eq!(decoded.payload, original_commitment.payload);
+		assert_eq!(decoded.request_hash, original_commitment.request_hash);
+		assert_eq!(decoded.slasher, original_commitment.slasher);
+
+		println!("Original: {:?}", original_commitment);
+		println!("Decoded: {:?}", decoded);
+		Ok(())
+	}
+}
+
+
