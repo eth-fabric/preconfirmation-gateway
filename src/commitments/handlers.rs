@@ -13,7 +13,7 @@ pub async fn commitment_request_handler<T>(
 	_extensions: Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment request");
-	let request: CommitmentRequest = params.parse()?;
+	let request: CommitmentRequest = params.one()?;
 
 	// Validate the commitment request
 	if let Err(e) = utils::validate_commitment_request(&request) {
