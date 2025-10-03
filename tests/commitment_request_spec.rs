@@ -298,4 +298,163 @@ mod test_cases {
 
 		Ok(())
 	}
+
+	#[tokio::test]
+	async fn test_database_storage_after_successful_request() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create a valid test request
+		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
+		let slasher = test_helpers::create_valid_slasher();
+		let commitment_type = test_helpers::create_valid_commitment_type();
+		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+		// Calculate the expected request hash
+		let expected_request_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+
+		// Test the request
+		let result = harness.test_commitment_request(request).await?;
+
+		// Verify the result was stored in the database
+		let stored_commitment = harness.context.database().get_commitment(&expected_request_hash).unwrap();
+		assert!(stored_commitment.is_some(), "SignedCommitment should be stored in database");
+
+		let stored = stored_commitment.unwrap();
+
+		// Verify the stored data matches the returned result
+		assert_eq!(stored.commitment.commitment_type, result.commitment.commitment_type);
+		assert_eq!(stored.commitment.payload, result.commitment.payload);
+		assert_eq!(stored.commitment.request_hash, result.commitment.request_hash);
+		assert_eq!(stored.commitment.slasher, result.commitment.slasher);
+		assert_eq!(stored.nonce, result.nonce);
+		assert_eq!(stored.signing_id, result.signing_id);
+		assert_eq!(stored.signature, result.signature);
+
+		// Verify the request hash matches what we calculated
+		assert_eq!(stored.commitment.request_hash, expected_request_hash);
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_database_persistence_across_multiple_requests() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create multiple requests with different parameters
+		let test_requests = vec![
+			(11111, test_helpers::create_valid_signed_tx()),
+			(22222, test_helpers::create_valid_signed_tx()),
+			(33333, test_helpers::create_valid_signed_tx()),
+		];
+
+		let mut request_hashes = Vec::new();
+		let mut expected_results = Vec::new();
+
+		// Process all requests and collect their hashes and results
+		for (slot, signed_tx) in test_requests {
+			let payload = test_helpers::create_valid_inclusion_payload(slot, signed_tx)?;
+			let request = test_helpers::create_valid_commitment_request(
+				test_helpers::create_valid_commitment_type(),
+				payload,
+				test_helpers::create_valid_slasher(),
+			);
+
+			let request_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+			let result = harness.test_commitment_request(request).await?;
+
+			request_hashes.push(request_hash);
+			expected_results.push(result);
+		}
+
+		// Verify all commitments are stored in the database
+		for (i, request_hash) in request_hashes.iter().enumerate() {
+			let stored_commitment = harness.context.database().get_commitment(request_hash).unwrap();
+			assert!(stored_commitment.is_some(), "Commitment {} should be stored in database", i);
+
+			let stored = stored_commitment.unwrap();
+			let expected = &expected_results[i];
+
+			// Verify the stored data matches the expected result
+			assert_eq!(stored.commitment.commitment_type, expected.commitment.commitment_type);
+			assert_eq!(stored.commitment.payload, expected.commitment.payload);
+			assert_eq!(stored.commitment.request_hash, expected.commitment.request_hash);
+			assert_eq!(stored.commitment.slasher, expected.commitment.slasher);
+			assert_eq!(stored.nonce, expected.nonce);
+			assert_eq!(stored.signing_id, expected.signing_id);
+			assert_eq!(stored.signature, expected.signature);
+		}
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_database_retrieval_nonexistent_hash() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Try to retrieve a commitment with a non-existent hash
+		let nonexistent_hash = alloy::primitives::B256::from_slice(&[0x99; 32]);
+		let retrieved_commitment = harness.context.database().get_commitment(&nonexistent_hash).unwrap();
+
+		assert!(retrieved_commitment.is_none(), "Should return None for non-existent commitment");
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_request_hash_consistency() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create a test request
+		let payload = test_helpers::create_valid_inclusion_payload(99999, test_helpers::create_valid_signed_tx())?;
+		let slasher = test_helpers::create_valid_slasher();
+		let commitment_type = test_helpers::create_valid_commitment_type();
+		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+		// Calculate request hash before processing
+		let expected_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+
+		// Process the request
+		let result = harness.test_commitment_request(request).await?;
+
+		// Verify the request hash in the result matches our calculation
+		assert_eq!(result.commitment.request_hash, expected_hash);
+
+		// Verify we can retrieve the commitment using the calculated hash
+		let retrieved = harness.context.database().get_commitment(&expected_hash).unwrap();
+		assert!(retrieved.is_some(), "Should be able to retrieve using calculated hash");
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_database_serialization_roundtrip() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create and process a request
+		let payload = test_helpers::create_valid_inclusion_payload(77777, test_helpers::create_valid_signed_tx())?;
+		let slasher = test_helpers::create_valid_slasher();
+		let commitment_type = test_helpers::create_valid_commitment_type();
+		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+		let result = harness.test_commitment_request(request).await?;
+		let request_hash = result.commitment.request_hash;
+
+		// Retrieve from database
+		let stored = harness.context.database().get_commitment(&request_hash).unwrap().unwrap();
+
+		// Verify serialization/deserialization roundtrip maintains data integrity
+		assert_eq!(stored.commitment.commitment_type, result.commitment.commitment_type);
+		assert_eq!(stored.commitment.payload, result.commitment.payload);
+		assert_eq!(stored.commitment.request_hash, result.commitment.request_hash);
+		assert_eq!(stored.commitment.slasher, result.commitment.slasher);
+		assert_eq!(stored.nonce, result.nonce);
+		assert_eq!(stored.signing_id, result.signing_id);
+		assert_eq!(stored.signature, result.signature);
+
+		// Verify the signature is properly preserved
+		assert!(!stored.signature.to_string().is_empty(), "Signature should not be empty after roundtrip");
+		assert_eq!(stored.signature, result.signature, "Signature should match exactly after roundtrip");
+
+		Ok(())
+	}
 }
