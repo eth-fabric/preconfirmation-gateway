@@ -1,32 +1,49 @@
 # Preconfirmation Gateway Configuration
 # This file contains configuration settings for the preconfirmation gateway service
 
-[server]
-# Server binding configuration
-host = "127.0.0.1"  # IP address to bind the server to
-port = 8080         # Port number for the JSON-RPC server
+# Chain configuration
+chain = "Hoodi"
 
-[database]
-# Database connection configuration
-# This can be overridden by the DATABASE_URL environment variable
-url = "postgresql://localhost/preconfirmation_gateway"
+# PBS (Proposer-Builder Separation) configuration
+[pbs]
+port = 18550
+with_signer = true
 
-[logging]
-# Logging configuration
-level = "info"                    # Log level: trace, debug, info, warn, error
-enable_method_tracing = true      # Enable detailed tracing for specific RPC methods
+# Relays configuration
+[[relays]]
+url = "https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"
 
-# List of RPC methods to trace in detail
-traced_methods = [
-    "commitmentRequest",
-    "commitmentResult", 
-    "slots",
-    "fee"
-]
+# Metrics configuration
+[metrics]
+enabled = true
 
-[committer]
-# Committer address for signing operations
-address = "0x0000000000000000000000000000000000000000"
-
+# Signer configuration
 [signer]
 port = 20000
+
+[signer.local.loader]
+format = "lighthouse"
+keys_path = "./tests/data/keystores/keys"
+secrets_path = "./tests/data/keystores/secrets"
+
+[signer.local.store]
+proxy_dir = "./tests/data/keystores/proxies"
+
+# Module configuration with consolidated application settings
+[[modules]]
+id = "inclusion-preconf-module"
+signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Consolidated application configuration
+rpc_server_host = "127.0.0.1"
+rpc_server_port = 8080
+database_url = "postgresql://localhost/preconfirmation_gateway"
+log_level = "info"
+enable_method_tracing = true
+traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
+committer_address = "0x0000000000000000000000000000000000000000"
+sleep_secs = 5
+use_ecdsa_keys = true

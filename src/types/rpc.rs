@@ -175,11 +175,8 @@ mod tests {
 
 	#[test]
 	fn test_abi_encode_commitment_request() -> Result<()> {
-		let commitment_request = CommitmentRequest { 
-			commitment_type: 1, 
-			payload: Bytes::new(), 
-			slasher: Address::ZERO 
-		};
+		let commitment_request =
+			CommitmentRequest { commitment_type: 1, payload: Bytes::new(), slasher: Address::ZERO };
 
 		let encoded = commitment_request.abi_encode()?;
 
@@ -190,18 +187,17 @@ mod tests {
 		let encoded_bytes = encoded.as_ref();
 		assert!(encoded_bytes.len() > 0);
 
-		assert_eq!(keccak256(&encoded).to_string(), "0xf61a6130b6ebfffcb3738e03fe820e4b883b623ec3ab7657ffbf385b2e94edba");
+		assert_eq!(
+			keccak256(&encoded).to_string(),
+			"0xf61a6130b6ebfffcb3738e03fe820e4b883b623ec3ab7657ffbf385b2e94edba"
+		);
 		Ok(())
 	}
 
 	#[test]
 	fn test_abi_encode_commitment() -> Result<()> {
-		let commitment = Commitment { 
-			commitment_type: 1, 
-			payload: Bytes::new(), 
-			request_hash: B256::ZERO, 
-			slasher: Address::ZERO 
-		};
+		let commitment =
+			Commitment { commitment_type: 1, payload: Bytes::new(), request_hash: B256::ZERO, slasher: Address::ZERO };
 
 		let encoded = commitment.abi_encode()?;
 
@@ -212,32 +208,33 @@ mod tests {
 		let encoded_bytes = encoded.as_ref();
 		assert!(encoded_bytes.len() > 0);
 
-		assert_eq!(keccak256(&encoded).to_string(), "0x53c39bc1f3870634c4f9a8b63b2e4e3a914acc9da71f4d0093df91eabd9247a9");
+		assert_eq!(
+			keccak256(&encoded).to_string(),
+			"0x53c39bc1f3870634c4f9a8b63b2e4e3a914acc9da71f4d0093df91eabd9247a9"
+		);
 		Ok(())
 	}
 
 	#[test]
 	fn test_abi_encode_inclusion_payload() -> Result<()> {
-		let payload = InclusionPayload { 
-			slot: 12345, 
-			signed_tx: Bytes::new()
-		};
+		let payload = InclusionPayload { slot: 12345, signed_tx: Bytes::new() };
 
 		let encoded = payload.abi_encode()?;
 
 		// Verify the encoded data is not empty
 		assert!(!encoded.is_empty());
 
-		assert_eq!(keccak256(&encoded).to_string(), "0x0ccee42883ae08bce4f8725891b2e9cc65a260876b55b23d4b7d94d60fad8211");
+		assert_eq!(
+			keccak256(&encoded).to_string(),
+			"0x0ccee42883ae08bce4f8725891b2e9cc65a260876b55b23d4b7d94d60fad8211"
+		);
 		Ok(())
 	}
 
 	#[test]
 	fn test_abi_decode_inclusion_payload() -> Result<()> {
-		let original_payload = InclusionPayload { 
-			slot: 67890, 
-			signed_tx: Bytes::from(vec![0x05, 0x06, 0x07, 0x08, 0x09]) 
-		};
+		let original_payload =
+			InclusionPayload { slot: 67890, signed_tx: Bytes::from(vec![0x05, 0x06, 0x07, 0x08, 0x09]) };
 
 		// Encode first
 		let encoded = original_payload.abi_encode()?;
@@ -304,5 +301,3 @@ mod tests {
 		Ok(())
 	}
 }
-
-

@@ -101,4 +101,3 @@ pub fn fee_handler<T>(
 	info!("Fee request processed successfully");
 	Ok(fee_info)
 }
-

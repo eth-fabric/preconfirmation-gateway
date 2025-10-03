@@ -1,9 +1,11 @@
 use jsonrpsee::server::RpcModule;
 
-use crate::types::RpcContext;
 use crate::rpc::handlers;
+use crate::types::RpcContext;
 
-pub fn setup_rpc_methods<T: Send + Sync + 'static>(rpc_context: RpcContext<T>) -> anyhow::Result<RpcModule<RpcContext<T>>> {
+pub fn setup_rpc_methods<T: Send + Sync + 'static>(
+	rpc_context: RpcContext<T>,
+) -> anyhow::Result<RpcModule<RpcContext<T>>> {
 	let mut module = RpcModule::new(rpc_context);
 
 	module.register_async_method("commitmentRequest", handlers::commitment_request_handler)?;

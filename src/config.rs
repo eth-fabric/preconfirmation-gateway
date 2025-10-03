@@ -1,50 +1,49 @@
-use std::path::Path;
+use serde::Deserialize;
 
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
-	pub server: ServerConfig,
-	pub database: DatabaseConfig,
-	pub logging: LoggingConfig,
-	pub committer: CommitterConfig,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// Individual configuration structs for backward compatibility
+#[derive(Debug, Clone, Deserialize)]
 pub struct ServerConfig {
 	pub host: String,
 	pub port: u16,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DatabaseConfig {
 	pub url: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct LoggingConfig {
 	pub level: String,
 	pub enable_method_tracing: bool,
 	pub traced_methods: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct CommitterConfig {
 	pub address: String,
 }
 
-impl Default for Config {
-	fn default() -> Self {
-		Self { 
-			server: ServerConfig::default(), 
-			database: DatabaseConfig::default(), 
-			logging: LoggingConfig::default(),
-			committer: CommitterConfig::default(),
-		}
-	}
+// Consolidated configuration that will be loaded by load_commit_module_config
+#[derive(Debug, Clone, Deserialize)]
+pub struct InclusionPreconfConfig {
+	// RPC Server configuration
+	pub rpc_server_host: String,
+	pub rpc_server_port: u16,
+
+	// Database configuration
+	pub database_url: String,
+
+	// Logging configuration
+	pub log_level: String,
+	pub enable_method_tracing: bool,
+	pub traced_methods: Vec<String>,
+
+	// Committer configuration
+	pub committer_address: String,
 }
 
+// Default implementations for individual config structs
 impl Default for ServerConfig {
 	fn default() -> Self {
 		Self { host: "127.0.0.1".to_string(), port: 8080 }
@@ -74,36 +73,33 @@ impl Default for LoggingConfig {
 
 impl Default for CommitterConfig {
 	fn default() -> Self {
-		Self {
-			address: "0x0000000000000000000000000000000000000000".to_string(),
-		}
+		Self { address: "0x0000000000000000000000000000000000000000".to_string() }
 	}
 }
 
-impl Config {
-	pub fn load() -> Result<Self> {
-		Self::load_from_file("config.toml")
+// Methods to extract individual config structs from InclusionPreconfConfig
+impl InclusionPreconfConfig {
+	pub fn server(&self) -> ServerConfig {
+		ServerConfig { host: self.rpc_server_host.clone(), port: self.rpc_server_port }
 	}
 
-	pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-		let config_path = path.as_ref();
+	pub fn database(&self) -> DatabaseConfig {
+		DatabaseConfig { url: self.database_url.clone() }
+	}
 
-		if !config_path.exists() {
-			tracing::warn!("Configuration file {} not found, using defaults", config_path.display());
-			return Ok(Self::default());
+	pub fn logging(&self) -> LoggingConfig {
+		LoggingConfig {
+			level: self.log_level.clone(),
+			enable_method_tracing: self.enable_method_tracing,
+			traced_methods: self.traced_methods.clone(),
 		}
+	}
 
-		let config_str = std::fs::read_to_string(config_path)
-			.with_context(|| format!("Failed to read configuration file: {}", config_path.display()))?;
-
-		let config: Config = toml::from_str(&config_str)
-			.with_context(|| format!("Failed to parse configuration file: {}", config_path.display()))?;
-
-		tracing::info!("Configuration loaded from {}", config_path.display());
-		Ok(config)
+	pub fn committer(&self) -> CommitterConfig {
+		CommitterConfig { address: self.committer_address.clone() }
 	}
 
 	pub fn database_url(&self) -> &str {
-		&self.database.url
+		&self.database_url
 	}
 }

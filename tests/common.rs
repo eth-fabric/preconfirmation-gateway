@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 use alloy::primitives::B256;
-use commit_boost::prelude::StartCommitModuleConfig;
 use cb_common::{
 	commit::client::SignerClient,
 	config::load_module_signing_configs,
 	types::{Jwt, ModuleId},
 };
+use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::Result;
+use std::collections::HashMap;
 
 /// Starts a local signer server for testing and reconstructs a StartCommitModuleConfig
 /// This function allows unit tests to start a local signer service and get a properly configured
@@ -20,7 +20,7 @@ pub async fn start_local_signer_server(
 	use cb_tests::{signer_service, utils};
 
 	utils::setup_test_env();
-	
+
 	let mut cfg = utils::get_commit_boost_config(utils::get_pbs_static_config(utils::get_pbs_config(0)));
 
 	let module_id = ModuleId(module_id.to_string());
@@ -35,21 +35,17 @@ pub async fn start_local_signer_server(
 	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
 
 	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
-	let signer_url = format!("http://{}", start_config.endpoint).parse()
+	let signer_url = format!("http://{}", start_config.endpoint)
+		.parse()
 		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
-	
+
 	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
-	
+
 	// Create SignerClient with the same parameters as the local signer
 	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
-	
+
 	// Use the chain from the config
 	let chain = cfg.chain;
 
-	Ok(StartCommitModuleConfig {
-		id: module_id,
-		chain,
-		signer_client,
-		extra: (),
-	})
+	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: () })
 }

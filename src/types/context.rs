@@ -1,6 +1,6 @@
 use crate::types::database::DatabaseContext;
-use commit_boost::prelude::StartCommitModuleConfig;
 use alloy::primitives::Address;
+use commit_boost::prelude::StartCommitModuleConfig;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -17,12 +17,12 @@ pub struct RpcContext<T = ()> {
 
 impl<T> RpcContext<T> {
 	/// Create a new RPC context with the given database context, commit config, and committer address
-	pub fn new(database: DatabaseContext, commit_config: StartCommitModuleConfig<T>, committer_address: Address) -> Self {
-		Self { 
-			database, 
-			commit_config: Arc::new(Mutex::new(commit_config)),
-			committer_address,
-		}
+	pub fn new(
+		database: DatabaseContext,
+		commit_config: StartCommitModuleConfig<T>,
+		committer_address: Address,
+	) -> Self {
+		Self { database, commit_config: Arc::new(Mutex::new(commit_config)), committer_address }
 	}
 
 	/// Convenience method for database operations
