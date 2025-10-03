@@ -1,13 +1,11 @@
-use alloy::primitives::{Address, Bytes};
 use jsonrpsee::Extensions;
 use jsonrpsee::types::Params;
 use preconfirmation_gateway::commitments::handlers::commitment_request_handler;
 use preconfirmation_gateway::types::CommitmentRequest;
-use preconfirmation_gateway::types::commitments::InclusionPayload;
 use std::sync::Arc;
 
 mod common;
-use common::{PUBKEY, create_test_context};
+use common::{PUBKEY, test_helpers};
 
 /// Test harness for commitment request testing
 /// This provides a clean interface for testing different commitment request scenarios
@@ -18,7 +16,7 @@ struct CommitmentRequestTestHarness {
 impl CommitmentRequestTestHarness {
 	/// Creates a new test harness with a properly configured context
 	async fn new() -> eyre::Result<Self> {
-		let mut context = create_test_context().await?;
+		let mut context = test_helpers::create_test_context().await?;
 
 		// Generate a proxy key for the committer using the signer from the context
 		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&PUBKEY).unwrap();
@@ -70,64 +68,6 @@ impl CommitmentRequestTestHarness {
 			Ok(_) => Err(eyre::eyre!("Expected handler to fail but it succeeded")),
 			Err(_) => Ok(()), // Expected failure
 		}
-	}
-}
-
-/// Helper functions for creating test data
-mod test_helpers {
-	use preconfirmation_gateway::constants::COMMITMENT_TYPE;
-
-	use super::*;
-
-	/// Creates a valid inclusion payload
-	pub fn create_valid_inclusion_payload(slot: u64, signed_tx: Vec<u8>) -> eyre::Result<Bytes> {
-		let inclusion_payload = InclusionPayload { slot, signed_tx: signed_tx.into() };
-		inclusion_payload.abi_encode()
-	}
-
-	/// Creates a valid signed transaction (RLP-encoded)
-	/// This creates a realistic EIP-1559 transaction for testing
-	pub fn create_valid_signed_tx() -> Vec<u8> {
-		// Use the function from utils.rs
-		preconfirmation_gateway::commitments::utils::create_valid_signed_transaction().to_vec()
-	}
-
-	/// Creates a valid commitment request
-	pub fn create_valid_commitment_request(
-		commitment_type: u64,
-		payload: Bytes,
-		slasher: Address,
-	) -> CommitmentRequest {
-		CommitmentRequest { commitment_type, payload, slasher }
-	}
-
-	/// Creates a valid slasher address
-	pub fn create_valid_slasher() -> Address {
-		Address::from([0x2; 20])
-	}
-
-	pub fn create_valid_commitment_type() -> u64 {
-		COMMITMENT_TYPE
-	}
-
-	/// Creates an invalid slasher address (zero address)
-	pub fn create_invalid_slasher() -> Address {
-		Address::ZERO
-	}
-
-	/// Creates an invalid commitment type
-	pub fn create_invalid_commitment_type() -> u64 {
-		COMMITMENT_TYPE + 1 // Invalid commitment type
-	}
-
-	/// Creates an empty payload
-	pub fn create_empty_payload() -> Bytes {
-		Bytes::new()
-	}
-
-	/// Creates an invalid payload (not ABI-encoded InclusionPayload)
-	pub fn create_invalid_payload() -> Bytes {
-		Bytes::from(vec![0x01, 0x02, 0x03]) // Not ABI-encoded
 	}
 }
 

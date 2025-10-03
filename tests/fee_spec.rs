@@ -4,7 +4,7 @@ use preconfirmation_gateway::{CommitmentRequest, fee_handler};
 use serde_json::json;
 
 mod common;
-use common::create_test_context;
+use common::test_helpers::create_test_context;
 
 #[tokio::test]
 async fn test_fee_handler_basic() -> eyre::Result<()> {
