@@ -1,4 +1,4 @@
-use alloy::primitives::B256;
+use alloy::primitives::{Address, B256, b256, hex};
 use cb_common::{
 	commit::client::SignerClient,
 	config::load_module_signing_configs,
@@ -6,7 +6,17 @@ use cb_common::{
 };
 use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::Result;
-use std::collections::HashMap;
+use preconfirmation_gateway::{DatabaseContext, RpcContext};
+use rand::Rng;
+use rocksdb::{DB, Options};
+use std::{collections::HashMap, sync::Arc};
+use tempfile::TempDir;
+
+// Test constants
+pub const MODULE_ID: &str = "inclusion-preconf-module";
+pub const SIGNING_ID: B256 = b256!("0x1111111111111111111111111111111111111111111111111111111111111111");
+pub const PUBKEY: [u8; 48] =
+	hex!("883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4");
 
 /// Starts a local signer server for testing and reconstructs a StartCommitModuleConfig
 /// This function allows unit tests to start a local signer service and get a properly configured
@@ -48,4 +58,30 @@ pub async fn start_local_signer_server(
 	let chain = cfg.chain;
 
 	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: () })
+}
+
+/// Creates a test RPC context with a temporary RocksDB database and local signer server
+/// This function provides a complete test environment for RPC handler tests
+/// The port is randomly generated to avoid conflicts between concurrent tests
+pub async fn create_test_context() -> Result<RpcContext> {
+	let temp_dir = TempDir::new().unwrap();
+	let db_path = temp_dir.path().join("test_db");
+
+	let mut opts = Options::default();
+	opts.create_if_missing(true);
+	let db = DB::open(&opts, &db_path).unwrap();
+	let database = DatabaseContext::new(Arc::new(db));
+
+	// Generate a random port to avoid conflicts
+	let mut rng = rand::thread_rng();
+	let port = rng.gen_range(20000..65535);
+
+	// Start local signer server to get proper config
+	let commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", port).await?;
+
+	Ok(RpcContext {
+		database,
+		commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
+		committer_address: Address::ZERO,
+	})
 }

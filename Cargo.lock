@@ -4875,6 +4875,7 @@ dependencies = [
  "http-body",
  "http-body-util",
  "jsonrpsee",
+ "rand 0.8.5",
  "reqwest",
  "rocksdb",
  "serde",
