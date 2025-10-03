@@ -129,7 +129,7 @@ impl std::fmt::Debug for DatabaseContext {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::types::rpc::Offering;
+	use crate::types::commitments::Offering;
 	use crate::types::{Commitment, FeeInfo, SignedCommitment, SlotInfo};
 	use alloy::primitives::{Address, B256, Bytes, Signature};
 	use rocksdb::{DB, Options};

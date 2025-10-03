@@ -3,7 +3,7 @@ use jsonrpsee::Extensions;
 use jsonrpsee::types::Params;
 use preconfirmation_gateway::rpc::handlers::commitment_request_handler;
 use preconfirmation_gateway::types::CommitmentRequest;
-use preconfirmation_gateway::types::rpc::InclusionPayload;
+use preconfirmation_gateway::types::commitments::InclusionPayload;
 use std::sync::Arc;
 
 mod common;

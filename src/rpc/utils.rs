@@ -7,7 +7,7 @@ use tracing::{debug, info, warn};
 
 use crate::constants::COMMITMENT_TYPE;
 use crate::signing;
-use crate::types::rpc::InclusionPayload;
+use crate::types::commitments::InclusionPayload;
 use crate::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
 
 /// Helper functions for RPC business logic
