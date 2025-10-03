@@ -1,10 +1,9 @@
 use commit_boost::prelude::{StartCommitModuleConfig, commit::{request::SignProxyRequest, response::EcdsaSignResponse}, verify_proposer_commitment_signature_ecdsa_for_message};
-use alloy::primitives::{B256, Signature, Address};
+use alloy::primitives::{B256, Address};
 use eyre::{Result, WrapErr};
 use tracing::{debug, info, error};
 
 use crate::constants::SIGNING_ID;
-use crate::types::{Commitment, CommitmentRequest, SignedCommitment};
 
 /// Calls the proxy_ecdsa signer to sign a hash
 pub async fn call_proxy_ecdsa_signer<T>(
@@ -36,36 +35,4 @@ pub async fn call_proxy_ecdsa_signer<T>(
     };
 
     Ok(proxy_response_ecdsa)
-}
-
-/// Creates a mock signed commitment for testing/development
-pub fn create_mock_signed_commitment(request: &CommitmentRequest) -> SignedCommitment {
-    let commitment = create_mock_commitment(request);
-    let signature = create_mock_signature();
-
-    SignedCommitment { 
-        commitment, 
-        nonce: 0, // Mock nonce
-        signing_id: SIGNING_ID,
-        signature 
-    }
-}
-
-/// Creates a mock commitment for testing/development
-fn create_mock_commitment(request: &CommitmentRequest) -> Commitment {
-    debug!("Creating mock commitment for type: {}", request.commitment_type);
-    
-    Commitment {
-        commitment_type: request.commitment_type,
-        payload: request.payload.clone(),
-        request_hash: B256::ZERO, // Mock hash
-        slasher: request.slasher,
-    }
-}
-
-/// Creates a mock signature for testing/development
-fn create_mock_signature() -> Signature {
-    "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-        .parse()
-        .expect("Failed to parse mock signature - this should never happen")
 }

@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-
 use alloy::primitives::{Address, B256, b256, hex};
 use commit_boost::prelude::*;
-use cb_common::{
-	commit::request::EncryptionScheme,
-	config::load_module_signing_configs,
-	types::ModuleId,
-};
+use cb_common::commit::request::EncryptionScheme;
 use eyre::Result;
+
+mod common;
+use common::start_local_signer_server;
 
 const MODULE_ID: &str = "inclusion-preconf-module";
 const SIGNING_ID: B256 = b256!("0x1111111111111111111111111111111111111111111111111111111111111111");
@@ -18,48 +15,6 @@ const PUBKEY: [u8; 48] = hex!(
 );
 
 
-/// Alternative function that starts a local signer server and reconstructs a StartCommitModuleConfig
-/// This allows testing call_proxy_ecdsa_signer against the local signer
-pub async fn start_local_signer_server_with_commit_config() -> Result<StartCommitModuleConfig<()>> {
-	use cb_tests::{signer_service, utils};
-	use cb_common::commit::client::SignerClient;
-	use cb_common::types::Jwt;
-
-	utils::setup_test_env();
-	
-	let mut cfg = utils::get_commit_boost_config(utils::get_pbs_static_config(utils::get_pbs_config(0)));
-
-	let module_id = ModuleId(MODULE_ID.to_string());
-
-	cfg.modules = Some(vec![utils::create_module_config(module_id.clone(), SIGNING_ID)]);
-
-	let jwts = HashMap::from([(module_id.clone(), ADMIN_SECRET.to_string())]);
-
-	let mod_cfgs = load_module_signing_configs(&cfg, &jwts)?;
-
-	let start_config = signer_service::start_server(PORT, &mod_cfgs, ADMIN_SECRET.to_string(), false).await?;
-	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
-
-	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
-	let signer_url = format!("http://{}", start_config.endpoint).parse()
-		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
-	
-	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
-	
-	// Create SignerClient with the same parameters as the local signer
-	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
-	
-	// Use the chain from the config
-	let chain = cfg.chain;
-
-	Ok(StartCommitModuleConfig {
-		id: module_id,
-		chain,
-		signer_client,
-		extra: (),
-	})
-}
-
 /// Helper function to generate a proxy key using a local signer service
 /// This encapsulates the pattern of starting a signer, making a request, and extracting the proxy address
 pub async fn generate_proxy_key_with_local_signer(
@@ -67,7 +22,12 @@ pub async fn generate_proxy_key_with_local_signer(
 	scheme: EncryptionScheme,
 ) -> Result<String> {
 	// Use the new function to get the commit config
-	let mut commit_config = start_local_signer_server_with_commit_config().await?;
+	let mut commit_config = start_local_signer_server(
+		MODULE_ID,
+		SIGNING_ID,
+		ADMIN_SECRET,
+		PORT,
+	).await?;
 
 	// Use the appropriate SignerClient method based on the scheme
 	let proxy_address = match scheme {
@@ -150,7 +110,12 @@ async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	use cb_common::commit::request::EncryptionScheme;
 
 	// Start the local signer server and get the reconstructed StartCommitModuleConfig
-	let mut commit_config = start_local_signer_server_with_commit_config().await?;
+	let mut commit_config = start_local_signer_server(
+		MODULE_ID,
+		SIGNING_ID,
+		ADMIN_SECRET,
+		PORT,
+	).await?;
 	
 	// First, generate a proxy key for the committer
 	let test_bls_pubkey = BlsPublicKey::deserialize(&PUBKEY).unwrap();

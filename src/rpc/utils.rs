@@ -66,11 +66,6 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<()> {
 	Ok(())
 }
 
-/// Creates a signed commitment with mock data
-pub fn create_mock_signed_commitment(request: &CommitmentRequest) -> SignedCommitment {
-	signing::create_mock_signed_commitment(request)
-}
-
 /// Calculates fee information for a commitment request
 pub fn calculate_fee_info(request: &CommitmentRequest) -> FeeInfo {
 	debug!("Calculating fee for commitment type: {}", request.commitment_type);

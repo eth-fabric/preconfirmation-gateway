@@ -37,8 +37,11 @@ pub async fn commitment_request_handler<T>(
 		Ok(commitment) => commitment,
 		Err(e) => {
 			error!("Failed to create signed commitment: {}", e);
-			// For now, return a mock commitment on error
-			utils::create_mock_signed_commitment(&request)
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Failed to create signed commitment",
+				Some(format!("{}", e)),
+			));
 		}
 	};
 
@@ -98,3 +101,4 @@ pub fn fee_handler<T>(
 	info!("Fee request processed successfully");
 	Ok(fee_info)
 }
+
