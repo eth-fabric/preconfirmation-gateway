@@ -10,7 +10,7 @@ fn test_config_load_from_existing_file() {
 	assert_eq!(server_config.port, 8080);
 
 	let db_config = DatabaseConfig::default();
-	assert_eq!(db_config.url, "postgresql://localhost/preconfirmation_gateway");
+	assert_eq!(db_config.url, "./data/rocksdb");
 
 	let logging_config = LoggingConfig::default();
 	assert_eq!(logging_config.level, "info");
@@ -60,7 +60,7 @@ fn test_server_config_default() {
 #[test]
 fn test_database_config_default() {
 	let db_config = DatabaseConfig::default();
-	assert_eq!(db_config.url, "postgresql://localhost/preconfirmation_gateway");
+	assert_eq!(db_config.url, "./data/rocksdb");
 }
 
 #[test]

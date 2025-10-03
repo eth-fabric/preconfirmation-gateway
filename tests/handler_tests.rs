@@ -4,8 +4,9 @@ use jsonrpsee::types::Params;
 use preconfirmation_gateway::rpc::handlers::commitment_request_handler;
 use preconfirmation_gateway::types::rpc::InclusionPayload;
 use preconfirmation_gateway::types::{CommitmentRequest, DatabaseContext, RpcContext};
+use rocksdb::{DB, Options};
 use std::sync::Arc;
-use tokio_postgres::NoTls;
+use tempfile::TempDir;
 
 mod common;
 use common::start_local_signer_server;
@@ -31,14 +32,14 @@ async fn test_commitment_request_handler_with_local_signer() -> eyre::Result<()>
 		.map_err(|e| eyre::eyre!("Failed to generate ECDSA proxy key: {}", e))?;
 	let committer_address = proxy_address.message.proxy;
 
-	// Create a mock database context (we'll use a dummy for now)
-	let mut config = deadpool_postgres::Config::new();
-	config.dbname = Some("test".to_string());
-	config.host = Some("localhost".to_string());
-	config.user = Some("test".to_string());
-	config.password = Some("test".to_string());
-	let pool = config.create_pool(None, NoTls).unwrap();
-	let database = DatabaseContext::new(pool);
+	// Create a temporary RocksDB database for testing
+	let temp_dir = TempDir::new().unwrap();
+	let db_path = temp_dir.path().join("test_db");
+
+	let mut opts = Options::default();
+	opts.create_if_missing(true);
+	let db = DB::open(&opts, &db_path).unwrap();
+	let database = DatabaseContext::new(Arc::new(db));
 
 	// Create RPC context
 	let context = Arc::new(RpcContext {

@@ -52,7 +52,7 @@ impl Default for ServerConfig {
 
 impl Default for DatabaseConfig {
 	fn default() -> Self {
-		Self { url: "postgresql://localhost/preconfirmation_gateway".to_string() }
+		Self { url: "./data/rocksdb".to_string() }
 	}
 }
 

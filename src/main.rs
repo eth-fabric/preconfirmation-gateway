@@ -17,10 +17,10 @@ async fn main() -> anyhow::Result<()> {
 	// Setup logging with configuration
 	server::setup_logging(&commit_config)?;
 
-	// Initialize database connection pool
-	let db_pool = db::create_pool(&commit_config).await?;
-	db::test_connection(&db_pool).await?;
-	let db_context = types::DatabaseContext::new(db_pool);
+	// Initialize RocksDB database
+	let db = db::create_database(&commit_config)?;
+	db::db_healthcheck(&db).await?;
+	let db_context = types::DatabaseContext::new(db);
 
 	// Parse committer address from config
 	let committer_address = commit_config

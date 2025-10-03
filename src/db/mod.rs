@@ -1,34 +1,54 @@
 use std::env;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use deadpool_postgres::{Config, Pool, Runtime};
-use tokio_postgres::NoTls;
+use rocksdb::{DB, Options};
 
 use crate::config::InclusionPreconfConfig;
 use commit_boost::prelude::StartCommitModuleConfig;
 
-/// Create a PostgreSQL connection pool from commit-boost config
-pub async fn create_pool(commit_config: &StartCommitModuleConfig<InclusionPreconfConfig>) -> Result<Pool> {
+/// Create a RocksDB database from commit-boost config
+pub fn create_database(commit_config: &StartCommitModuleConfig<InclusionPreconfConfig>) -> Result<Arc<DB>> {
 	let app_config = &commit_config.extra;
 	// Environment variable takes precedence over config file
-	let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| app_config.database_url.clone());
+	let database_path = env::var("DATABASE_PATH").unwrap_or_else(|_| app_config.database_url.clone());
 
-	let mut cfg = Config::new();
-	cfg.url = Some(database_url.clone());
+	// Create database directory if it doesn't exist
+	std::fs::create_dir_all(&database_path)
+		.with_context(|| format!("Failed to create database directory: {}", database_path))?;
 
-	let pool = cfg
-		.create_pool(Some(Runtime::Tokio1), NoTls)
-		.with_context(|| format!("Failed to create connection pool for database: {}", database_url))?;
+	// Configure RocksDB options
+	let mut opts = Options::default();
+	opts.create_if_missing(true);
+	opts.create_missing_column_families(true);
 
-	Ok(pool)
+	// Open the database
+	let db = DB::open(&opts, &database_path)
+		.with_context(|| format!("Failed to open RocksDB database at: {}", database_path))?;
+
+	tracing::info!("RocksDB database opened successfully at: {}", database_path);
+	Ok(Arc::new(db))
 }
 
-/// Test the database connection pool
-pub async fn test_connection(pool: &Pool) -> Result<()> {
-	let client = pool.get().await.with_context(|| "Failed to get connection from pool")?;
+/// Perform a health check on the database
+pub async fn db_healthcheck(db: &Arc<DB>) -> Result<()> {
+	// Test by putting and getting a test value
+	let test_key = b"test_connection";
+	let test_value = b"test_value";
 
-	client.simple_query("SELECT 1").await.with_context(|| "Failed to execute test query")?;
+	db.put(test_key, test_value).with_context(|| "Failed to put test value")?;
 
-	tracing::info!("Database connection test successful");
-	Ok(())
+	let retrieved = db.get(test_key).with_context(|| "Failed to get test value")?;
+
+	if let Some(value) = retrieved {
+		if value == test_value {
+			db.delete(test_key).with_context(|| "Failed to delete test value")?; // Clean up test data
+			tracing::info!("Database connection test successful");
+			Ok(())
+		} else {
+			Err(anyhow::anyhow!("Database test failed: value mismatch"))
+		}
+	} else {
+		Err(anyhow::anyhow!("Database test failed: value not found"))
+	}
 }

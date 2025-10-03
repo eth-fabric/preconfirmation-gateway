@@ -2,9 +2,9 @@ use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
 use tracing::{error, info, instrument};
 
-use super::super::types::{Commitment, CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
+use super::super::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 use super::utils;
-use alloy::primitives::{Address, B256, Bytes};
+use alloy::primitives::B256;
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
 pub async fn commitment_request_handler<T>(
@@ -25,11 +25,6 @@ pub async fn commitment_request_handler<T>(
 		));
 	}
 
-	// Database is now available via _context.database
-	// Example usage: _context.database.with_client(|client| { /* database operations */ }).await?;
-	// Or use the convenience method: _context.with_database(|client| { /* database operations */ }).await?;
-	// Or get direct client access: _context.database_client();
-
 	// Create and sign the commitment using ECDSA with commit-boost
 	let commit_config = _context.commit_config.clone();
 	let committer_address = _context.committer_address;
@@ -45,6 +40,17 @@ pub async fn commitment_request_handler<T>(
 		}
 	};
 
+	// Store the signed commitment in the database
+	let request_hash = signed_commitment.commitment.request_hash;
+	if let Err(e) = _context.database().store_commitment(&request_hash, &signed_commitment) {
+		error!("Failed to store commitment in database: {}", e);
+		return Err(jsonrpsee::types::error::ErrorObject::owned(
+			-32603, // Internal error
+			"Failed to store commitment",
+			Some(format!("{}", e)),
+		));
+	}
+
 	info!("Commitment request processed successfully");
 	Ok(signed_commitment)
 }
@@ -58,18 +64,29 @@ pub fn commitment_result_handler<T>(
 	info!("Processing commitment result request");
 	let request_hash: B256 = params.one()?;
 
-	// TODO: Implement actual commitment retrieval logic
-	let commitment = Commitment { commitment_type: 1, payload: Bytes::new(), request_hash, slasher: Address::ZERO };
-
-	let signed_commitment = SignedCommitment {
-		commitment,
-		nonce: 0, // Mock nonce
-		signing_id: B256::from_slice(&[0u8; 32]), // Mock signing_id
-		signature: "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap()
-	};
-
-	info!("Commitment result request processed successfully");
-	Ok(signed_commitment)
+	// Retrieve the commitment from the database
+	match _context.database().get_commitment(&request_hash) {
+		Ok(Some(signed_commitment)) => {
+			info!("Commitment result request processed successfully");
+			Ok(signed_commitment)
+		}
+		Ok(None) => {
+			error!("Commitment not found for request hash: {}", request_hash);
+			Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Commitment not found",
+				Some(format!("No commitment found for request hash: {}", request_hash)),
+			))
+		}
+		Err(e) => {
+			error!("Failed to retrieve commitment from database: {}", e);
+			Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Database error",
+				Some(format!("{}", e)),
+			))
+		}
+	}
 }
 
 #[instrument(name = "slots", skip(_context, _extensions))]
@@ -97,6 +114,28 @@ pub fn fee_handler<T>(
 
 	// Use helper function to calculate fee
 	let fee_info = utils::calculate_fee_info(&request);
+
+	// Store fee information in the database
+	let request_hash = match utils::calculate_request_hash(&request) {
+		Ok(hash) => hash,
+		Err(e) => {
+			error!("Failed to calculate request hash: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Invalid request",
+				Some(format!("{}", e)),
+			));
+		}
+	};
+
+	if let Err(e) = _context.database().store_fee_info(&request_hash, &fee_info) {
+		error!("Failed to store fee info in database: {}", e);
+		return Err(jsonrpsee::types::error::ErrorObject::owned(
+			-32603, // Internal error
+			"Failed to store fee info",
+			Some(format!("{}", e)),
+		));
+	}
 
 	info!("Fee request processed successfully");
 	Ok(fee_info)

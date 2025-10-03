@@ -40,7 +40,7 @@ env_file = ".cb.env"
 # Consolidated application configuration
 rpc_server_host = "127.0.0.1"
 rpc_server_port = 8080
-database_url = "postgresql://localhost/preconfirmation_gateway"
+database_url = "./data/rocksdb"
 log_level = "info"
 enable_method_tracing = true
 traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]

@@ -188,6 +188,12 @@ pub async fn create_signed_commitment<T>(
 	Ok(signed_commitment)
 }
 
+/// Calculate the request hash for a CommitmentRequest
+pub fn calculate_request_hash(request: &CommitmentRequest) -> Result<B256> {
+	let encoded_request = request.abi_encode()?;
+	Ok(keccak256(&encoded_request))
+}
+
 /// Validates a signature against a commitment
 pub fn verify_commitment_signature(
 	commitment: &Commitment,
