@@ -7,7 +7,7 @@ use tracing::{debug, info, warn};
 
 use crate::constants::COMMITMENT_TYPE;
 use crate::signing;
-use crate::types::commitments::InclusionPayload;
+use crate::types::commitments::{FeePayload, InclusionPayload};
 use crate::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
 
 /// Helper functions for RPC business logic
@@ -169,15 +169,19 @@ pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
 }
 
 /// Calculates fee information for a commitment request
-pub fn calculate_fee_info(request: &CommitmentRequest) -> FeeInfo {
+pub fn calculate_fee_info(request: &CommitmentRequest) -> Result<FeeInfo> {
 	debug!("Calculating fee for commitment type: {}", request.commitment_type);
+
+	// Todo calculate price_gwei
+	let price_gwei = 1;
+
+	let request_hash = request.request_hash()?;
+
+	let fee_payload = FeePayload { request_hash: request_hash, price_gwei: price_gwei };
 
 	// TODO: Implement actual fee calculation logic
 	// This is a placeholder implementation
-	FeeInfo {
-		fee_payload: Bytes::new(), // TODO: Calculate actual fee payload
-		commitment_type: request.commitment_type,
-	}
+	Ok(FeeInfo { fee_payload: fee_payload.abi_encode()?, commitment_type: request.commitment_type })
 }
 
 /// Validates a request hash format
@@ -288,12 +292,6 @@ pub async fn create_signed_commitment<T>(
 
 	debug!("Signed commitment created successfully");
 	Ok(signed_commitment)
-}
-
-/// Calculate the request hash for a CommitmentRequest
-pub fn calculate_request_hash(request: &CommitmentRequest) -> Result<B256> {
-	let encoded_request = request.abi_encode()?;
-	Ok(keccak256(&encoded_request))
 }
 
 /// Validates a signature against a commitment
@@ -467,10 +465,13 @@ mod tests {
 			slasher: "0x9876543210987654321098765432109876543210".parse()?,
 		};
 
-		let fee_info = calculate_fee_info(&request);
+		let fee_info = calculate_fee_info(&request).unwrap();
+
+		// todo update once pricing is implemented
+		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 1 };
 
 		assert_eq!(fee_info.commitment_type, request.commitment_type);
-		assert_eq!(fee_info.fee_payload, Bytes::new());
+		assert_eq!(fee_info.fee_payload, fee_payload.abi_encode()?);
 
 		println!("Fee info: {:?}", fee_info);
 		Ok(())

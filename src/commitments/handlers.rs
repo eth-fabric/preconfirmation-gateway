@@ -113,10 +113,20 @@ pub fn fee_handler<T>(
 	let request: CommitmentRequest = params.parse()?;
 
 	// Use helper function to calculate fee
-	let fee_info = utils::calculate_fee_info(&request);
+	let fee_info = match utils::calculate_fee_info(&request) {
+		Ok(fee_info) => fee_info,
+		Err(e) => {
+			error!("Failed to calculate fee info: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Invalid request",
+				Some(format!("{}", e)),
+			));
+		}
+	};
 
 	// Store fee information in the database
-	let request_hash = match utils::calculate_request_hash(&request) {
+	let request_hash = match request.request_hash() {
 		Ok(hash) => hash,
 		Err(e) => {
 			error!("Failed to calculate request hash: {}", e);

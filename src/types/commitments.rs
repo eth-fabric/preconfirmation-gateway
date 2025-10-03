@@ -85,6 +85,11 @@ impl CommitmentRequest {
 			slasher: decoded.slasher,
 		})
 	}
+
+	pub fn request_hash(&self) -> Result<B256> {
+		let encoded_request = self.abi_encode()?;
+		Ok(alloy::primitives::keccak256(&encoded_request))
+	}
 }
 
 /// Core commitment data structure
@@ -166,6 +171,43 @@ pub struct SlotInfo {
 pub struct FeeInfo {
 	pub fee_payload: Bytes, // opaque fee payload
 	pub commitment_type: u64,
+}
+
+/// Fee payload for an inclusion preconf request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeePayload {
+	pub request_hash: B256,
+	pub price_gwei: u64,
+}
+
+impl FeePayload {
+	/// ABI-encodes the FeePayload struct
+	pub fn abi_encode(&self) -> Result<Bytes> {
+		alloy::sol! {
+			struct SolFeePayload {
+				bytes32 request_hash;
+				uint64 price_gwei;
+			}
+		}
+		Ok(Bytes::from(SolFeePayload::abi_encode(&SolFeePayload {
+			request_hash: self.request_hash,
+			price_gwei: self.price_gwei,
+		})))
+	}
+
+	/// ABI-decodes a FeePayload from bytes
+	pub fn abi_decode(data: &Bytes) -> Result<Self> {
+		alloy::sol! {
+			struct SolFeePayload {
+				bytes32 request_hash;
+				uint64 price_gwei;
+			}
+		}
+
+		let decoded = SolFeePayload::abi_decode(data).wrap_err("Failed to decode FeePayload")?;
+
+		Ok(FeePayload { request_hash: decoded.request_hash, price_gwei: decoded.price_gwei })
+	}
 }
 
 #[cfg(test)]
@@ -298,6 +340,21 @@ mod tests {
 
 		println!("Original: {:?}", original_commitment);
 		println!("Decoded: {:?}", decoded);
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_encode_fee_payload() -> Result<()> {
+		let fee_payload = FeePayload { request_hash: B256::ZERO, price_gwei: 1 };
+		fee_payload.abi_encode().unwrap();
+		Ok(())
+	}
+
+	#[test]
+	fn test_abi_decode_fee_payload() -> Result<()> {
+		let original_fee_payload = FeePayload { request_hash: B256::ZERO, price_gwei: 1 };
+		let encoded = original_fee_payload.abi_encode().unwrap();
+		FeePayload::abi_decode(&encoded).unwrap();
 		Ok(())
 	}
 }

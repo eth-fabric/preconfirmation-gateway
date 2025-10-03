@@ -1,6 +1,6 @@
 use alloy::primitives::{Address, Bytes};
 use jsonrpsee::{Extensions, types::Params};
-use preconfirmation_gateway::{CommitmentRequest, fee_handler};
+use preconfirmation_gateway::{CommitmentRequest, fee_handler, types::commitments::FeePayload};
 use serde_json::json;
 
 mod common;
@@ -16,6 +16,9 @@ async fn test_fee_handler_basic() -> eyre::Result<()> {
 		slasher: "0x1234567890123456789012345678901234567890".parse::<Address>().unwrap(),
 	};
 
+	// todo update once pricing is implemented
+	let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 1 };
+
 	let params_json = json!(request);
 	let params_string = params_json.to_string();
 	let params = Params::new(Some(&params_string));
@@ -28,8 +31,7 @@ async fn test_fee_handler_basic() -> eyre::Result<()> {
 	assert!(result.is_ok());
 	let fee_info = result.unwrap();
 	assert_eq!(fee_info.commitment_type, 1);
-	assert_eq!(fee_info.fee_payload.len(), 0); // Currently returns empty bytes as placeholder
-	assert_eq!(fee_info.fee_payload, vec![]);
+	assert_eq!(fee_info.fee_payload, fee_payload.abi_encode()?);
 
 	Ok(())
 }

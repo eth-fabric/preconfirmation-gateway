@@ -250,7 +250,7 @@ mod test_cases {
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
 
 		// Calculate the expected request hash
-		let expected_request_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+		let expected_request_hash = request.request_hash()?;
 
 		// Test the request
 		let result = harness.test_commitment_request(request).await?;
@@ -299,7 +299,7 @@ mod test_cases {
 				test_helpers::create_valid_slasher(),
 			);
 
-			let request_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+			let request_hash = request.request_hash()?;
 			let result = harness.test_commitment_request(request).await?;
 
 			request_hashes.push(request_hash);
@@ -351,7 +351,7 @@ mod test_cases {
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
 
 		// Calculate request hash before processing
-		let expected_hash = preconfirmation_gateway::commitments::utils::calculate_request_hash(&request)?;
+		let expected_hash = request.request_hash()?;
 
 		// Process the request
 		let result = harness.test_commitment_request(request).await?;
