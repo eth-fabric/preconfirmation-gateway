@@ -85,6 +85,13 @@ mod test_helpers {
 		inclusion_payload.abi_encode()
 	}
 
+	/// Creates a valid signed transaction (RLP-encoded)
+	/// This creates a realistic EIP-1559 transaction for testing
+	pub fn create_valid_signed_tx() -> Vec<u8> {
+		// Use the function from utils.rs
+		preconfirmation_gateway::commitments::utils::create_valid_signed_transaction().to_vec()
+	}
+
 	/// Creates a valid commitment request
 	pub fn create_valid_commitment_request(
 		commitment_type: u64,
@@ -133,7 +140,7 @@ mod test_cases {
 		let harness = CommitmentRequestTestHarness::new().await?;
 
 		// Create a valid test request
-		let payload = test_helpers::create_valid_inclusion_payload(12345, vec![0x01, 0x02, 0x03, 0x04])?;
+		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
@@ -160,7 +167,7 @@ mod test_cases {
 		let harness = CommitmentRequestTestHarness::new().await?;
 
 		// Create a request with invalid commitment type
-		let payload = test_helpers::create_valid_inclusion_payload(12345, vec![0x01, 0x02, 0x03, 0x04])?;
+		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let request = test_helpers::create_valid_commitment_request(
 			test_helpers::create_invalid_commitment_type(),
@@ -196,7 +203,7 @@ mod test_cases {
 		let harness = CommitmentRequestTestHarness::new().await?;
 
 		// Create a request with zero address slasher
-		let payload = test_helpers::create_valid_inclusion_payload(12345, vec![0x01, 0x02, 0x03, 0x04])?;
+		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
 		let request = test_helpers::create_valid_commitment_request(
 			test_helpers::create_valid_commitment_type(),
 			payload,
@@ -231,7 +238,7 @@ mod test_cases {
 		let harness = CommitmentRequestTestHarness::new().await?;
 
 		// Create a request with slot 0 (invalid)
-		let payload = test_helpers::create_valid_inclusion_payload(0, vec![0x01, 0x02, 0x03, 0x04])?;
+		let payload = test_helpers::create_valid_inclusion_payload(0, test_helpers::create_valid_signed_tx())?;
 		let request = test_helpers::create_valid_commitment_request(
 			test_helpers::create_valid_commitment_type(),
 			payload,
@@ -268,9 +275,9 @@ mod test_cases {
 
 		// Test multiple valid requests with different parameters
 		let test_cases = vec![
-			(12345, vec![0x01, 0x02, 0x03, 0x04]),
-			(67890, vec![0x05, 0x06, 0x07, 0x08]),
-			(11111, vec![0x09, 0x0a, 0x0b, 0x0c]),
+			(12345, test_helpers::create_valid_signed_tx()),
+			(67890, test_helpers::create_valid_signed_tx()),
+			(11111, test_helpers::create_valid_signed_tx()),
 		];
 
 		for (slot, signed_tx) in test_cases {

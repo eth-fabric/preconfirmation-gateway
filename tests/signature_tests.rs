@@ -5,11 +5,11 @@ use eyre::Result;
 
 mod common;
 use common::start_local_signer_server;
+use rand::Rng;
 
 const MODULE_ID: &str = "inclusion-preconf-module";
 const SIGNING_ID: B256 = b256!("0x1111111111111111111111111111111111111111111111111111111111111111");
 const ADMIN_SECRET: &str = "test-admin-secret";
-const PORT: u16 = 20200;
 const PUBKEY: [u8; 48] =
 	hex!("883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4");
 
@@ -19,8 +19,9 @@ pub async fn generate_proxy_key_with_local_signer(
 	bls_pubkey: BlsPublicKey,
 	scheme: EncryptionScheme,
 ) -> Result<String> {
+	let port = rand::thread_rng().gen_range(20000..65535);
 	// Use the new function to get the commit config
-	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, PORT).await?;
+	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port).await?;
 
 	// Use the appropriate SignerClient method based on the scheme
 	let proxy_address = match scheme {
@@ -106,15 +107,21 @@ async fn test_generate_proxy_key_helper_function() -> Result<()> {
 #[tokio::test]
 async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	use alloy::primitives::{Address, b256};
-	use cb_common::commit::request::EncryptionScheme;
 	use preconfirmation_gateway::signing::call_proxy_ecdsa_signer;
 
-	// Start the local signer server and get the reconstructed StartCommitModuleConfig
-	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, PORT).await?;
+	let port = rand::thread_rng().gen_range(20000..65535);
 
-	// First, generate a proxy key for the committer
+	// Start the local signer server and get the reconstructed StartCommitModuleConfig
+	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port).await?;
+
+	// First, generate a proxy key for the committer using the same signer service instance
 	let test_bls_pubkey = BlsPublicKey::deserialize(&PUBKEY).unwrap();
-	let proxy_address = generate_proxy_key_with_local_signer(test_bls_pubkey, EncryptionScheme::Ecdsa).await?;
+	let signed_delegation = commit_config
+		.signer_client
+		.generate_proxy_key_ecdsa(test_bls_pubkey)
+		.await
+		.map_err(|e| eyre::eyre!("Failed to generate ECDSA proxy key: {}", e))?;
+	let proxy_address = signed_delegation.message.proxy.to_string();
 
 	// Parse the proxy address as the committer
 	let committer =
