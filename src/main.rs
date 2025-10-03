@@ -1,7 +1,7 @@
 mod config;
 mod constants;
 mod db;
-mod rpc;
+mod commitments;
 mod server;
 mod signing;
 mod types;

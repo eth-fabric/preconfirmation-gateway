@@ -1,7 +1,7 @@
 use alloy::primitives::{Address, Bytes};
 use jsonrpsee::Extensions;
 use jsonrpsee::types::Params;
-use preconfirmation_gateway::rpc::handlers::commitment_request_handler;
+use preconfirmation_gateway::commitments::handlers::commitment_request_handler;
 use preconfirmation_gateway::types::CommitmentRequest;
 use preconfirmation_gateway::types::commitments::InclusionPayload;
 use std::sync::Arc;

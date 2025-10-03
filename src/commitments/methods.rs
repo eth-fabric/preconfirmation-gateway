@@ -1,9 +1,9 @@
 use jsonrpsee::server::RpcModule;
 
-use crate::rpc::handlers;
+use crate::commitments::handlers;
 use crate::types::RpcContext;
 
-pub fn setup_rpc_methods<T: Send + Sync + 'static>(
+pub fn setup_commitment_methods<T: Send + Sync + 'static>(
 	rpc_context: RpcContext<T>,
 ) -> anyhow::Result<RpcModule<RpcContext<T>>> {
 	let mut module = RpcModule::new(rpc_context);
