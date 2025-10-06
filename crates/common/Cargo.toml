@@ -15,6 +15,9 @@ tracing = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 commit-boost = { workspace = true }
+urc = { workspace = true }
+
+blst = "0.3"
 
 [dev-dependencies]
 tempfile = "3.8"

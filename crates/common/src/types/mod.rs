@@ -7,7 +7,7 @@ pub mod responses;
 // Re-export all types for easy access
 pub use commitments::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo};
 pub use constraints::{
-	Constraint, ConstraintCapabilities, ConstraintProofs, ConstraintsMessage, Delegation, SignedConstraints,
+	Constraint, ConstraintCapabilities, ConstraintsMessage, Delegation, MessageType, SignedConstraints,
 	SignedDelegation,
 };
 pub use context::RpcContext;

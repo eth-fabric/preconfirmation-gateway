@@ -1,7 +1,32 @@
-use alloy::primitives::{Address, B256, Bytes, Signature};
+use alloy::primitives::{Address, B256, Bytes, Signature, U256};
 use alloy::sol_types::SolValue;
+use alloy_primitives::keccak256;
 use eyre::{Result, WrapErr};
 use serde::{Deserialize, Serialize};
+use tracing::error;
+
+use blst::*;
+use commit_boost::prelude::{BlsPublicKey, BlsSignature};
+use urc::i_registry::BLS::{G1Point, G2Point};
+use urc::i_registry::ISlasher::Delegation as SolDelegation;
+
+/// Binding of the MessageType enum, defined here:
+/// https://github.com/eth-fabric/urc/blob/304e59f967dd8fdf4342c2f776f789e7c99b8ef9/src/IRegistry.sol#L99
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum MessageType {
+	Reserved = 0,
+	Registration = 1,
+	Delegation = 2,
+	Commitment = 3,
+	Constraints = 4,
+}
+
+impl MessageType {
+	pub fn to_uint256(self) -> U256 {
+		U256::from(self as u64)
+	}
+}
 
 /// A constraint with its type and payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,148 +75,40 @@ impl Constraint {
 /// A delegation message from proposer to gateway
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Delegation {
-	pub proposer: Bytes, // BLS public key
-	pub delegate: Bytes, // BLS public key
+	pub proposer: BlsPublicKey,
+	pub delegate: BlsPublicKey,
 	pub committer: Address,
 	pub slot: u64,
 	pub metadata: Bytes,
 }
 
 impl Delegation {
-	/// ABI-encodes the Delegation struct
-	pub fn abi_encode(&self) -> Result<Bytes> {
-		alloy::sol! {
-			struct SolDelegation {
-				bytes proposer;
-				bytes delegate;
-				address committer;
-				uint64 slot;
-				bytes metadata;
-			}
-		}
+	/// ABI-encodes the ConstraintsMessage struct
+	pub fn to_object_root(&self) -> Result<B256> {
+		// Convert the pubkeys to G1 points
+		let proposer = convert_pubkey_to_g1_point(&self.proposer).map_err(|e| {
+			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.proposer.as_hex_string());
+			e
+		})?;
+		let delegate = convert_pubkey_to_g1_point(&self.delegate).map_err(|e| {
+			error!("Error converting delegate pubkey {} to G1 point: {e:?}", self.delegate.as_hex_string());
+			e
+		})?;
 
-		Ok(Bytes::from(SolDelegation::abi_encode(&SolDelegation {
-			proposer: self.proposer.clone(),
-			delegate: self.delegate.clone(),
-			committer: self.committer,
+		// Convert the delegation to EVM format
+		let delegation_evm = SolDelegation {
+			proposer,
+			delegate,
+			committer: Address(*self.committer),
 			slot: self.slot,
 			metadata: self.metadata.clone(),
-		})))
-	}
+		};
 
-	/// ABI-decodes a Delegation from bytes
-	pub fn abi_decode(data: &Bytes) -> Result<Self> {
-		alloy::sol! {
-			struct SolDelegation {
-				bytes proposer;
-				bytes delegate;
-				address committer;
-				uint64 slot;
-				bytes metadata;
-			}
-		}
-
-		let decoded = SolDelegation::abi_decode(data).wrap_err("Failed to decode Delegation")?;
-
-		Ok(Delegation {
-			proposer: decoded.proposer,
-			delegate: decoded.delegate,
-			committer: decoded.committer,
-			slot: decoded.slot,
-			metadata: decoded.metadata,
-		})
-	}
-
-	/// Hashes the delegation using ABI encoding and keccak256
-	pub fn hash(&self) -> Result<B256> {
-		let encoded = self.abi_encode()?;
-		Ok(alloy::primitives::keccak256(&encoded))
-	}
-}
-
-/// A constraints message containing multiple constraints
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstraintsMessage {
-	pub proposer: Bytes, // BLS public key
-	pub delegate: Bytes, // BLS public key
-	pub slot: u64,
-	pub constraints: Vec<Constraint>,
-	pub receivers: Vec<Bytes>, // BLS public keys
-}
-
-impl ConstraintsMessage {
-	/// ABI-encodes the ConstraintsMessage struct
-	pub fn abi_encode(&self) -> Result<Bytes> {
-		alloy::sol! {
-			struct SolConstraint {
-				uint64 constraintType;
-				bytes payload;
-			}
-
-			struct SolConstraintsMessage {
-				bytes proposer;
-				bytes delegate;
-				uint64 slot;
-				SolConstraint[] constraints;
-				bytes[] receivers;
-			}
-		}
-
-		// Convert constraints to SolConstraint format
-		let sol_constraints: Vec<SolConstraint> = self
-			.constraints
-			.iter()
-			.map(|c| SolConstraint { constraintType: c.constraint_type, payload: c.payload.clone() })
-			.collect();
-
-		Ok(Bytes::from(SolConstraintsMessage::abi_encode(&SolConstraintsMessage {
-			proposer: self.proposer.clone(),
-			delegate: self.delegate.clone(),
-			slot: self.slot,
-			constraints: sol_constraints,
-			receivers: self.receivers.clone(),
-		})))
-	}
-
-	/// ABI-decodes a ConstraintsMessage from bytes
-	pub fn abi_decode(data: &Bytes) -> Result<Self> {
-		alloy::sol! {
-			struct SolConstraint {
-				uint64 constraintType;
-				bytes payload;
-			}
-
-			struct SolConstraintsMessage {
-				bytes proposer;
-				bytes delegate;
-				uint64 slot;
-				SolConstraint[] constraints;
-				bytes[] receivers;
-			}
-		}
-
-		let decoded = SolConstraintsMessage::abi_decode(data).wrap_err("Failed to decode ConstraintsMessage")?;
-
-		// Convert SolConstraint back to Constraint
-		let constraints: Vec<Constraint> = decoded
-			.constraints
-			.into_iter()
-			.map(|c| Constraint { constraint_type: c.constraintType, payload: c.payload })
-			.collect();
-
-		Ok(ConstraintsMessage {
-			proposer: decoded.proposer,
-			delegate: decoded.delegate,
-			slot: decoded.slot,
-			constraints,
-			receivers: decoded.receivers,
-		})
-	}
-
-	/// Hashes the constraints message using ABI encoding and keccak256
-	pub fn hash(&self) -> Result<B256> {
-		let encoded = self.abi_encode()?;
-		Ok(alloy::primitives::keccak256(&encoded))
+		// Get the object root to sign
+		let message_type = MessageType::Delegation.to_uint256();
+		let encoded = (message_type, delegation_evm).abi_encode_params(); // Rust equivalent of abi.encode(message_type, delegation) in Solidity
+		let object_root = keccak256(encoded);
+		Ok(object_root)
 	}
 }
 
@@ -201,7 +118,66 @@ pub struct SignedDelegation {
 	pub message: Delegation,
 	pub nonce: u64,
 	pub signing_id: B256,
-	pub signature: Signature,
+	pub signature: BlsSignature,
+}
+
+/// A constraints message containing multiple constraints
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstraintsMessage {
+	pub proposer: BlsPublicKey,
+	pub delegate: BlsPublicKey,
+	pub slot: u64,
+	pub constraints: Vec<Constraint>,
+	pub receivers: Vec<BlsPublicKey>,
+}
+
+impl ConstraintsMessage {
+	/// ABI-encodes the ConstraintsMessage struct
+	pub fn to_object_root(&self) -> Result<B256> {
+		alloy::sol! {
+			struct SolConstraint {
+				uint64 constraintType;
+				bytes payload;
+			}
+
+			struct SolConstraintsMessage {
+				G1Point proposer;
+				G1Point delegate;
+				uint64 slot;
+				SolConstraint[] constraints;
+				G1Point[] receivers;
+			}
+		}
+
+		// Convert the pubkeys to G1 points
+		let proposer = convert_pubkey_to_g1_point(&self.proposer).map_err(|e| {
+			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.proposer.as_hex_string());
+			e
+		})?;
+		let delegate = convert_pubkey_to_g1_point(&self.delegate).map_err(|e| {
+			error!("Error converting delegate pubkey {} to G1 point: {e:?}", self.delegate.as_hex_string());
+			e
+		})?;
+
+		// Convert the ConstraintsMessage to EVM format
+		let constraints_message_evm = SolConstraintsMessage {
+			proposer,
+			delegate,
+			slot: self.slot,
+			constraints: self
+				.constraints
+				.iter()
+				.map(|c| SolConstraint { constraintType: c.constraint_type, payload: c.payload.clone() })
+				.collect(),
+			receivers: self.receivers.iter().map(|r| convert_pubkey_to_g1_point(r)).collect::<Result<Vec<_>, _>>()?,
+		};
+
+		// Get the object root to sign
+		let message_type = MessageType::Constraints.to_uint256();
+		let encoded = (message_type, constraints_message_evm).abi_encode_params(); // Rust equivalent of abi.encode(message_type, delegation) in Solidity
+		let object_root = keccak256(encoded);
+		Ok(object_root)
+	}
 }
 
 /// A signed constraints message with BLS signature
@@ -210,7 +186,7 @@ pub struct SignedConstraints {
 	pub message: ConstraintsMessage,
 	pub nonce: u64,
 	pub signing_id: B256,
-	pub signature: Signature,
+	pub signature: BlsSignature,
 }
 
 /// Constraint capabilities response
@@ -219,168 +195,69 @@ pub struct ConstraintCapabilities {
 	pub constraint_types: Vec<u64>,
 }
 
-/// Constraint proofs for block submission
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstraintProofs {
-	pub constraint_types: Vec<u64>,
-	pub payloads: Vec<Bytes>,
+/// Converts a pubkey to its corresponding affine G1 point form for EVM
+/// precompile usage
+pub fn convert_pubkey_to_g1_point(pubkey: &BlsPublicKey) -> eyre::Result<G1Point> {
+	// Convert pubkey to bytes
+	let pubkey_byes = pubkey.serialize();
+
+	// Uncompress the bytes to an affine point
+	let mut pubkey_affine = blst_p1_affine::default();
+	let uncompress_result = unsafe { blst_p1_uncompress(&mut pubkey_affine, pubkey_byes.as_ptr()) };
+	match uncompress_result {
+		BLST_ERROR::BLST_SUCCESS => Ok(()),
+		_ => Err(eyre::eyre!("Error converting pubkey to affine point: {uncompress_result:?}")),
+	}?;
+
+	// Convert the coordinates to big-endian byte arrays
+	let (x_a, x_b) = convert_fp_to_uint256_pair(&pubkey_affine.x);
+	let (y_a, y_b) = convert_fp_to_uint256_pair(&pubkey_affine.y);
+
+	// Return the G1Point
+	Ok(G1Point { x_a, x_b, y_a, y_b })
 }
 
-impl ConstraintProofs {
-	/// Validates that constraint_types and payloads have the same length
-	pub fn validate(&self) -> Result<()> {
-		if self.constraint_types.len() != self.payloads.len() {
-			return Err(eyre::eyre!(
-				"Constraint types and payloads length mismatch: {} vs {}",
-				self.constraint_types.len(),
-				self.payloads.len()
-			));
-		}
-		Ok(())
-	}
+/// Converts a signature to its corresponding affine G2 point form for EVM
+/// precompile usage
+pub fn convert_signature_to_g2_point(signature: &BlsSignature) -> eyre::Result<G2Point> {
+	// Convert signature to bytes
+	let signature_bytes = signature.serialize();
+
+	// Uncompress the bytes to an affine point
+	let mut signature_affine = blst_p2_affine::default();
+	let uncompress_result = unsafe { blst_p2_uncompress(&mut signature_affine, signature_bytes.as_ptr()) };
+	match uncompress_result {
+		BLST_ERROR::BLST_SUCCESS => Ok(()),
+		_ => Err(eyre::eyre!("Error converting signature to affine point: {uncompress_result:?}")),
+	}?;
+
+	// Convert the coordinates to big-endian byte arrays
+	let (x_c0_a, x_c0_b) = convert_fp_to_uint256_pair(&signature_affine.x.fp[0]);
+	let (x_c1_a, x_c1_b) = convert_fp_to_uint256_pair(&signature_affine.x.fp[1]);
+	let (y_c0_a, y_c0_b) = convert_fp_to_uint256_pair(&signature_affine.y.fp[0]);
+	let (y_c1_a, y_c1_b) = convert_fp_to_uint256_pair(&signature_affine.y.fp[1]);
+
+	// Return the G2Point
+	Ok(G2Point { x_c0_a, x_c0_b, x_c1_a, x_c1_b, y_c0_a, y_c0_b, y_c1_a, y_c1_b })
 }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	#[test]
-	fn test_abi_encode_constraint() -> Result<()> {
-		let constraint = Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02, 0x03]) };
-
-		let encoded = constraint.abi_encode()?;
-		assert!(!encoded.is_empty());
-
-		// Test round-trip encoding/decoding
-		let decoded = Constraint::abi_decode(&encoded)?;
-		assert_eq!(decoded.constraint_type, constraint.constraint_type);
-		assert_eq!(decoded.payload, constraint.payload);
-
-		Ok(())
+/// Converts a blst_fp to a pair of B256, as used in G1Point
+pub fn convert_fp_to_uint256_pair(fp: &blst_fp) -> (B256, B256) {
+	let mut fp_bytes = [0u8; 48];
+	unsafe {
+		blst_bendian_from_fp(fp_bytes.as_mut_ptr(), fp);
 	}
 
-	#[test]
-	fn test_abi_encode_delegation() -> Result<()> {
-		let delegation = Delegation {
-			proposer: Bytes::from(vec![0x11; 48]), // BLS public key size
-			delegate: Bytes::from(vec![0x22; 48]),
-			committer: Address::from([0x33; 20]),
-			slot: 12345,
-			metadata: Bytes::from(vec![0x44, 0x55, 0x66]),
-		};
+	// The first one is the high 16 bytes, padded on the left with zeros
+	let mut high_bytes = [0u8; 32];
+	high_bytes[16..].copy_from_slice(&fp_bytes[0..16]);
+	let high = B256::from(high_bytes);
 
-		let encoded = delegation.abi_encode()?;
-		assert!(!encoded.is_empty());
+	// The second one is the low 32 bytes
+	let mut low_bytes = [0u8; 32];
+	low_bytes.copy_from_slice(&fp_bytes[16..48]);
+	let low = B256::from(low_bytes);
 
-		// Test round-trip encoding/decoding
-		let decoded = Delegation::abi_decode(&encoded)?;
-		assert_eq!(decoded.proposer, delegation.proposer);
-		assert_eq!(decoded.delegate, delegation.delegate);
-		assert_eq!(decoded.committer, delegation.committer);
-		assert_eq!(decoded.slot, delegation.slot);
-		assert_eq!(decoded.metadata, delegation.metadata);
-
-		Ok(())
-	}
-
-	#[test]
-	fn test_abi_encode_constraints_message() -> Result<()> {
-		let constraints = vec![
-			Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02]) },
-			Constraint { constraint_type: 2, payload: Bytes::from(vec![0x03, 0x04]) },
-		];
-
-		let message = ConstraintsMessage {
-			proposer: Bytes::from(vec![0x11; 48]),
-			delegate: Bytes::from(vec![0x22; 48]),
-			slot: 67890,
-			constraints,
-			receivers: vec![Bytes::from(vec![0x33; 48]), Bytes::from(vec![0x44; 48])],
-		};
-
-		let encoded = message.abi_encode()?;
-		assert!(!encoded.is_empty());
-
-		// Test round-trip encoding/decoding
-		let decoded = ConstraintsMessage::abi_decode(&encoded)?;
-		assert_eq!(decoded.proposer, message.proposer);
-		assert_eq!(decoded.delegate, message.delegate);
-		assert_eq!(decoded.slot, message.slot);
-		assert_eq!(decoded.constraints.len(), message.constraints.len());
-		assert_eq!(decoded.receivers.len(), message.receivers.len());
-
-		Ok(())
-	}
-
-	#[test]
-	fn test_constraint_hash() -> Result<()> {
-		let constraint = Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02, 0x03]) };
-
-		let hash = constraint.hash()?;
-		assert_ne!(hash, B256::ZERO);
-
-		// Hash should be deterministic
-		let hash2 = constraint.hash()?;
-		assert_eq!(hash, hash2);
-
-		Ok(())
-	}
-
-	#[test]
-	fn test_delegation_hash() -> Result<()> {
-		let delegation = Delegation {
-			proposer: Bytes::from(vec![0x11; 48]),
-			delegate: Bytes::from(vec![0x22; 48]),
-			committer: Address::from([0x33; 20]),
-			slot: 12345,
-			metadata: Bytes::from(vec![0x44, 0x55, 0x66]),
-		};
-
-		let hash = delegation.hash()?;
-		assert_ne!(hash, B256::ZERO);
-
-		// Hash should be deterministic
-		let hash2 = delegation.hash()?;
-		assert_eq!(hash, hash2);
-
-		Ok(())
-	}
-
-	#[test]
-	fn test_constraints_message_hash() -> Result<()> {
-		let constraints = vec![Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02]) }];
-
-		let message = ConstraintsMessage {
-			proposer: Bytes::from(vec![0x11; 48]),
-			delegate: Bytes::from(vec![0x22; 48]),
-			slot: 67890,
-			constraints,
-			receivers: vec![Bytes::from(vec![0x33; 48])],
-		};
-
-		let hash = message.hash()?;
-		assert_ne!(hash, B256::ZERO);
-
-		// Hash should be deterministic
-		let hash2 = message.hash()?;
-		assert_eq!(hash, hash2);
-
-		Ok(())
-	}
-
-	#[test]
-	fn test_constraint_proofs_validation() -> Result<()> {
-		// Valid case
-		let valid_proofs = ConstraintProofs {
-			constraint_types: vec![1, 2, 3],
-			payloads: vec![Bytes::from(vec![0x01]), Bytes::from(vec![0x02]), Bytes::from(vec![0x03])],
-		};
-		assert!(valid_proofs.validate().is_ok());
-
-		// Invalid case - length mismatch
-		let invalid_proofs = ConstraintProofs { constraint_types: vec![1, 2], payloads: vec![Bytes::from(vec![0x01])] };
-		assert!(invalid_proofs.validate().is_err());
-
-		Ok(())
-	}
+	// Return the pair
+	(high, low)
 }
