@@ -1,12 +1,6 @@
-mod commitments;
-mod config;
-mod constants;
-mod db;
-mod server;
-mod signing;
-mod types;
-
 use commit_boost::prelude::*;
+use commitments::server;
+use common::{config, db, types};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

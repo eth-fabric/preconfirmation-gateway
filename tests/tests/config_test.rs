@@ -1,4 +1,4 @@
-use preconfirmation_gateway::config::{DatabaseConfig, InclusionPreconfConfig, LoggingConfig, ServerConfig};
+use common::config::{DatabaseConfig, InclusionPreconfConfig, LoggingConfig, ServerConfig};
 
 #[test]
 fn test_config_load_from_existing_file() {

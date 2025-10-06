@@ -2,9 +2,9 @@ use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
 use tracing::{error, info, instrument};
 
-use super::super::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 use super::utils;
 use alloy::primitives::B256;
+use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
 pub async fn commitment_request_handler<T>(

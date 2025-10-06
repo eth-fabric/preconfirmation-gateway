@@ -1,14 +1,13 @@
 use alloy::primitives::B256;
+use common::types::{CommitmentRequest, SignedCommitment};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use preconfirmation_gateway::types::{CommitmentRequest, SignedCommitment};
 use rand::Rng;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;
 
-mod common;
-use common::{MODULE_ID, SIGNING_ID, test_helpers};
+use integration_tests::test_common::{MODULE_ID, SIGNING_ID, test_helpers};
 
 /// Integration test for the full RPC server flow
 /// This test instantiates the RPC server, starts a local signer, and tests the complete flow
@@ -46,7 +45,7 @@ impl TestEnvironment {
 		let rpc_port = rng.gen_range(30000..39999);
 
 		// Create test configuration
-		let app_config = preconfirmation_gateway::config::InclusionPreconfConfig {
+		let app_config = common::config::InclusionPreconfConfig {
 			rpc_server_host: "127.0.0.1".to_string(),
 			rpc_server_port: rpc_port,
 			database_url: db_path.to_string_lossy().to_string(),
@@ -62,7 +61,7 @@ impl TestEnvironment {
 		};
 
 		// Start local signer server with test configuration
-		let commit_config = common::start_local_signer_server_with_config(
+		let commit_config = integration_tests::test_common::start_local_signer_server_with_config(
 			MODULE_ID,
 			SIGNING_ID,
 			"test-admin-secret",
@@ -73,10 +72,10 @@ impl TestEnvironment {
 
 		// Create database
 		let db = create_test_database(&db_path)?;
-		let database = preconfirmation_gateway::DatabaseContext::new(std::sync::Arc::new(db));
+		let database = common::types::DatabaseContext::new(std::sync::Arc::new(db));
 
 		// Generate proxy key for committer
-		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&common::PUBKEY)
+		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
 			.map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))?;
 		let mut commit_config_guard = commit_config;
 		let proxy_address = commit_config_guard
@@ -87,12 +86,12 @@ impl TestEnvironment {
 		let committer_address = proxy_address.message.proxy;
 
 		// Create RPC context
-		let rpc_context = preconfirmation_gateway::RpcContext::new(database, commit_config_guard, committer_address);
+		let rpc_context = common::types::RpcContext::new(database, commit_config_guard, committer_address);
 
 		// Start RPC server
 		let server_address = format!("127.0.0.1:{}", rpc_port);
 		let server_handle = tokio::spawn(async move {
-			if let Err(e) = preconfirmation_gateway::server::run_server(rpc_context).await {
+			if let Err(e) = commitments::server::run_server(rpc_context).await {
 				eprintln!("RPC server error: {}", e);
 			}
 		});

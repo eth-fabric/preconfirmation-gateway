@@ -5,10 +5,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
-use crate::constants::COMMITMENT_TYPE;
-use crate::signing;
-use crate::types::commitments::{FeePayload, InclusionPayload};
-use crate::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
+use common::constants::COMMITMENT_TYPE;
+use common::signing;
+use common::types::commitments::{FeePayload, InclusionPayload};
+use common::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
 
 /// Helper functions for RPC business logic
 /// This module contains utility functions that can be shared across multiple RPC handlers

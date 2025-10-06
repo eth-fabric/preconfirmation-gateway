@@ -3,8 +3,7 @@ use cb_common::commit::request::EncryptionScheme;
 use commit_boost::prelude::*;
 use eyre::Result;
 
-mod common;
-use common::start_local_signer_server;
+use integration_tests::test_common::start_local_signer_server;
 use rand::Rng;
 
 const MODULE_ID: &str = "inclusion-preconf-module";
@@ -107,7 +106,7 @@ async fn test_generate_proxy_key_helper_function() -> Result<()> {
 #[tokio::test]
 async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	use alloy::primitives::{Address, b256};
-	use preconfirmation_gateway::signing::call_proxy_ecdsa_signer;
+	use common::signing::call_proxy_ecdsa_signer;
 
 	let port = rand::thread_rng().gen_range(20000..65535);
 

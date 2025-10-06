@@ -1,16 +1,15 @@
 use alloy::primitives::B256;
+use commitments::handlers::commitment_result_handler;
+use common::types::SignedCommitment;
 use jsonrpsee::Extensions;
 use jsonrpsee::types::Params;
-use preconfirmation_gateway::commitments::handlers::commitment_result_handler;
-use preconfirmation_gateway::types::SignedCommitment;
 
-mod common;
-use common::test_helpers;
+use integration_tests::test_common::test_helpers;
 
 /// Test harness for commitment result testing
 /// This provides a clean interface for testing different commitment result scenarios
 struct CommitmentResultTestHarness {
-	context: preconfirmation_gateway::RpcContext,
+	context: common::types::RpcContext,
 }
 
 impl CommitmentResultTestHarness {

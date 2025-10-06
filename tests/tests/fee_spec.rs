@@ -1,10 +1,10 @@
 use alloy::primitives::{Address, Bytes};
+use commitments::handlers::fee_handler;
+use common::types::{CommitmentRequest, commitments::FeePayload};
 use jsonrpsee::{Extensions, types::Params};
-use preconfirmation_gateway::{CommitmentRequest, fee_handler, types::commitments::FeePayload};
 use serde_json::json;
 
-mod common;
-use common::test_helpers::create_test_context;
+use integration_tests::test_common::test_helpers::create_test_context;
 
 #[tokio::test]
 async fn test_fee_handler_basic() -> eyre::Result<()> {

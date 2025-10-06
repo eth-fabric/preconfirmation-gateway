@@ -2070,6 +2070,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "commitments"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-primitives 1.4.0",
+ "anyhow",
+ "commit-boost",
+ "common",
+ "eyre",
+ "futures",
+ "http-body",
+ "http-body-util",
+ "jsonrpsee",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-primitives 1.4.0",
+ "anyhow",
+ "cb-common",
+ "cb-signer",
+ "cb-tests",
+ "commit-boost",
+ "config",
+ "eyre",
+ "rand 0.8.5",
+ "reqwest",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-test",
+ "tracing",
+]
+
+[[package]]
 name = "compare_fields"
 version = "0.2.0"
 source = "git+https://github.com/sigp/lighthouse?tag=v8.0.0-rc.0#e5b4983d6baf85770fe4539a565d8a2dd462bc53"
@@ -2162,6 +2207,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "constraints"
+version = "0.1.0"
+dependencies = [
+ "common",
 ]
 
 [[package]]
@@ -3797,6 +3849,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "integration-tests"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-primitives 1.4.0",
+ "anyhow",
+ "cb-common",
+ "cb-signer",
+ "cb-tests",
+ "commit-boost",
+ "commitments",
+ "common",
+ "config",
+ "eyre",
+ "futures",
+ "http-body",
+ "http-body-util",
+ "jsonrpsee",
+ "rand 0.8.5",
+ "reqwest",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-test",
+ "toml 0.9.7",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "interprocess"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4862,28 +4946,12 @@ dependencies = [
 name = "preconfirmation-gateway"
 version = "0.1.0"
 dependencies = [
- "alloy",
- "alloy-primitives 1.4.0",
  "anyhow",
- "cb-common",
- "cb-signer",
- "cb-tests",
  "commit-boost",
- "config",
+ "commitments",
+ "common",
  "eyre",
- "futures",
- "http-body",
- "http-body-util",
- "jsonrpsee",
- "rand 0.8.5",
- "reqwest",
- "rocksdb",
- "serde",
- "serde_json",
- "tempfile",
  "tokio",
- "tokio-test",
- "toml 0.9.7",
  "tracing",
  "tracing-subscriber",
 ]
@@ -4896,6 +4964,13 @@ checksum = "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b"
 dependencies = [
  "proc-macro2",
  "syn 2.0.106",
+]
+
+[[package]]
+name = "pricer"
+version = "0.1.0"
+dependencies = [
+ "common",
 ]
 
 [[package]]

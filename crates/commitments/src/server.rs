@@ -4,9 +4,10 @@ use anyhow::Result;
 use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::config::InclusionPreconfConfig;
-use crate::{commitments, types};
+use super::methods;
 use commit_boost::prelude::StartCommitModuleConfig;
+use common::config::InclusionPreconfConfig;
+use common::types;
 
 // Functions for working with commit-boost configuration
 pub async fn run_server<T: Send + Sync + 'static>(rpc_context: types::RpcContext<T>) -> Result<()>
@@ -20,7 +21,7 @@ where
 	drop(commit_config); // Release the lock
 
 	let server = Server::builder().build(server_address.parse::<SocketAddr>()?).await?;
-	let module = commitments::setup_commitment_methods(rpc_context)?;
+	let module = methods::setup_commitment_methods(rpc_context)?;
 
 	let addr = server.local_addr()?;
 	tracing::info!("Starting RPC server on {}", addr);

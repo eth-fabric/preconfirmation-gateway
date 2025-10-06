@@ -1,16 +1,15 @@
+use commitments::handlers::commitment_request_handler;
+use common::types::CommitmentRequest;
 use jsonrpsee::Extensions;
 use jsonrpsee::types::Params;
-use preconfirmation_gateway::commitments::handlers::commitment_request_handler;
-use preconfirmation_gateway::types::CommitmentRequest;
 use std::sync::Arc;
 
-mod common;
-use common::{PUBKEY, test_helpers};
+use integration_tests::test_common::{PUBKEY, test_helpers};
 
 /// Test harness for commitment request testing
 /// This provides a clean interface for testing different commitment request scenarios
 struct CommitmentRequestTestHarness {
-	context: preconfirmation_gateway::RpcContext,
+	context: common::types::RpcContext,
 }
 
 impl CommitmentRequestTestHarness {
@@ -39,10 +38,11 @@ impl CommitmentRequestTestHarness {
 	async fn test_commitment_request(
 		&self,
 		request: CommitmentRequest,
-	) -> eyre::Result<preconfirmation_gateway::types::SignedCommitment> {
-		// Serialize the request to JSON for the params
+	) -> eyre::Result<common::types::SignedCommitment> {
+		// Serialize the request to JSON and wrap in array for JSON-RPC params
 		let request_json = serde_json::to_string(&request)?;
-		let params = Params::new(Some(&request_json));
+		let params_json = format!("[{}]", request_json);
+		let params = Params::new(Some(&params_json));
 
 		// Call the handler
 		let result =
@@ -56,9 +56,10 @@ impl CommitmentRequestTestHarness {
 
 	/// Tests a commitment request and expects it to fail with a specific error
 	async fn test_commitment_request_should_fail(&self, request: CommitmentRequest) -> eyre::Result<()> {
-		// Serialize the request to JSON for the params
+		// Serialize the request to JSON and wrap in array for JSON-RPC params
 		let request_json = serde_json::to_string(&request)?;
-		let params = Params::new(Some(&request_json));
+		let params_json = format!("[{}]", request_json);
+		let params = Params::new(Some(&params_json));
 
 		// Call the handler
 		let result =

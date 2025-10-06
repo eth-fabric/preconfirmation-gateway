@@ -5,11 +5,10 @@ use cb_common::{
 	types::{Jwt, ModuleId},
 };
 use commit_boost::prelude::StartCommitModuleConfig;
+use common::config::InclusionPreconfConfig;
+use common::types::commitments::InclusionPayload;
+use common::types::{Commitment, CommitmentRequest, DatabaseContext, RpcContext, SignedCommitment};
 use eyre::Result;
-use preconfirmation_gateway::config::InclusionPreconfConfig;
-use preconfirmation_gateway::types::commitments::InclusionPayload;
-use preconfirmation_gateway::types::{Commitment, CommitmentRequest, SignedCommitment};
-use preconfirmation_gateway::{DatabaseContext, RpcContext};
 use rand::Rng;
 use rocksdb::{DB, Options};
 use std::{collections::HashMap, sync::Arc};
@@ -108,7 +107,7 @@ pub async fn start_local_signer_server_with_config(
 /// This module provides shared helper functions for both commitment_request and commitment_result tests
 pub mod test_helpers {
 	use super::*;
-	use preconfirmation_gateway::constants::COMMITMENT_TYPE;
+	use common::constants::COMMITMENT_TYPE;
 
 	/// Creates a valid inclusion payload
 	pub fn create_valid_inclusion_payload(slot: u64, signed_tx: Vec<u8>) -> eyre::Result<Bytes> {
@@ -120,7 +119,7 @@ pub mod test_helpers {
 	/// This creates a realistic EIP-1559 transaction for testing
 	pub fn create_valid_signed_tx() -> Vec<u8> {
 		// Use the function from utils.rs
-		preconfirmation_gateway::commitments::utils::create_valid_signed_transaction().to_vec()
+		commitments::utils::create_valid_signed_transaction().to_vec()
 	}
 
 	/// Creates a valid commitment request

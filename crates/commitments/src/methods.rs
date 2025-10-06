@@ -1,7 +1,7 @@
 use jsonrpsee::server::RpcModule;
 
-use crate::commitments::handlers;
-use crate::types::RpcContext;
+use super::handlers;
+use common::types::RpcContext;
 
 pub fn setup_commitment_methods<T: Send + Sync + 'static>(
 	rpc_context: RpcContext<T>,
