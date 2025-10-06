@@ -5,3 +5,8 @@ edition = "2024"
 
 [dependencies]
 common = { path = "../common" }
+alloy = { workspace = true }
+commit-boost = { workspace = true }
+eyre = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

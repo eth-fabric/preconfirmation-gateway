@@ -2213,7 +2213,12 @@ dependencies = [
 name = "constraints"
 version = "0.1.0"
 dependencies = [
+ "alloy",
+ "commit-boost",
  "common",
+ "eyre",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
