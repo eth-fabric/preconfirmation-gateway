@@ -34,44 +34,6 @@ pub struct Constraint {
 	pub constraint_type: u64,
 	pub payload: Bytes,
 }
-
-impl Constraint {
-	/// ABI-encodes the Constraint struct
-	pub fn abi_encode(&self) -> Result<Bytes> {
-		alloy::sol! {
-			struct SolConstraint {
-				uint64 constraintType;
-				bytes payload;
-			}
-		}
-
-		Ok(Bytes::from(SolConstraint::abi_encode(&SolConstraint {
-			constraintType: self.constraint_type,
-			payload: self.payload.clone(),
-		})))
-	}
-
-	/// ABI-decodes a Constraint from bytes
-	pub fn abi_decode(data: &Bytes) -> Result<Self> {
-		alloy::sol! {
-			struct SolConstraint {
-				uint64 constraintType;
-				bytes payload;
-			}
-		}
-
-		let decoded = SolConstraint::abi_decode(data).wrap_err("Failed to decode Constraint")?;
-
-		Ok(Constraint { constraint_type: decoded.constraintType, payload: decoded.payload })
-	}
-
-	/// Hashes the constraint using ABI encoding and keccak256
-	pub fn hash(&self) -> Result<B256> {
-		let encoded = self.abi_encode()?;
-		Ok(alloy::primitives::keccak256(&encoded))
-	}
-}
-
 /// A delegation message from proposer to gateway
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Delegation {
@@ -260,4 +222,87 @@ pub fn convert_fp_to_uint256_pair(fp: &blst_fp) -> (B256, B256) {
 
 	// Return the pair
 	(high, low)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use alloy::primitives::{Bytes, hex};
+	use cb_common::utils::bls_pubkey_from_hex;
+
+	#[test]
+	fn test_message_type_to_uint256() {
+		assert_eq!(MessageType::Reserved.to_uint256(), U256::from(0));
+		assert_eq!(MessageType::Registration.to_uint256(), U256::from(1));
+		assert_eq!(MessageType::Delegation.to_uint256(), U256::from(2));
+		assert_eq!(MessageType::Commitment.to_uint256(), U256::from(3));
+		assert_eq!(MessageType::Constraints.to_uint256(), U256::from(4));
+	}
+
+	#[test]
+	fn test_delegation_to_object_root() {
+		let proposer = bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+		let delegate = bls_pubkey_from_hex(
+			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
+		)
+		.unwrap();
+
+		let delegation = Delegation {
+			proposer: proposer,
+			delegate: delegate,
+			committer: hex!("0x1111111111111111111111111111111111111111").into(),
+			slot: 5,
+			metadata: Bytes::from("some-metadata-here"),
+		};
+		let object_root = delegation.to_object_root().unwrap();
+		let expected_root = hex!("0xcd9aca062121f6f50df1bfd7e74e2b023a5a0d9e1387447568a2119db5022e1b");
+		assert_eq!(object_root, expected_root);
+	}
+
+	#[test]
+	fn test_constraints_message_to_object_root() {
+		let proposer = bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+		let delegate = bls_pubkey_from_hex(
+			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
+		)
+		.unwrap();
+
+		// Create test BLS public keys
+		let receivers = vec![
+			bls_pubkey_from_hex(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		];
+
+		let constraints_message = ConstraintsMessage {
+			proposer: proposer,
+			delegate: delegate,
+			slot: 67890,
+			constraints: vec![
+				Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02]) },
+				Constraint { constraint_type: 2, payload: Bytes::from(vec![0x03, 0x04]) },
+			],
+			receivers: receivers,
+		};
+
+		let object_root = constraints_message.to_object_root().unwrap();
+		let expected_root = hex!("b27bb26406c8fe6cf9e5bb1723d7dd2b06e4d32efc0cb0419dc57cc6c4b0ca87");
+		assert_eq!(object_root, expected_root);
+	}
+
+	#[test]
+	fn test_constraint_capabilities() {
+		let capabilities = ConstraintCapabilities { constraint_types: vec![1, 2, 3, 4, 5] };
+
+		assert_eq!(capabilities.constraint_types.len(), 5);
+		assert_eq!(capabilities.constraint_types[0], 1);
+		assert_eq!(capabilities.constraint_types[4], 5);
+	}
 }
