@@ -22,14 +22,37 @@ cargo build --package common
 cargo build --package commitments
 ```
 
+#### Building the URC Bindings
+
+To refresh the Rust ABI bindings for the URC contracts, run the following steps:
+
+Make sure Foundry is installed, if you don't have it yet:
+
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+```
+
+Initialize the submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+Run forge to build the bindings:
+
+```bash
+cd ./urc
+forge bind --crate-name urc --overwrite --bindings-path ../crates/common/bindings/urc
+```
+
+The new bindings will be in the `/crates/common/bindings/urc` module.
+
 ### Running
 
 ```bash
 # Run the main commitments server
 cargo run --package preconfirmation-gateway --bin commitments
-
-# Or use the task runner
-task run
 ```
 
 This starts the RPC server on `127.0.0.1` with a random port and demonstrates client connectivity.
@@ -139,30 +162,6 @@ Will contain dynamic pricing logic and gas oracle integration.
 - **Integration Tests**: Framework complete, requires external services for full testing
 - **Constraints API**: Placeholder crate ready for future implementation
 - **Pricer Module**: Placeholder crate ready for future implementation
-
-### 📊 Test Coverage
-- **Unit Tests**: 26 tests passing
-  - Common crate: 19 tests (types, database, config)
-  - Commitments crate: 7 tests (validation, business logic)
-- **Integration Tests**: Framework complete, requires external signer services
-- **Compilation**: All packages compile successfully
-
-## Dependencies
-
-### Core Runtime
-- **jsonrpsee**: JSON-RPC 2.0 server implementation
-- **tokio**: Async runtime with multi-threading support
-- **rocksdb**: Embedded key-value database for persistence
-- **tracing**: Structured logging and diagnostics
-- **alloy**: Ethereum library for blockchain interactions
-- **commit-boost**: Commit-boost client integration
-
-### Development
-- **eyre**: Error handling and reporting
-- **serde**: Serialization framework
-- **config**: Configuration management
-- **tempfile**: Temporary file handling for tests
-- **reqwest**: HTTP client for integration tests
 
 ## Specifications
 
