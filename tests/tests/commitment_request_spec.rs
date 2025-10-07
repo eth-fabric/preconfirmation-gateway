@@ -398,4 +398,104 @@ mod test_cases {
 
 		Ok(())
 	}
+
+	#[tokio::test]
+	async fn test_constraint_saved_after_commitment() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create and process a commitment request
+		let slot = 12345;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
+		let slasher = test_helpers::create_valid_slasher();
+		let commitment_type = test_helpers::create_valid_commitment_type();
+		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+		// Process the request
+		let result = harness.test_commitment_request(request).await?;
+
+		// Verify the commitment was stored
+		let request_hash = result.commitment.request_hash;
+		let stored_commitment = harness.context.database().get_commitment(&request_hash).unwrap();
+		assert!(stored_commitment.is_some(), "Commitment should be stored in database");
+
+		// Verify that a constraint was also saved
+		// We need to check if there are any constraints in the database for this slot
+		let constraints = harness.context.database().get_pending_constraints().unwrap();
+		assert!(!constraints.is_empty(), "At least one constraint should be saved");
+
+		// Find the constraint that matches our slot
+		let matching_constraint = constraints.iter().find(|(_, constraint)| {
+			// Decode the constraint payload to check the slot
+			use common::types::commitments::InclusionPayload;
+			if let Ok(inclusion_payload) = InclusionPayload::abi_decode(&constraint.payload) {
+				inclusion_payload.slot == slot
+			} else {
+				false
+			}
+		});
+
+		assert!(matching_constraint.is_some(), "Should find a constraint for slot {}", slot);
+
+		let (_, constraint) = matching_constraint.unwrap();
+		assert_eq!(constraint.constraint_type, 1, "Constraint type should be 1 (CONSTRAINT_TYPE)");
+		assert_eq!(constraint.payload, result.commitment.payload, "Constraint payload should match commitment payload");
+
+		println!("Successfully verified constraint was saved for slot {}", slot);
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_multiple_constraints_same_slot() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create multiple commitment requests with the same slot but different payloads
+		let slot = 54321;
+		let num_requests = 3;
+
+		for i in 0..num_requests {
+			// Create different signed transactions for each request by varying the transaction data
+			// We'll use the same signed_tx but add some variation to the request to make each unique
+			let signed_tx = test_helpers::create_valid_signed_tx();
+			let payload = test_helpers::create_valid_inclusion_payload(slot, signed_tx)?;
+			// Use different slasher addresses to make each request unique
+			let slasher = test_helpers::create_valid_slasher();
+			let commitment_type = test_helpers::create_valid_commitment_type();
+			let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+			// Process the request
+			let result = harness.test_commitment_request(request).await?;
+			println!("Processed commitment request {} for slot {}", i + 1, slot);
+
+			// Verify the commitment was stored
+			let request_hash = result.commitment.request_hash;
+			let stored_commitment = harness.context.database().get_commitment(&request_hash).unwrap();
+			assert!(stored_commitment.is_some(), "Commitment {} should be stored in database", i + 1);
+		}
+
+		// Verify that multiple constraints were saved for the same slot
+		let constraints = harness.context.database().get_pending_constraints().unwrap();
+
+		// Count constraints for our specific slot
+		let slot_constraints: Vec<_> = constraints
+			.iter()
+			.filter(|(_, constraint)| {
+				use common::types::commitments::InclusionPayload;
+				if let Ok(inclusion_payload) = InclusionPayload::abi_decode(&constraint.payload) {
+					inclusion_payload.slot == slot
+				} else {
+					false
+				}
+			})
+			.collect();
+
+		assert_eq!(slot_constraints.len(), num_requests, "Should have {} constraints for slot {}", num_requests, slot);
+
+		// Verify all constraints have the correct type
+		for (_, constraint) in &slot_constraints {
+			assert_eq!(constraint.constraint_type, 1, "All constraints should have type 1 (CONSTRAINT_TYPE)");
+		}
+
+		println!("Successfully verified {} constraints were saved for slot {}", slot_constraints.len(), slot);
+		Ok(())
+	}
 }

@@ -43,7 +43,22 @@ pub async fn commitment_request_handler<T>(
 
 	// Store the signed commitment in the database
 	let request_hash = signed_commitment.commitment.request_hash;
-	if let Err(e) = _context.database().store_commitment(&request_hash, &signed_commitment) {
+
+	// Extract slot from the commitment request payload
+	use common::types::commitments::InclusionPayload;
+	let slot = match InclusionPayload::abi_decode(&request.payload) {
+		Ok(inclusion_payload) => inclusion_payload.slot,
+		Err(e) => {
+			error!("Failed to extract slot from commitment request: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to extract slot from commitment request",
+				Some(format!("{}", e)),
+			));
+		}
+	};
+
+	if let Err(e) = _context.database().store_commitment(slot, &request_hash, &signed_commitment) {
 		error!("Failed to store commitment in database: {}", e);
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
 			-32603, // Internal error
@@ -52,7 +67,38 @@ pub async fn commitment_request_handler<T>(
 		));
 	}
 
-	info!("Commitment request processed successfully");
+	// Create the constraint after successful commitment signing
+	let constraint = match utils::create_constraint_from_commitment_request(&request, slot) {
+		Ok(constraint) => constraint,
+		Err(e) => {
+			error!("Failed to create constraint from commitment request: {}", e);
+			// If constraint creation fails, we need to clean up the stored commitment
+			if let Err(cleanup_err) = _context.database().delete_commitment(&request_hash) {
+				error!("Failed to clean up commitment after constraint creation failure: {}", cleanup_err);
+			}
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to create constraint",
+				Some(format!("{}", e)),
+			));
+		}
+	};
+
+	// Store the constraint in the database using request_hash as constraint_id
+	if let Err(e) = _context.database().store_constraint(slot, &request_hash, &constraint) {
+		error!("Failed to store constraint in database: {}", e);
+		// If constraint storage fails, we need to clean up the stored commitment
+		if let Err(cleanup_err) = _context.database().delete_commitment(&request_hash) {
+			error!("Failed to clean up commitment after constraint storage failure: {}", cleanup_err);
+		}
+		return Err(jsonrpsee::types::error::ErrorObject::owned(
+			-32603, // Internal error
+			"Failed to store constraint",
+			Some(format!("{}", e)),
+		));
+	}
+
+	info!("Commitment request processed successfully with constraint saved");
 	Ok(signed_commitment)
 }
 

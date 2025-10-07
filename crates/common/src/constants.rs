@@ -6,6 +6,9 @@ pub const SIGNING_ID: B256 = b256!("0x111111111111111111111111111111111111111111
 /// The commitment type for inclusion commitments
 pub const COMMITMENT_TYPE: u64 = 1;
 
+/// The constraint type for inclusion constraints
+pub const CONSTRAINT_TYPE: u64 = 1;
+
 /// Shared route constants for the preconfirmation gateway
 pub mod routes {
 	/// Health check endpoint

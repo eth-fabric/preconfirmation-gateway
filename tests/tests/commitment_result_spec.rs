@@ -52,20 +52,25 @@ impl CommitmentResultTestHarness {
 	}
 
 	/// Pre-populates the database with a signed commitment for testing
-	fn pre_populate_commitment(&self, request_hash: B256, signed_commitment: SignedCommitment) -> eyre::Result<()> {
+	fn pre_populate_commitment(
+		&self,
+		request_hash: B256,
+		signed_commitment: SignedCommitment,
+		slot: u64,
+	) -> eyre::Result<()> {
 		self.context
 			.database()
-			.store_commitment(&request_hash, &signed_commitment)
+			.store_commitment(slot, &request_hash, &signed_commitment)
 			.map_err(|e| eyre::eyre!("Failed to store commitment: {}", e))?;
 		Ok(())
 	}
 
 	/// Pre-populates the database with multiple signed commitments for testing
-	fn pre_populate_multiple_commitments(&self, commitments: Vec<(B256, SignedCommitment)>) -> eyre::Result<()> {
-		for (request_hash, signed_commitment) in commitments {
+	fn pre_populate_multiple_commitments(&self, commitments: Vec<(B256, SignedCommitment, u64)>) -> eyre::Result<()> {
+		for (request_hash, signed_commitment, slot) in commitments {
 			self.context
 				.database()
-				.store_commitment(&request_hash, &signed_commitment)
+				.store_commitment(slot, &request_hash, &signed_commitment)
 				.map_err(|e| eyre::eyre!("Failed to store commitment: {}", e))?;
 		}
 		Ok(())
@@ -98,7 +103,7 @@ mod test_cases {
 			signing_id,
 		);
 
-		harness.pre_populate_commitment(request_hash, signed_commitment.clone())?;
+		harness.pre_populate_commitment(request_hash, signed_commitment.clone(), 12345)?;
 
 		// Test retrieving the commitment
 		let result = harness.test_commitment_result(request_hash).await?;
@@ -142,6 +147,7 @@ mod test_cases {
 					test_helpers::create_valid_nonce(),
 					test_helpers::create_valid_signing_id(),
 				),
+				12345,
 			),
 			(
 				test_helpers::create_another_valid_request_hash(),
@@ -153,6 +159,7 @@ mod test_cases {
 					test_helpers::create_another_valid_nonce(),
 					test_helpers::create_valid_signing_id(),
 				),
+				12346,
 			),
 		];
 
@@ -160,7 +167,7 @@ mod test_cases {
 		harness.pre_populate_multiple_commitments(commitments.clone())?;
 
 		// Test retrieving each commitment
-		for (request_hash, expected_commitment) in commitments {
+		for (request_hash, expected_commitment, _slot) in commitments {
 			let result = harness.test_commitment_result(request_hash).await?;
 
 			// Verify the result matches what we stored

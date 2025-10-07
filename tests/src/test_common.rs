@@ -122,6 +122,35 @@ pub mod test_helpers {
 		commitments::utils::create_valid_signed_transaction().to_vec()
 	}
 
+	/// Creates a valid signed transaction with a specific nonce for testing
+	pub fn create_valid_signed_tx_with_nonce(nonce: u64) -> Vec<u8> {
+		use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
+		use alloy::primitives::{Address, Bytes, Signature, TxKind, U256};
+		use alloy::rlp::Encodable;
+
+		let tx = TxEip1559 {
+			chain_id: 1,
+			nonce,
+			gas_limit: 21000,
+			max_fee_per_gas: 20_000_000_000u128,
+			max_priority_fee_per_gas: 2_000_000_000u128,
+			to: TxKind::Call(Address::from([0x01; 20])),
+			value: U256::from(1_000_000_000_000_000_000u64),
+			input: Bytes::new(),
+			access_list: Default::default(),
+		};
+
+		// Create a mock signature (all zeros for testing)
+		let signature = Signature::from_raw(&[0u8; 65]).unwrap();
+		let signed_tx = Signed::new_unhashed(tx, signature);
+		let envelope = TxEnvelope::Eip1559(signed_tx);
+
+		// Encode to bytes
+		let mut buf = Vec::new();
+		envelope.encode(&mut buf);
+		buf
+	}
+
 	/// Creates a valid commitment request
 	pub fn create_valid_commitment_request(
 		commitment_type: u64,
@@ -133,7 +162,7 @@ pub mod test_helpers {
 
 	/// Creates a valid slasher address
 	pub fn create_valid_slasher() -> Address {
-		Address::from([0x2; 20])
+		Address::random()
 	}
 
 	pub fn create_valid_commitment_type() -> u64 {

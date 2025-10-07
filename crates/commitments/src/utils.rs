@@ -5,10 +5,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
-use common::constants::COMMITMENT_TYPE;
+use common::constants::{COMMITMENT_TYPE, CONSTRAINT_TYPE};
 use common::signer;
 use common::types::commitments::{FeePayload, InclusionPayload};
-use common::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
+use common::types::{Commitment, CommitmentRequest, Constraint, FeeInfo, SignedCommitment};
 
 /// Helper functions for RPC business logic
 /// This module contains utility functions that can be shared across multiple RPC handlers
@@ -222,6 +222,23 @@ pub fn is_valid_commitment_type(commitment_type: u64) -> bool {
 /// Helper to format error messages consistently
 pub fn format_error(context: &str, error: &str) -> String {
 	format!("{}: {}", context, error)
+}
+
+/// Creates a constraint from a commitment request
+/// This function creates a constraint with the same payload but using the constraint type
+pub fn create_constraint_from_commitment_request(request: &CommitmentRequest, slot: u64) -> Result<Constraint> {
+	debug!("Creating constraint from commitment request for slot {}", slot);
+
+	// Create the constraint with the same payload but constraint type
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: request.payload.clone() };
+
+	debug!(
+		"Created constraint with type {} and payload length {} for slot {}",
+		constraint.constraint_type,
+		constraint.payload.len(),
+		slot
+	);
+	Ok(constraint)
 }
 
 /// Creates a properly signed commitment using ECDSA
