@@ -1,117 +1,136 @@
 use axum::{extract::State, http::StatusCode, response::Json};
 use eyre::Result;
-use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use super::client::ConstraintsClient;
-use super::utils::{create_constraints_message, create_signed_constraints};
-use common::types::{ConstraintCapabilities, RpcContext, SignedDelegation};
+use crate::utils::{
+	create_constraints_error_response, create_constraints_message, create_signed_constraints,
+	parse_bls_public_key_with_error_response, parse_bls_public_key_with_status_code,
+	parse_bls_public_keys_with_error_response,
+};
+use common::types::{
+	ConstraintCapabilities, HealthResponse, ProcessConstraintsRequest, ProcessConstraintsResponse,
+	ProcessDelegationsRequest, ProcessDelegationsResponse, RpcContext, SignedDelegation,
+};
 
-/// Response for processing constraints
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessConstraintsResponse {
-	pub success: bool,
-	pub processed_count: usize,
-	pub message: String,
-}
-
-/// Response for health check
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HealthResponse {
-	pub status: String,
-	pub timestamp: u64,
-}
-
-/// Request for processing delegations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessDelegationsRequest {
-	pub slot: u64,
-	pub delegate_bls_public_key: String,
-}
-
-/// Response for processing delegations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessDelegationsResponse {
-	pub success: bool,
-	pub slot: u64,
-	pub total_delegations: usize,
-	pub matching_delegations: Vec<SignedDelegation>,
-	pub message: String,
-}
-
-/// Scheduler endpoint: Process pending constraints
+/// Scheduler endpoint: Process constraints for a specific slot
 pub async fn process_constraints_handler<T>(
 	State(context): State<RpcContext<T>>,
+	Json(request): Json<ProcessConstraintsRequest>,
 ) -> Result<Json<ProcessConstraintsResponse>, StatusCode> {
-	info!("Processing constraints request");
+	info!("Processing constraints for slot {} with BLS public key", request.slot);
 
-	// 1. Read pending constraints from DB
-	let pending_constraints = match context.database().get_pending_constraints() {
+	// Parse BLS public keys
+	let bls_public_key =
+		match parse_bls_public_key_with_error_response(&request.bls_public_key, "delegate", request.slot) {
+			Ok(key) => key,
+			Err(error_response) => return error_response,
+		};
+
+	let proposer_public_key =
+		match parse_bls_public_key_with_error_response(&request.proposer_public_key, "proposer", request.slot) {
+			Ok(key) => key,
+			Err(error_response) => return error_response,
+		};
+
+	// Parse receiver BLS public keys
+	let receivers = match parse_bls_public_keys_with_error_response(&request.receivers, "receiver", request.slot) {
+		Ok(keys) => keys,
+		Err(error_response) => return error_response,
+	};
+
+	// 1. Get constraints for the specific slot
+	let slot_constraints = match context.database().get_constraints_for_slot(request.slot) {
 		Ok(constraints) => constraints,
 		Err(e) => {
-			error!("Failed to get pending constraints from database: {}", e);
-			return Err(StatusCode::INTERNAL_SERVER_ERROR);
+			error!("Failed to get constraints for slot {}: {}", request.slot, e);
+			return create_constraints_error_response(
+				request.slot,
+				&format!("Failed to get constraints for slot: {}", e),
+			);
 		}
 	};
 
-	if pending_constraints.is_empty() {
-		info!("No pending constraints to process");
+	if slot_constraints.is_empty() {
+		info!("No constraints found for slot {}", request.slot);
 		return Ok(Json(ProcessConstraintsResponse {
 			success: true,
+			slot: request.slot,
 			processed_count: 0,
-			message: "No pending constraints".to_string(),
+			signed_constraints: None,
+			message: format!("No constraints found for slot {}", request.slot),
 		}));
 	}
 
-	info!("Found {} pending constraints", pending_constraints.len());
-
-	// 2. Create ConstraintsMessage
-	let constraints_message = match create_constraints_message(pending_constraints.clone()) {
+	// 2. Create constraints message from slot constraints
+	let constraints_message = match create_constraints_message(
+		slot_constraints.clone(),
+		proposer_public_key,
+		bls_public_key.clone(), // delegate is the same as the signing key
+		request.slot,
+		receivers,
+	) {
 		Ok(message) => message,
 		Err(e) => {
-			error!("Failed to create constraints message: {}", e);
-			return Err(StatusCode::INTERNAL_SERVER_ERROR);
+			error!("Failed to create constraints message for slot {}: {}", request.slot, e);
+			return create_constraints_error_response(
+				request.slot,
+				&format!("Failed to create constraints message: {}", e),
+			);
 		}
 	};
 
-	// 3. Sign the message
-	let bls_public_key = context.bls_public_key.clone();
+	// 3. Sign the constraints message with the provided BLS public key
 	let signed_constraints =
 		match create_signed_constraints(&constraints_message, context.commit_config.clone(), bls_public_key).await {
 			Ok(signed) => signed,
 			Err(e) => {
-				error!("Failed to sign constraints message: {}", e);
-				return Err(StatusCode::INTERNAL_SERVER_ERROR);
+				error!("Failed to sign constraints message for slot {}: {}", request.slot, e);
+				return create_constraints_error_response(
+					request.slot,
+					&format!("Failed to sign constraints message: {}", e),
+				);
 			}
 		};
 
-	// 4. Send to relay using client
+	// 4. Send to relay using the client
 	let client = ConstraintsClient::new(context.relay_url.clone(), context.api_key.clone());
 
 	match client.post_constraints(&signed_constraints).await {
 		Ok(_) => {
-			info!("Successfully posted constraints to relay");
+			info!("Successfully sent constraints for slot {} to relay", request.slot);
+
+			// 5. Mark constraints as sent (atomic operation)
+			let mut all_marked = true;
+			for (constraint_id, _) in &slot_constraints {
+				if let Err(e) = context.database().mark_constraint_sent(constraint_id) {
+					error!("Failed to mark constraint {} as sent: {}", constraint_id, e);
+					all_marked = false;
+					// Continue processing other constraints
+				}
+			}
+
+			if !all_marked {
+				warn!("Some constraints could not be marked as sent for slot {}", request.slot);
+			}
+
+			Ok(Json(ProcessConstraintsResponse {
+				success: true,
+				slot: request.slot,
+				processed_count: constraints_message.constraints.len(),
+				signed_constraints: Some(signed_constraints),
+				message: format!(
+					"Successfully processed {} constraints for slot {}",
+					constraints_message.constraints.len(),
+					request.slot
+				),
+			}))
 		}
 		Err(e) => {
-			error!("Failed to post constraints to relay: {}", e);
-			return Err(StatusCode::INTERNAL_SERVER_ERROR);
+			error!("Failed to send constraints for slot {} to relay: {}", request.slot, e);
+			create_constraints_error_response(request.slot, &format!("Failed to send constraints to relay: {}", e))
 		}
 	}
-
-	// 5. Mark constraints as sent
-	for (constraint_id, _) in &pending_constraints {
-		if let Err(e) = context.database().mark_constraint_sent(constraint_id) {
-			warn!("Failed to mark constraint {} as sent: {}", constraint_id, e);
-		}
-	}
-
-	info!("Successfully processed {} constraints", pending_constraints.len());
-
-	Ok(Json(ProcessConstraintsResponse {
-		success: true,
-		processed_count: pending_constraints.len(),
-		message: "Constraints processed successfully".to_string(),
-	}))
 }
 
 /// Health check endpoint
@@ -141,13 +160,11 @@ pub async fn process_delegations_handler<T>(
 	info!("Processing delegations request for slot {} and delegate {}", request.slot, request.delegate_bls_public_key);
 
 	// Parse the delegate BLS public key
-	let delegate_bls_public_key = match cb_common::utils::bls_pubkey_from_hex(&request.delegate_bls_public_key) {
-		Ok(key) => key,
-		Err(e) => {
-			error!("Invalid delegate BLS public key format: {}", e);
-			return Err(StatusCode::BAD_REQUEST);
-		}
-	};
+	let delegate_bls_public_key =
+		match parse_bls_public_key_with_status_code(&request.delegate_bls_public_key, "delegate") {
+			Ok(key) => key,
+			Err(status_code) => return Err(status_code),
+		};
 
 	// Create client and fetch delegations for the slot
 	let client = ConstraintsClient::new(context.relay_url.clone(), context.api_key.clone());
@@ -192,12 +209,33 @@ mod tests {
 
 	#[test]
 	fn test_process_constraints_response() {
-		let response =
-			ProcessConstraintsResponse { success: true, processed_count: 5, message: "Test message".to_string() };
+		let response = ProcessConstraintsResponse {
+			success: true,
+			slot: 12345,
+			processed_count: 5,
+			signed_constraints: None,
+			message: "Test message".to_string(),
+		};
 
 		assert!(response.success);
+		assert_eq!(response.slot, 12345);
 		assert_eq!(response.processed_count, 5);
 		assert_eq!(response.message, "Test message");
+	}
+
+	#[test]
+	fn test_process_constraints_request() {
+		let request = ProcessConstraintsRequest {
+			slot: 12345,
+			bls_public_key: "0x1234567890abcdef".to_string(),
+			proposer_public_key: "0xabcdef1234567890".to_string(),
+			receivers: vec!["0x1111111111111111".to_string(), "0x2222222222222222".to_string()],
+		};
+
+		assert_eq!(request.slot, 12345);
+		assert_eq!(request.bls_public_key, "0x1234567890abcdef");
+		assert_eq!(request.proposer_public_key, "0xabcdef1234567890");
+		assert_eq!(request.receivers.len(), 2);
 	}
 
 	#[test]

@@ -2,6 +2,7 @@ pub mod commitments;
 pub mod constraints;
 pub mod context;
 pub mod database;
+pub mod requests;
 pub mod responses;
 
 // Re-export all types for easy access
@@ -12,4 +13,5 @@ pub use constraints::{
 };
 pub use context::RpcContext;
 pub use database::DatabaseContext;
-pub use responses::SlotInfoResponse;
+pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};
+pub use responses::{HealthResponse, ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse};

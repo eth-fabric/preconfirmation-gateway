@@ -1,9 +1,10 @@
 use alloy::primitives::B256;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
+use common::constants::CONSTRAINT_TYPE;
 use eyre::Result;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use common::signer;
 use common::types::constraints::{Constraint, ConstraintsMessage, SignedConstraints};
@@ -45,26 +46,18 @@ pub fn validate_constraints_message(_message: &ConstraintsMessage) -> Result<()>
 }
 
 /// Creates a ConstraintsMessage from pending constraints
-pub fn create_constraints_message(pending_constraints: Vec<(B256, Constraint)>) -> Result<ConstraintsMessage> {
+pub fn create_constraints_message(
+	pending_constraints: Vec<(B256, Constraint)>,
+	proposer: BlsPublicKey,
+	delegate: BlsPublicKey,
+	slot: u64,
+	receivers: Vec<BlsPublicKey>,
+) -> Result<ConstraintsMessage> {
 	info!("Creating constraints message from {} pending constraints", pending_constraints.len());
 
 	if pending_constraints.is_empty() {
 		return Err(eyre::eyre!("No pending constraints to process"));
 	}
-
-	// TODO: Extract proposer, delegate, slot, and receivers from constraints
-	// For now, using placeholder values - these will be replaced with proper values
-	// Note: These are dummy values that will be replaced with real ones from config
-	let proposer = cb_common::utils::bls_pubkey_from_hex(
-		"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-	)
-	.unwrap(); // TODO: Get from config or constraints
-	let delegate = cb_common::utils::bls_pubkey_from_hex(
-		"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-	)
-	.unwrap(); // TODO: Get from config or constraints
-	let slot = 0; // TODO: Get current slot
-	let receivers = vec![]; // TODO: Get from config or constraints
 
 	let constraints: Vec<Constraint> = pending_constraints.into_iter().map(|(_, constraint)| constraint).collect();
 
@@ -76,15 +69,84 @@ pub fn create_constraints_message(pending_constraints: Vec<(B256, Constraint)>) 
 
 /// Validates a constraint
 pub fn validate_constraint(constraint: &Constraint) -> Result<()> {
-	if constraint.constraint_type == 0 {
-		return Err(eyre::eyre!("Invalid constraint type: 0"));
+	if constraint.constraint_type != CONSTRAINT_TYPE {
+		return Err(eyre::eyre!("Invalid constraint type: {}", constraint.constraint_type));
 	}
 
 	if constraint.payload.is_empty() {
 		return Err(eyre::eyre!("Empty constraint payload"));
 	}
 
+	// todo other validation logic
+
 	Ok(())
+}
+
+/// Parse a BLS public key from hex string with error handling
+pub fn parse_bls_public_key(hex_string: &str, field_name: &str) -> Result<BlsPublicKey> {
+	cb_common::utils::bls_pubkey_from_hex(hex_string)
+		.map_err(|e| eyre::eyre!("Invalid {} BLS public key: {}", field_name, e))
+}
+
+/// Parse multiple BLS public keys from hex strings with error handling
+pub fn parse_bls_public_keys(hex_strings: &[String], field_name: &str) -> Result<Vec<BlsPublicKey>> {
+	let mut keys = Vec::new();
+	for (index, hex_string) in hex_strings.iter().enumerate() {
+		let key = cb_common::utils::bls_pubkey_from_hex(hex_string)
+			.map_err(|e| eyre::eyre!("Invalid {} BLS public key at index {}: {}", field_name, index, e))?;
+		keys.push(key);
+	}
+	Ok(keys)
+}
+
+/// Helper function to create error response for constraints handlers
+pub fn create_constraints_error_response(
+	slot: u64,
+	error_message: &str,
+) -> Result<axum::response::Json<common::types::ProcessConstraintsResponse>, axum::http::StatusCode> {
+	use axum::response::Json;
+
+	Ok(Json(common::types::ProcessConstraintsResponse {
+		success: false,
+		slot,
+		processed_count: 0,
+		signed_constraints: None,
+		message: error_message.to_string(),
+	}))
+}
+
+/// Parse BLS public key with error handling for constraints handlers
+pub fn parse_bls_public_key_with_error_response(
+	hex_string: &str,
+	field_name: &str,
+	slot: u64,
+) -> Result<BlsPublicKey, Result<axum::response::Json<common::types::ProcessConstraintsResponse>, axum::http::StatusCode>>
+{
+	parse_bls_public_key(hex_string, field_name).map_err(|e| create_constraints_error_response(slot, &format!("{}", e)))
+}
+
+/// Parse multiple BLS public keys with error handling for constraints handlers
+pub fn parse_bls_public_keys_with_error_response(
+	hex_strings: &[String],
+	field_name: &str,
+	slot: u64,
+) -> Result<
+	Vec<BlsPublicKey>,
+	Result<axum::response::Json<common::types::ProcessConstraintsResponse>, axum::http::StatusCode>,
+> {
+	parse_bls_public_keys(hex_strings, field_name)
+		.map_err(|e| create_constraints_error_response(slot, &format!("{}", e)))
+}
+
+/// Parse BLS public key with error handling for delegations handlers (returns StatusCode)
+pub fn parse_bls_public_key_with_status_code(
+	hex_string: &str,
+	field_name: &str,
+) -> Result<BlsPublicKey, axum::http::StatusCode> {
+	parse_bls_public_key(hex_string, field_name).map_err(|e| {
+		error!("{}", e);
+		axum::http::StatusCode::BAD_REQUEST
+	})
 }
 
 /// Validates multiple constraints
