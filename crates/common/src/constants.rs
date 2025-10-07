@@ -16,6 +16,9 @@ pub mod routes {
 		/// Process constraints endpoint (for scheduler)
 		pub const PROCESS: &str = "/process-constraints";
 
+		/// Process delegations endpoint (for scheduler)
+		pub const PROCESS_DELEGATIONS: &str = "/process-delegations";
+
 		/// Constraints capabilities endpoint
 		pub const CAPABILITIES: &str = "/constraints/capabilities";
 

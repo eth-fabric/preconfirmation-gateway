@@ -21,6 +21,7 @@ pub async fn run_constraints_server<T: Send + Sync + Clone + 'static>(
 ) -> Result<()> {
 	let app = Router::new()
 		.route(routes::constraints::PROCESS, post(handlers::process_constraints_handler))
+		.route(routes::constraints::PROCESS_DELEGATIONS, post(handlers::process_delegations_handler))
 		.route(routes::HEALTH, get(handlers::health_handler))
 		.route(routes::constraints::CAPABILITIES, get(handlers::capabilities_handler))
 		.with_state(rpc_context);
