@@ -288,9 +288,6 @@ pub mod test_helpers {
 			constraints_bls_public_key:
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
-			constraints_proposer_public_key:
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
-					.to_string(),
 			constraints_delegate_public_key:
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),

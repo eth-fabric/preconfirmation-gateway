@@ -41,9 +41,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		constraints_bls_public_key:
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
-		constraints_proposer_public_key:
-			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
-				.to_string(),
 		constraints_delegate_public_key:
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),

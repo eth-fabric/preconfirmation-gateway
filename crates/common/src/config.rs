@@ -30,7 +30,6 @@ pub struct ConstraintsConfig {
 	pub relay_url: String,
 	pub api_key: Option<String>,
 	pub bls_public_key: String,
-	pub proposer_public_key: String,
 	pub delegate_public_key: String,
 }
 
@@ -57,7 +56,6 @@ pub struct InclusionPreconfConfig {
 	pub constraints_relay_url: String,
 	pub constraints_api_key: Option<String>,
 	pub constraints_bls_public_key: String,
-	pub constraints_proposer_public_key: String,
 	pub constraints_delegate_public_key: String,
 }
 
@@ -104,9 +102,6 @@ impl Default for ConstraintsConfig {
 			bls_public_key:
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
-			proposer_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
 			delegate_public_key:
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
@@ -142,7 +137,6 @@ impl InclusionPreconfConfig {
 			relay_url: self.constraints_relay_url.clone(),
 			api_key: self.constraints_api_key.clone(),
 			bls_public_key: self.constraints_bls_public_key.clone(),
-			proposer_public_key: self.constraints_proposer_public_key.clone(),
 			delegate_public_key: self.constraints_delegate_public_key.clone(),
 		}
 	}
@@ -172,9 +166,6 @@ mod tests {
 			constraints_api_key: Some("test-api-key".to_string()),
 			constraints_bls_public_key:
 				"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
-					.to_string(),
-			constraints_proposer_public_key:
-				"020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
 					.to_string(),
 			constraints_delegate_public_key:
 				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"

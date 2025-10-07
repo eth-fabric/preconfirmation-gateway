@@ -3,9 +3,8 @@ use jsonrpsee::core::RpcResult;
 use tracing::{error, info, instrument};
 
 use super::utils;
-use alloy::primitives::{Address, B256};
+use alloy::primitives::B256;
 use commit_boost::prelude::commit::request::EncryptionScheme;
-use common::signer;
 use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
