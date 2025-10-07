@@ -19,3 +19,4 @@ tracing-subscriber = { workspace = true }
 alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 commit-boost = { workspace = true }
+cb-common = { workspace = true }

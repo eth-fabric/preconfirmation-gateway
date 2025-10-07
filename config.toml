@@ -47,3 +47,11 @@ traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
 committer_address = "0x0000000000000000000000000000000000000000"
 sleep_secs = 5
 use_ecdsa_keys = true
+
+# Constraints configuration
+constraints_server_port = 8081
+constraints_relay_url = "https://relay.example.com"
+constraints_api_key = ""
+constraints_bls_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+constraints_proposer_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+constraints_delegate_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"

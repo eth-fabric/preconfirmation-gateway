@@ -29,6 +29,19 @@ fn test_inclusion_preconf_config_methods() {
 		enable_method_tracing: false,
 		traced_methods: vec!["test_method".to_string()],
 		committer_address: "0x1234567890123456789012345678901234567890".to_string(),
+		// Constraints config fields
+		constraints_server_port: 8080,
+		constraints_relay_url: "https://relay.example.com".to_string(),
+		constraints_api_key: None,
+		constraints_bls_public_key:
+			"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+				.to_string(),
+		constraints_proposer_public_key:
+			"020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+				.to_string(),
+		constraints_delegate_public_key:
+			"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
+				.to_string(),
 	};
 
 	// Test the individual config methods

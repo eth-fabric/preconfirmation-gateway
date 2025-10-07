@@ -3,10 +3,10 @@ use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::{Result, WrapErr};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use common::constants::COMMITMENT_TYPE;
-use common::signing;
+use common::signer;
 use common::types::commitments::{FeePayload, InclusionPayload};
 use common::types::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment};
 
@@ -224,25 +224,6 @@ pub fn format_error(context: &str, error: &str) -> String {
 	format!("{}: {}", context, error)
 }
 
-/// Signs a commitment using ECDSA with the provided private key
-pub async fn sign_commitment(_commitment: &Commitment, _private_key: &str) -> Result<Signature> {
-	debug!("Signing commitment with ECDSA using commit-boost");
-
-	// TODO: Implement proper commit-boost integration
-	// The commit-boost client requires a signer service setup
-	// For now, using mock signature until we set up the signer service
-
-	warn!("Using mock signature - commit-boost signer service integration pending");
-
-	// Create a mock signature for now
-	let signature = "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-        .parse()
-        .wrap_err("Failed to parse mock signature")?;
-
-	debug!("Commitment signed successfully (mock)");
-	Ok(signature)
-}
-
 /// Creates a properly signed commitment using ECDSA
 pub async fn create_signed_commitment<T>(
 	request: &CommitmentRequest,
@@ -278,7 +259,7 @@ pub async fn create_signed_commitment<T>(
 	// 6. Call the proxy_ecdsa signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
-		signing::call_proxy_ecdsa_signer(&mut *commit_config, commitment_hash, committer_address).await?
+		signer::call_proxy_ecdsa_signer(&mut *commit_config, commitment_hash, committer_address).await?
 	};
 	debug!("Received response from proxy_ecdsa: {:?}", response);
 

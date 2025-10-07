@@ -1,7 +1,7 @@
-use alloy::primitives::{Address, B256, Bytes, Signature, U256};
+use alloy::primitives::{Address, B256, Bytes, U256};
 use alloy::sol_types::SolValue;
 use alloy_primitives::keccak256;
-use eyre::{Result, WrapErr};
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -304,5 +304,18 @@ mod tests {
 		assert_eq!(capabilities.constraint_types.len(), 5);
 		assert_eq!(capabilities.constraint_types[0], 1);
 		assert_eq!(capabilities.constraint_types[4], 5);
+	}
+
+	/// Test serialization and deserialization of constraint types
+	#[test]
+	fn test_constraint_serialization() {
+		let constraint = Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3, 4, 5, 6, 7, 8]) };
+
+		// Test JSON serialization
+		let json = serde_json::to_string(&constraint).unwrap();
+		let deserialized: Constraint = serde_json::from_str(&json).unwrap();
+
+		assert_eq!(constraint.constraint_type, deserialized.constraint_type);
+		assert_eq!(constraint.payload, deserialized.payload);
 	}
 }

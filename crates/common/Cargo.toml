@@ -18,6 +18,7 @@ commit-boost = { workspace = true }
 urc = { workspace = true }
 
 blst = "0.3"
+hex = "0.4"
 
 [dev-dependencies]
 tempfile = "3.8"

@@ -238,10 +238,89 @@ pub mod test_helpers {
 		// Start local signer server to get proper config
 		let commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", port).await?;
 
+		// TODO: Get these from configuration - using defaults for tests
+		// Use a valid BLS public key for testing
+		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
+		let relay_url = "https://relay.example.com".to_string();
+		let api_key = None::<String>;
+
 		Ok(RpcContext {
 			database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			committer_address: Address::ZERO,
+			bls_public_key,
+			relay_url,
+			api_key,
+		})
+	}
+
+	/// Creates a test RPC context with InclusionPreconfConfig for server tests
+	/// This function provides a complete test environment for server tests that need the full config
+	pub async fn create_test_context_with_config() -> Result<RpcContext<InclusionPreconfConfig>> {
+		let temp_dir = TempDir::new().unwrap();
+		let db_path = temp_dir.path().join("test_db");
+
+		let mut opts = Options::default();
+		opts.create_if_missing(true);
+		let db = DB::open(&opts, &db_path).unwrap();
+		let database = DatabaseContext::new(Arc::new(db));
+
+		// Generate a random port to avoid conflicts
+		let mut rng = rand::thread_rng();
+		let rpc_port = rng.gen_range(3000..65535);
+		let constraints_port = rpc_port + 1;
+
+		// Create test config
+		let app_config = InclusionPreconfConfig {
+			rpc_server_host: "127.0.0.1".to_string(),
+			rpc_server_port: rpc_port,
+			database_url: "./test_db".to_string(),
+			log_level: "info".to_string(),
+			enable_method_tracing: false,
+			traced_methods: vec![],
+			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
+			constraints_server_port: constraints_port,
+			constraints_relay_url: "https://relay.example.com".to_string(),
+			constraints_api_key: None,
+			constraints_bls_public_key:
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
+			constraints_proposer_public_key:
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
+			constraints_delegate_public_key:
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
+		};
+
+		// Start local signer server with config
+		let commit_config = start_local_signer_server_with_config(
+			MODULE_ID,
+			SIGNING_ID,
+			"test-admin-secret",
+			rpc_port,
+			app_config.clone(),
+		)
+		.await?;
+
+		// Use a valid BLS public key for testing
+		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
+		let relay_url = "https://relay.example.com".to_string();
+		let api_key = None::<String>;
+
+		Ok(RpcContext {
+			database,
+			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
+			committer_address: Address::ZERO,
+			bls_public_key,
+			relay_url,
+			api_key,
 		})
 	}
 }

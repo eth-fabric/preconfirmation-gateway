@@ -2,7 +2,7 @@ use alloy::primitives::{Address, B256};
 use commit_boost::prelude::{
 	BlsPublicKey, StartCommitModuleConfig,
 	commit::{
-		request::SignProxyRequest,
+		request::{EncryptionScheme, SignProxyRequest},
 		response::{BlsSignResponse, EcdsaSignResponse},
 	},
 	verify_proposer_commitment_signature_ecdsa_for_message,
@@ -68,4 +68,40 @@ pub async fn call_proxy_bls_signer<T>(
 	info!("BLS signature received (verification pending)");
 
 	Ok(proxy_response_bls)
+}
+
+/// Generates a proxy key using the signer client
+pub async fn generate_proxy_key_ecdsa<T>(
+	commit_config: &mut StartCommitModuleConfig<T>,
+	bls_public_key: BlsPublicKey,
+) -> Result<Address> {
+	debug!("Generating ECDSA proxy key for BLS public key: {:?}", bls_public_key);
+
+	let signed_delegation = commit_config
+		.signer_client
+		.generate_proxy_key_ecdsa(bls_public_key)
+		.await
+		.wrap_err("Failed to generate ECDSA proxy key")?;
+
+	let proxy_address = signed_delegation.message.proxy;
+	info!("Generated ECDSA proxy key: {:?}", proxy_address);
+	Ok(proxy_address)
+}
+
+/// Generates a BLS proxy key using the signer client
+pub async fn generate_proxy_key_bls<T>(
+	commit_config: &mut StartCommitModuleConfig<T>,
+	bls_public_key: BlsPublicKey,
+) -> Result<BlsPublicKey> {
+	debug!("Generating BLS proxy key for BLS public key: {:?}", bls_public_key);
+
+	let signed_delegation = commit_config
+		.signer_client
+		.generate_proxy_key_bls(bls_public_key)
+		.await
+		.wrap_err("Failed to generate BLS proxy key")?;
+
+	let proxy_key = signed_delegation.message.proxy;
+	info!("Generated BLS proxy key: {:?}", proxy_key);
+	Ok(proxy_key)
 }

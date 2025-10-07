@@ -118,6 +118,114 @@ impl DatabaseContext {
 			None => Ok(None),
 		}
 	}
+
+	/// Store a constraint in the database
+	pub fn store_constraint(&self, constraint_id: &B256, constraint: &crate::types::Constraint) -> Result<()> {
+		let key = format!("constraint:{}", constraint_id);
+		let value = serde_json::to_vec(constraint)?;
+		self.put(key.as_bytes(), &value)
+	}
+
+	/// Retrieve a constraint from the database
+	pub fn get_constraint(&self, constraint_id: &B256) -> Result<Option<crate::types::Constraint>> {
+		let key = format!("constraint:{}", constraint_id);
+		match self.get(key.as_bytes())? {
+			Some(value) => {
+				let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
+				Ok(Some(constraint))
+			}
+			None => Ok(None),
+		}
+	}
+
+	/// Get all pending constraints (not yet sent to relay)
+	pub fn get_pending_constraints(&self) -> Result<Vec<(B256, crate::types::Constraint)>> {
+		let mut pending_constraints = Vec::new();
+
+		// Scan for constraint:* keys
+		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+
+		for item in iter {
+			let (key, value) = item?;
+			let key_str = String::from_utf8_lossy(&key);
+
+			// Check if this is a constraint key
+			if key_str.starts_with("constraint:") {
+				let constraint_id_str = &key_str[11..]; // Remove "constraint:" prefix
+
+				// Parse the constraint ID
+				if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
+					// Check if this constraint has been sent
+					let status_key = format!("constraint_status:{}", constraint_id);
+					let status = self.get(status_key.as_bytes())?;
+
+					// If no status or status is not "sent", it's pending
+					if status.is_none() || status != Some(b"sent".to_vec()) {
+						// Deserialize the constraint
+						if let Ok(constraint) = serde_json::from_slice::<crate::types::Constraint>(&value) {
+							pending_constraints.push((constraint_id, constraint));
+						}
+					}
+				}
+			}
+		}
+
+		Ok(pending_constraints)
+	}
+
+	/// Mark constraint as sent to relay
+	pub fn mark_constraint_sent(&self, constraint_id: &B256) -> Result<()> {
+		let key = format!("constraint_status:{}", constraint_id);
+		self.put(key.as_bytes(), b"sent")
+	}
+
+	/// Get constraint status
+	pub fn get_constraint_status(&self, constraint_id: &B256) -> Result<Option<String>> {
+		let key = format!("constraint_status:{}", constraint_id);
+		match self.get(key.as_bytes())? {
+			Some(value) => Ok(Some(String::from_utf8_lossy(&value).to_string())),
+			None => Ok(None),
+		}
+	}
+
+	/// Get all constraints (pending and sent)
+	pub fn get_all_constraints(&self) -> Result<Vec<(B256, crate::types::Constraint)>> {
+		let mut all_constraints = Vec::new();
+
+		// Scan for constraint:* keys
+		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+
+		for item in iter {
+			let (key, value) = item?;
+			let key_str = String::from_utf8_lossy(&key);
+
+			// Check if this is a constraint key
+			if key_str.starts_with("constraint:") {
+				let constraint_id_str = &key_str[11..]; // Remove "constraint:" prefix
+
+				// Parse the constraint ID
+				if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
+					// Deserialize the constraint
+					if let Ok(constraint) = serde_json::from_slice::<crate::types::Constraint>(&value) {
+						all_constraints.push((constraint_id, constraint));
+					}
+				}
+			}
+		}
+
+		Ok(all_constraints)
+	}
+
+	/// Delete constraint and its status
+	pub fn delete_constraint(&self, constraint_id: &B256) -> Result<()> {
+		let constraint_key = format!("constraint:{}", constraint_id);
+		let status_key = format!("constraint_status:{}", constraint_id);
+
+		self.delete(constraint_key.as_bytes())?;
+		self.delete(status_key.as_bytes())?;
+
+		Ok(())
+	}
 }
 
 impl std::fmt::Debug for DatabaseContext {
@@ -380,5 +488,211 @@ mod tests {
 		let test_key = b"test_connection";
 		let retrieved = db.get(test_key).unwrap();
 		assert!(retrieved.is_none());
+	}
+
+	/// Test database operations for constraints
+	#[tokio::test]
+	async fn test_constraint_database_operations() {
+		let (_temp_dir, database) = create_test_db();
+
+		// Create test constraint
+		let constraint_id = B256::random();
+		let constraint = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3, 4]) };
+
+		// Test storing constraint
+		database.store_constraint(&constraint_id, &constraint).unwrap();
+
+		// Test retrieving constraint
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_some());
+		assert_eq!(retrieved.unwrap().constraint_type, constraint.constraint_type);
+
+		// Test getting pending constraints
+		let pending = database.get_pending_constraints().unwrap();
+		assert_eq!(pending.len(), 1);
+		assert_eq!(pending[0].0, constraint_id);
+
+		// Test marking constraint as sent
+		database.mark_constraint_sent(&constraint_id).unwrap();
+
+		// Test that constraint is no longer pending
+		let pending_after = database.get_pending_constraints().unwrap();
+		assert_eq!(pending_after.len(), 0);
+
+		// Test constraint status
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, Some("sent".to_string()));
+
+		// Test deleting constraint
+		database.delete_constraint(&constraint_id).unwrap();
+		let deleted = database.get_constraint(&constraint_id).unwrap();
+		assert!(deleted.is_none());
+	}
+
+	/// Test constraint status edge cases
+	#[tokio::test]
+	async fn test_constraint_status_edge_cases() {
+		let (_temp_dir, database) = create_test_db();
+
+		let constraint_id = B256::random();
+		let constraint = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![5, 6, 7, 8]) };
+
+		// Test getting status for non-existent constraint
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, None);
+
+		// Store constraint but don't mark as sent
+		database.store_constraint(&constraint_id, &constraint).unwrap();
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, None);
+
+		// Mark as sent and verify status
+		database.mark_constraint_sent(&constraint_id).unwrap();
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, Some("sent".to_string()));
+	}
+
+	/// Test multiple constraints with different statuses
+	#[tokio::test]
+	async fn test_multiple_constraints_with_statuses() {
+		let (_temp_dir, database) = create_test_db();
+
+		// Create multiple constraints
+		let constraint1_id = B256::random();
+		let constraint1 = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3]) };
+
+		let constraint2_id = B256::random();
+		let constraint2 = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![4, 5, 6]) };
+
+		let constraint3_id = B256::random();
+		let constraint3 = crate::types::Constraint { constraint_type: 3, payload: Bytes::from(vec![7, 8, 9]) };
+
+		// Store all constraints
+		database.store_constraint(&constraint1_id, &constraint1).unwrap();
+		database.store_constraint(&constraint2_id, &constraint2).unwrap();
+		database.store_constraint(&constraint3_id, &constraint3).unwrap();
+
+		// All should be pending initially
+		let pending = database.get_pending_constraints().unwrap();
+		assert_eq!(pending.len(), 3);
+
+		// Mark constraint2 as sent
+		database.mark_constraint_sent(&constraint2_id).unwrap();
+
+		// Now only 2 should be pending
+		let pending = database.get_pending_constraints().unwrap();
+		assert_eq!(pending.len(), 2);
+		assert!(pending.iter().any(|(id, _)| *id == constraint1_id));
+		assert!(pending.iter().any(|(id, _)| *id == constraint3_id));
+		assert!(!pending.iter().any(|(id, _)| *id == constraint2_id));
+
+		// Test get_all_constraints returns all 3
+		let all_constraints = database.get_all_constraints().unwrap();
+		assert_eq!(all_constraints.len(), 3);
+	}
+
+	/// Test constraint serialization and deserialization
+	#[tokio::test]
+	async fn test_constraint_serialization_roundtrip() {
+		let (_temp_dir, database) = create_test_db();
+
+		let constraint_id = B256::random();
+		let original_constraint = crate::types::Constraint {
+			constraint_type: 42,
+			payload: Bytes::from(vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a]),
+		};
+
+		// Store constraint
+		database.store_constraint(&constraint_id, &original_constraint).unwrap();
+
+		// Retrieve and verify
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_some());
+		let retrieved_constraint = retrieved.unwrap();
+		assert_eq!(retrieved_constraint.constraint_type, original_constraint.constraint_type);
+		assert_eq!(retrieved_constraint.payload, original_constraint.payload);
+	}
+
+	/// Test constraint deletion removes both constraint and status
+	#[tokio::test]
+	async fn test_constraint_deletion_complete() {
+		let (_temp_dir, database) = create_test_db();
+
+		let constraint_id = B256::random();
+		let constraint = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3, 4]) };
+
+		// Store constraint and mark as sent
+		database.store_constraint(&constraint_id, &constraint).unwrap();
+		database.mark_constraint_sent(&constraint_id).unwrap();
+
+		// Verify both constraint and status exist
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_some());
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, Some("sent".to_string()));
+
+		// Delete constraint
+		database.delete_constraint(&constraint_id).unwrap();
+
+		// Verify both constraint and status are gone
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_none());
+		let status = database.get_constraint_status(&constraint_id).unwrap();
+		assert_eq!(status, None);
+	}
+
+	/// Test constraint with empty payload
+	#[tokio::test]
+	async fn test_constraint_empty_payload() {
+		let (_temp_dir, database) = create_test_db();
+
+		let constraint_id = B256::random();
+		let constraint = crate::types::Constraint { constraint_type: 0, payload: Bytes::new() };
+
+		database.store_constraint(&constraint_id, &constraint).unwrap();
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_some());
+		let retrieved_constraint = retrieved.unwrap();
+		assert_eq!(retrieved_constraint.constraint_type, 0);
+		assert_eq!(retrieved_constraint.payload, Bytes::new());
+	}
+
+	/// Test constraint with large payload
+	#[tokio::test]
+	async fn test_constraint_large_payload() {
+		let (_temp_dir, database) = create_test_db();
+
+		let constraint_id = B256::random();
+		let large_payload = Bytes::from(vec![0x42; 1000]); // 1000 bytes
+		let constraint = crate::types::Constraint { constraint_type: 999, payload: large_payload.clone() };
+
+		database.store_constraint(&constraint_id, &constraint).unwrap();
+		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		assert!(retrieved.is_some());
+		let retrieved_constraint = retrieved.unwrap();
+		assert_eq!(retrieved_constraint.constraint_type, 999);
+		assert_eq!(retrieved_constraint.payload, large_payload);
+	}
+
+	/// Test constraint ID parsing edge cases
+	#[tokio::test]
+	async fn test_constraint_id_parsing() {
+		let (_temp_dir, database) = create_test_db();
+
+		// Test with zero constraint ID
+		let zero_id = B256::ZERO;
+		let constraint = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1]) };
+
+		database.store_constraint(&zero_id, &constraint).unwrap();
+		let retrieved = database.get_constraint(&zero_id).unwrap();
+		assert!(retrieved.is_some());
+
+		// Test with max constraint ID
+		let max_id = B256::from([0xFF; 32]);
+		let constraint2 = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![2]) };
+
+		database.store_constraint(&max_id, &constraint2).unwrap();
+		let retrieved = database.get_constraint(&max_id).unwrap();
+		assert!(retrieved.is_some());
 	}
 }

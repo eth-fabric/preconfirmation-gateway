@@ -58,6 +58,19 @@ impl TestEnvironment {
 				"fee".to_string(),
 			],
 			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
+			// Constraints config fields
+			constraints_server_port: 8080,
+			constraints_relay_url: "https://relay.example.com".to_string(),
+			constraints_api_key: None,
+			constraints_bls_public_key:
+				"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+					.to_string(),
+			constraints_proposer_public_key:
+				"020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
+					.to_string(),
+			constraints_delegate_public_key:
+				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
+					.to_string(),
 		};
 
 		// Start local signer server with test configuration
@@ -85,8 +98,23 @@ impl TestEnvironment {
 			.map_err(|e| eyre::eyre!("Failed to generate proxy key: {}", e))?;
 		let committer_address = proxy_address.message.proxy;
 
-		// Create RPC context
-		let rpc_context = common::types::RpcContext::new(database, commit_config_guard, committer_address);
+		// Create RPC context with constraints fields
+		// Use a valid BLS public key for testing
+		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
+		let relay_url = "https://relay.example.com".to_string();
+		let api_key = None::<String>;
+
+		let rpc_context = common::types::RpcContext::new(
+			database,
+			commit_config_guard,
+			committer_address,
+			bls_public_key,
+			relay_url,
+			api_key,
+		);
 
 		// Start RPC server
 		let server_address = format!("127.0.0.1:{}", rpc_port);

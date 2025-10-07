@@ -1,6 +1,5 @@
 use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
-use commitments::server;
 use common::{config, db, types};
 
 #[tokio::main]
@@ -10,7 +9,7 @@ async fn main() -> anyhow::Result<()> {
 		.map_err(|e| anyhow::anyhow!("Failed to load commit module config: {}", e))?;
 
 	// Setup logging with configuration
-	server::setup_logging(&commit_config)?;
+	constraints::setup_logging(&commit_config).map_err(|e| anyhow::anyhow!("Failed to setup logging: {}", e))?;
 
 	// Initialize RocksDB database
 	let db = db::create_database(&commit_config)?;
@@ -24,7 +23,7 @@ async fn main() -> anyhow::Result<()> {
 		.parse()
 		.map_err(|e| anyhow::anyhow!("Invalid committer address in config: {}", e))?;
 
-	// Get constraints configuration for BLS keys and relay settings
+	// Get constraints configuration
 	let constraints_config = commit_config.extra.constraints();
 	let bls_public_key = bls_pubkey_from_hex(&constraints_config.bls_public_key)
 		.map_err(|e| anyhow::anyhow!("Failed to create BLS public key: {}", e))?;
@@ -35,7 +34,10 @@ async fn main() -> anyhow::Result<()> {
 	let rpc_context =
 		types::RpcContext::new(db_context, commit_config, committer_address, bls_public_key, relay_url, api_key);
 
-	server::run_server(rpc_context).await?;
+	// Run the constraints server
+	constraints::run_constraints_server(rpc_context, constraints_config.server_port)
+		.await
+		.map_err(|e| anyhow::anyhow!("Failed to run constraints server: {}", e))?;
 
 	Ok(())
 }

@@ -106,7 +106,7 @@ async fn test_generate_proxy_key_helper_function() -> Result<()> {
 #[tokio::test]
 async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	use alloy::primitives::{Address, b256};
-	use common::signing::call_proxy_ecdsa_signer;
+	use common::signer::call_proxy_ecdsa_signer;
 
 	let port = rand::thread_rng().gen_range(20000..65535);
 

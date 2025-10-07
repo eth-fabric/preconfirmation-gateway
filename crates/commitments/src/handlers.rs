@@ -3,7 +3,9 @@ use jsonrpsee::core::RpcResult;
 use tracing::{error, info, instrument};
 
 use super::utils;
-use alloy::primitives::B256;
+use alloy::primitives::{Address, B256};
+use commit_boost::prelude::commit::request::EncryptionScheme;
+use common::signer;
 use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
@@ -149,4 +151,102 @@ pub fn fee_handler<T>(
 
 	info!("Fee request processed successfully");
 	Ok(fee_info)
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+pub struct GenerateProxyKeyRequest {
+	pub bls_public_key: String,
+	pub encryption_scheme: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct GenerateProxyKeyResponse {
+	pub signed_delegation: serde_json::Value, // Will contain the SignedProxyDelegation
+	pub encryption_scheme: String,
+}
+
+#[instrument(name = "generate_proxy_key", skip(_context, _extensions))]
+pub async fn generate_proxy_key_handler<T>(
+	params: jsonrpsee::types::Params<'_>,
+	_context: std::sync::Arc<RpcContext<T>>,
+	_extensions: Extensions,
+) -> RpcResult<GenerateProxyKeyResponse> {
+	info!("Processing generate proxy key request");
+	let request: GenerateProxyKeyRequest = params.one()?;
+
+	// Parse BLS public key
+	let bls_public_key = match cb_common::utils::bls_pubkey_from_hex(&request.bls_public_key) {
+		Ok(key) => key,
+		Err(e) => {
+			error!("Invalid BLS public key format: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Invalid BLS public key format",
+				Some(format!("{}", e)),
+			));
+		}
+	};
+
+	// Parse encryption scheme
+	let encryption_scheme = match request.encryption_scheme.to_lowercase().as_str() {
+		"ecdsa" => EncryptionScheme::Ecdsa,
+		"bls" => EncryptionScheme::Bls,
+		_ => {
+			error!("Invalid encryption scheme: {}", request.encryption_scheme);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Invalid encryption scheme",
+				Some(format!("Expected 'ecdsa' or 'bls', got: {}", request.encryption_scheme)),
+			));
+		}
+	};
+
+	// Generate proxy key
+	let commit_config = _context.commit_config.clone();
+	let signed_delegation = {
+		let mut commit_config = commit_config.lock().await;
+		match encryption_scheme {
+			EncryptionScheme::Ecdsa => {
+				let delegation =
+					commit_config.signer_client.generate_proxy_key_ecdsa(bls_public_key).await.map_err(|e| {
+						error!("Failed to generate ECDSA proxy key: {}", e);
+						jsonrpsee::types::error::ErrorObject::owned(
+							-32603, // Internal error
+							"Failed to generate ECDSA proxy key",
+							Some(format!("{}", e)),
+						)
+					})?;
+				serde_json::to_value(delegation).map_err(|e| {
+					error!("Failed to serialize ECDSA delegation: {}", e);
+					jsonrpsee::types::error::ErrorObject::owned(
+						-32603, // Internal error
+						"Failed to serialize delegation",
+						Some(format!("{}", e)),
+					)
+				})?
+			}
+			EncryptionScheme::Bls => {
+				let delegation =
+					commit_config.signer_client.generate_proxy_key_bls(bls_public_key).await.map_err(|e| {
+						error!("Failed to generate BLS proxy key: {}", e);
+						jsonrpsee::types::error::ErrorObject::owned(
+							-32603, // Internal error
+							"Failed to generate BLS proxy key",
+							Some(format!("{}", e)),
+						)
+					})?;
+				serde_json::to_value(delegation).map_err(|e| {
+					error!("Failed to serialize BLS delegation: {}", e);
+					jsonrpsee::types::error::ErrorObject::owned(
+						-32603, // Internal error
+						"Failed to serialize delegation",
+						Some(format!("{}", e)),
+					)
+				})?
+			}
+		}
+	};
+
+	info!("Proxy key generated successfully");
+	Ok(GenerateProxyKeyResponse { signed_delegation, encryption_scheme: request.encryption_scheme })
 }

@@ -12,6 +12,7 @@ pub fn setup_commitment_methods<T: Send + Sync + 'static>(
 	module.register_method("commitmentResult", handlers::commitment_result_handler)?;
 	module.register_method("slots", handlers::slots_handler)?;
 	module.register_method("fee", handlers::fee_handler)?;
+	module.register_async_method("generateProxyKey", handlers::generate_proxy_key_handler)?;
 
 	Ok(module)
 }
