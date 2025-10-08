@@ -134,7 +134,7 @@ fn test_create_signed_constraints_with_local_signing() {
 #[tokio::test]
 async fn test_get_constraints_for_slot_with_local_signing() {
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 
@@ -180,7 +180,7 @@ fn test_constraints_message_object_root() {
 #[tokio::test]
 async fn test_multiple_constraints_same_slot() {
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 
@@ -243,7 +243,7 @@ async fn test_get_constraints_for_slot_handler_with_valid_headers() {
 	let _ = tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::new("debug")).try_init();
 
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 
@@ -279,7 +279,7 @@ async fn test_get_constraints_for_slot_handler_with_invalid_signature() {
 	use axum::extract::Path;
 
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 
@@ -314,7 +314,7 @@ async fn test_get_constraints_for_slot_handler_missing_headers() {
 	use axum::http::HeaderMap;
 
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 
@@ -348,7 +348,7 @@ async fn test_get_constraints_for_slot_handler_wrong_public_key() {
 	use axum::http::{HeaderMap, HeaderValue};
 
 	let (database, _temp_dir) = create_test_database();
-	let state = RelayState { database: Arc::new(database) };
+	let state = RelayState { database: Arc::new(database), config: relay::config::RelayConfig::default() };
 
 	let slot = 12345u64;
 

@@ -31,6 +31,9 @@ pub mod routes {
 		/// Builder constraints endpoint
 		pub const BUILDER_CONSTRAINTS: &str = "/constraints/v0/builder/constraints";
 
+		/// Builder capabilities endpoint
+		pub const BUILDER_CAPABILITIES: &str = "/constraints/v0/builder/capabilities";
+
 		/// Relay delegations endpoint
 		pub const RELAY_DELEGATIONS: &str = "/constraints/v0/relay/delegations";
 	}

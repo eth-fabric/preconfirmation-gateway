@@ -13,6 +13,7 @@ pub struct RelayServerConfig {
 	pub port: u16,
 	pub database_path: PathBuf,
 	pub log_level: String,
+	pub constraint_capabilities: Vec<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +29,7 @@ impl Default for RelayConfig {
 				port: 8080,
 				database_path: PathBuf::from("data/relay-rocksdb"),
 				log_level: "info".to_string(),
+				constraint_capabilities: vec![1],
 			},
 			storage: StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

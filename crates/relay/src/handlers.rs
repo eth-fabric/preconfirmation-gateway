@@ -1,7 +1,7 @@
 use axum::{extract::Path, extract::State, http::HeaderMap, http::StatusCode, response::Json};
 use common::types::{
-	GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse, SignedConstraints,
-	SignedDelegation,
+	ConstraintCapabilities, GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse,
+	SignedConstraints, SignedDelegation,
 };
 use hex;
 use std::sync::Arc;
@@ -66,6 +66,7 @@ fn extract_bls_auth_headers(
 #[derive(Clone)]
 pub struct RelayState {
 	pub database: Arc<RelayDatabase>,
+	pub config: crate::config::RelayConfig,
 }
 
 /// POST /delegation - Store a verified delegation
@@ -274,6 +275,16 @@ pub async fn get_constraints_for_slot_handler(
 	Ok(Json(authorized_constraints))
 }
 
+/// GET /constraints/v0/builder/capabilities - Get constraint capabilities
+pub async fn capabilities_handler(State(state): State<RelayState>) -> Result<Json<ConstraintCapabilities>, StatusCode> {
+	info!("Getting constraint capabilities");
+
+	let capabilities = ConstraintCapabilities { constraint_types: state.config.relay.constraint_capabilities.clone() };
+
+	info!("Returning constraint capabilities: {:?}", capabilities.constraint_types);
+	Ok(Json(capabilities))
+}
+
 /// GET /health - Health check endpoint
 pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<HealthResponse>, StatusCode> {
 	match state.database.get_health_status() {
@@ -430,7 +441,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_get_constraints_for_slot_handler_success() {
 		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database) };
+		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
 
 		let slot = 12345u64;
 		let public_key =
@@ -454,7 +465,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_get_constraints_for_slot_handler_missing_headers() {
 		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database) };
+		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
 
 		let slot = 12345u64;
 		let headers = HeaderMap::new(); // Empty headers
@@ -468,7 +479,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_get_constraints_for_slot_handler_no_constraints() {
 		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database) };
+		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
 
 		let slot = 12345u64;
 		let public_key =
@@ -540,5 +551,18 @@ mod tests {
 
 		assert_eq!(response.status, deserialized.status);
 		assert_eq!(response.timestamp, deserialized.timestamp);
+	}
+
+	#[tokio::test]
+	async fn test_capabilities_handler() {
+		let (database, _temp_dir) = create_test_database();
+		let config = crate::config::RelayConfig::default();
+		let state = RelayState { database: Arc::new(database), config };
+
+		let result = capabilities_handler(State(state)).await;
+		assert!(result.is_ok());
+
+		let capabilities = result.unwrap();
+		assert_eq!(capabilities.constraint_types, vec![1]);
 	}
 }
