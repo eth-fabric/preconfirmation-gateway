@@ -6,6 +6,7 @@ members = [
     "crates/constraints",
     "crates/pricer",
     "crates/relay",
+    "crates/scheduler",
     "tests",
 ]
 resolver = "2"
