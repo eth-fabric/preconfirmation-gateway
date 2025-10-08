@@ -26,6 +26,7 @@ pub struct CommitterConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConstraintsConfig {
+	pub server_host: String,
 	pub server_port: u16,
 	pub relay_url: String,
 	pub api_key: Option<String>,
@@ -36,12 +37,15 @@ pub struct ConstraintsConfig {
 // Consolidated configuration that will be loaded by load_commit_module_config
 #[derive(Debug, Clone, Deserialize)]
 pub struct InclusionPreconfConfig {
-	// RPC Server configuration
-	pub rpc_server_host: String,
-	pub rpc_server_port: u16,
+	// Commitments Server configuration
+	pub commitments_server_host: String,
+	pub commitments_server_port: u16,
 
 	// Database configuration
-	pub database_url: String,
+	pub commitments_database_url: String,
+	pub constraints_database_url: String,
+	pub delegations_database_url: String,
+	pub pricing_database_url: String,
 
 	// Logging configuration
 	pub log_level: String,
@@ -52,11 +56,15 @@ pub struct InclusionPreconfConfig {
 	pub committer_address: String,
 
 	// Constraints configuration
+	pub constraints_server_host: String,
 	pub constraints_server_port: u16,
 	pub constraints_relay_url: String,
 	pub constraints_api_key: Option<String>,
 	pub constraints_bls_public_key: String,
 	pub constraints_delegate_public_key: String,
+
+	// Scheduler configuration
+	pub eth_genesis_timestamp: u64,
 }
 
 // Default implementations for individual config structs
@@ -96,6 +104,7 @@ impl Default for CommitterConfig {
 impl Default for ConstraintsConfig {
 	fn default() -> Self {
 		Self {
+			server_host: "127.0.0.1".to_string(),
 			server_port: 8081,
 			relay_url: "https://relay.example.com".to_string(),
 			api_key: None,
@@ -112,11 +121,15 @@ impl Default for ConstraintsConfig {
 // Methods to extract individual config structs from InclusionPreconfConfig
 impl InclusionPreconfConfig {
 	pub fn server(&self) -> ServerConfig {
-		ServerConfig { host: self.rpc_server_host.clone(), port: self.rpc_server_port }
+		ServerConfig { host: self.commitments_server_host.clone(), port: self.commitments_server_port }
+	}
+
+	pub fn constraints_server(&self) -> ServerConfig {
+		ServerConfig { host: self.constraints_server_host.clone(), port: self.constraints_server_port }
 	}
 
 	pub fn database(&self) -> DatabaseConfig {
-		DatabaseConfig { url: self.database_url.clone() }
+		DatabaseConfig { url: self.commitments_database_url.clone() }
 	}
 
 	pub fn logging(&self) -> LoggingConfig {
@@ -133,6 +146,7 @@ impl InclusionPreconfConfig {
 
 	pub fn constraints(&self) -> ConstraintsConfig {
 		ConstraintsConfig {
+			server_host: self.constraints_server_host.clone(),
 			server_port: self.constraints_server_port,
 			relay_url: self.constraints_relay_url.clone(),
 			api_key: self.constraints_api_key.clone(),
@@ -142,7 +156,29 @@ impl InclusionPreconfConfig {
 	}
 
 	pub fn database_url(&self) -> &str {
-		&self.database_url
+		&self.commitments_database_url
+	}
+
+	// New methods for accessing specific database URLs
+	pub fn commitments_database_url(&self) -> &str {
+		&self.commitments_database_url
+	}
+
+	pub fn constraints_database_url(&self) -> &str {
+		&self.constraints_database_url
+	}
+
+	pub fn delegations_database_url(&self) -> &str {
+		&self.delegations_database_url
+	}
+
+	pub fn pricing_database_url(&self) -> &str {
+		&self.pricing_database_url
+	}
+
+	// Scheduler configuration access
+	pub fn eth_genesis_timestamp(&self) -> u64 {
+		self.eth_genesis_timestamp
 	}
 }
 
@@ -154,13 +190,17 @@ mod tests {
 	#[test]
 	fn test_constraints_configuration() {
 		let config = InclusionPreconfConfig {
-			rpc_server_host: "127.0.0.1".to_string(),
-			rpc_server_port: 9090,
-			database_url: "test.db".to_string(),
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: 9090,
+			commitments_database_url: "test.db".to_string(),
+			constraints_database_url: "constraints.db".to_string(),
+			delegations_database_url: "delegations.db".to_string(),
+			pricing_database_url: "pricing.db".to_string(),
 			log_level: "debug".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
 			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
+			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: 8080,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: Some("test-api-key".to_string()),
@@ -170,11 +210,15 @@ mod tests {
 			constraints_delegate_public_key:
 				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
 					.to_string(),
+			eth_genesis_timestamp: 1606824023, // Mainnet genesis
 		};
 
 		// Test constraints config access
 		let constraints_config = config.constraints();
 		assert_eq!(constraints_config.server_port, 8080);
+
+		// Test scheduler config access
+		assert_eq!(config.eth_genesis_timestamp(), 1606824023);
 		assert_eq!(constraints_config.relay_url, "https://relay.example.com");
 		assert_eq!(constraints_config.api_key, Some("test-api-key".to_string()));
 	}

@@ -11,7 +11,7 @@ use commit_boost::prelude::StartCommitModuleConfig;
 pub fn create_database(commit_config: &StartCommitModuleConfig<InclusionPreconfConfig>) -> Result<Arc<DB>> {
 	let app_config = &commit_config.extra;
 	// Environment variable takes precedence over config file
-	let database_path = env::var("DATABASE_PATH").unwrap_or_else(|_| app_config.database_url.clone());
+	let database_path = env::var("DATABASE_PATH").unwrap_or_else(|_| app_config.commitments_database_url.clone());
 
 	// Create database directory if it doesn't exist
 	std::fs::create_dir_all(&database_path)

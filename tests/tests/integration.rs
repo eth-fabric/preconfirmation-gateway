@@ -46,9 +46,12 @@ impl TestEnvironment {
 
 		// Create test configuration
 		let app_config = common::config::InclusionPreconfConfig {
-			rpc_server_host: "127.0.0.1".to_string(),
-			rpc_server_port: rpc_port,
-			database_url: db_path.to_string_lossy().to_string(),
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: rpc_port,
+			commitments_database_url: db_path.to_string_lossy().to_string(),
+			constraints_database_url: format!("{}_constraints", db_path.to_string_lossy()),
+			delegations_database_url: format!("{}_delegations", db_path.to_string_lossy()),
+			pricing_database_url: format!("{}_pricing", db_path.to_string_lossy()),
 			log_level: "debug".to_string(),
 			enable_method_tracing: true,
 			traced_methods: vec![
@@ -59,6 +62,7 @@ impl TestEnvironment {
 			],
 			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 			// Constraints config fields
+			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: 8080,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
@@ -68,6 +72,7 @@ impl TestEnvironment {
 			constraints_delegate_public_key:
 				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
 					.to_string(),
+			eth_genesis_timestamp: 1606824023,
 		};
 
 		// Start local signer server with test configuration

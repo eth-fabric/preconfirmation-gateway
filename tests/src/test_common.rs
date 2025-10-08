@@ -304,13 +304,17 @@ pub mod test_helpers {
 
 		// Create test config
 		let app_config = InclusionPreconfConfig {
-			rpc_server_host: "127.0.0.1".to_string(),
-			rpc_server_port: rpc_port,
-			database_url: "./test_db".to_string(),
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: rpc_port,
+			commitments_database_url: "./test_db".to_string(),
+			constraints_database_url: "./test_constraints_db".to_string(),
+			delegations_database_url: "./test_delegations_db".to_string(),
+			pricing_database_url: "./test_pricing_db".to_string(),
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
 			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
+			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: constraints_port,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
@@ -320,6 +324,7 @@ pub mod test_helpers {
 			constraints_delegate_public_key:
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
+			eth_genesis_timestamp: 1606824023,
 		};
 
 		// Start local signer server with config

@@ -1,5 +1,6 @@
+use common::config::InclusionPreconfConfig;
 use eyre::Result;
-use scheduler::{SchedulerConfig, SlotTimer, TaskCoordinator};
+use scheduler::{SlotTimer, TaskCoordinator};
 use std::time::Duration;
 use tracing::{error, info};
 
@@ -11,11 +12,33 @@ async fn main() -> Result<()> {
 	info!("Starting scheduler service");
 
 	// Load scheduler config
-	let config = SchedulerConfig::mainnet();
-	info!("Using Ethereum genesis timestamp: {}", config.eth_genesis_timestamp);
+	let config = InclusionPreconfConfig {
+		commitments_server_host: "127.0.0.1".to_string(),
+		commitments_server_port: 8080,
+		commitments_database_url: "./data/rocksdb".to_string(),
+		constraints_database_url: "./data/constraints-rocksdb".to_string(),
+		delegations_database_url: "./data/delegations-rocksdb".to_string(),
+		pricing_database_url: "./data/pricing-rocksdb".to_string(),
+		log_level: "info".to_string(),
+		enable_method_tracing: false,
+		traced_methods: vec![],
+		committer_address: "0x0000000000000000000000000000000000000000".to_string(),
+		constraints_server_host: "127.0.0.1".to_string(),
+		constraints_server_port: 8081,
+		constraints_relay_url: "https://relay.example.com".to_string(),
+		constraints_api_key: None,
+		constraints_bls_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		constraints_delegate_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		eth_genesis_timestamp: 1606824023, // Mainnet genesis
+	};
+	info!("Using Ethereum genesis timestamp: {}", config.eth_genesis_timestamp());
 
 	// Create slot timer
-	let slot_timer = SlotTimer::new(config.eth_genesis_timestamp);
+	let slot_timer = SlotTimer::new(config.eth_genesis_timestamp());
 
 	// Create task coordinator
 	let mut coordinator = TaskCoordinator::new();

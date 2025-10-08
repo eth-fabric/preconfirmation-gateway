@@ -21,9 +21,12 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 
 	// Create test configuration
 	let app_config = common::config::InclusionPreconfConfig {
-		rpc_server_host: "127.0.0.1".to_string(),
-		rpc_server_port: rpc_port,
-		database_url: db_path.to_string_lossy().to_string(),
+		commitments_server_host: "127.0.0.1".to_string(),
+		commitments_server_port: rpc_port,
+		commitments_database_url: db_path.to_string_lossy().to_string(),
+		constraints_database_url: format!("{}_constraints", db_path.to_string_lossy()),
+		delegations_database_url: format!("{}_delegations", db_path.to_string_lossy()),
+		pricing_database_url: format!("{}_pricing", db_path.to_string_lossy()),
 		log_level: "debug".to_string(),
 		enable_method_tracing: true,
 		traced_methods: vec![
@@ -35,6 +38,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		],
 		committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 		// Constraints config fields
+		constraints_server_host: "127.0.0.1".to_string(),
 		constraints_server_port: 8080,
 		constraints_relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
@@ -44,6 +48,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		constraints_delegate_public_key:
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
+		eth_genesis_timestamp: 1606824023,
 	};
 
 	// Start local signer server with test configuration

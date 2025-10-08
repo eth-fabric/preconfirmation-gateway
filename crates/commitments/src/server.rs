@@ -17,7 +17,7 @@ where
 	// Extract the server address from the commit config
 	let commit_config = rpc_context.commit_config.lock().await;
 	let app_config: InclusionPreconfConfig = commit_config.extra.clone().into();
-	let server_address = format!("{}:{}", app_config.rpc_server_host, app_config.rpc_server_port);
+	let server_address = format!("{}:{}", app_config.commitments_server_host, app_config.commitments_server_port);
 	drop(commit_config); // Release the lock
 
 	let server = Server::builder().build(server_address.parse::<SocketAddr>()?).await?;

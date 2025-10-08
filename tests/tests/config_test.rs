@@ -22,23 +22,27 @@ fn test_config_load_from_existing_file() {
 fn test_inclusion_preconf_config_methods() {
 	// Create a test InclusionPreconfConfig
 	let config = InclusionPreconfConfig {
-		rpc_server_host: "0.0.0.0".to_string(),
-		rpc_server_port: 9090,
-		database_url: "postgresql://test/testdb".to_string(),
+		commitments_server_host: "0.0.0.0".to_string(),
+		commitments_server_port: 9090,
+		commitments_database_url: "postgresql://test/testdb".to_string(),
+		constraints_database_url: "postgresql://test/constraints".to_string(),
+		delegations_database_url: "postgresql://test/delegations".to_string(),
+		pricing_database_url: "postgresql://test/pricing".to_string(),
 		log_level: "debug".to_string(),
 		enable_method_tracing: false,
 		traced_methods: vec!["test_method".to_string()],
 		committer_address: "0x1234567890123456789012345678901234567890".to_string(),
-		// Constraints config fields
-		constraints_server_port: 8080,
+		constraints_server_host: "0.0.0.0".to_string(),
+		constraints_server_port: 8081,
 		constraints_relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
 		constraints_bls_public_key:
-			"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 				.to_string(),
 		constraints_delegate_public_key:
-			"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 				.to_string(),
+		eth_genesis_timestamp: 1606824023,
 	};
 
 	// Test the individual config methods
@@ -58,6 +62,18 @@ fn test_inclusion_preconf_config_methods() {
 	assert_eq!(committer_config.address, "0x1234567890123456789012345678901234567890");
 
 	assert_eq!(config.database_url(), "postgresql://test/testdb");
+	assert_eq!(config.commitments_database_url(), "postgresql://test/testdb");
+	assert_eq!(config.constraints_database_url(), "postgresql://test/constraints");
+	assert_eq!(config.delegations_database_url(), "postgresql://test/delegations");
+	assert_eq!(config.pricing_database_url(), "postgresql://test/pricing");
+
+	// Test constraints server config
+	let constraints_server_config = config.constraints_server();
+	assert_eq!(constraints_server_config.host, "0.0.0.0");
+	assert_eq!(constraints_server_config.port, 8081);
+
+	// Test scheduler config
+	assert_eq!(config.eth_genesis_timestamp(), 1606824023);
 }
 
 #[test]
