@@ -11,10 +11,15 @@ path = "commitments.rs"
 name = "constraints"
 path = "constraints.rs"
 
+[[bin]]
+name = "relay"
+path = "relay.rs"
+
 [dependencies]
 common = { path = "../crates/common" }
 commitments = { path = "../crates/commitments" }
 constraints = { path = "../crates/constraints" }
+relay = { path = "../crates/relay" }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 tokio = { workspace = true }

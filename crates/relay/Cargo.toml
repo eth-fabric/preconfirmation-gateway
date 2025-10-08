@@ -1,0 +1,45 @@
+[package]
+name = "relay"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+axum = { workspace = true }
+tokio = { workspace = true }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Database
+rocksdb = { workspace = true }
+
+# Error handling
+eyre = { workspace = true }
+
+
+# BLS and crypto
+commit-boost = { workspace = true }
+
+# Alloy for primitives
+alloy = { workspace = true }
+
+# Common types (reuse from our common crate)
+common = { path = "../common" }
+
+# Configuration
+toml = { workspace = true }
+
+# Hex encoding/decoding
+hex = { workspace = true }
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = "3.8"

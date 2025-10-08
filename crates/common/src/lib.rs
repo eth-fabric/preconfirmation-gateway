@@ -3,6 +3,7 @@ pub mod constants;
 pub mod db;
 pub mod signer;
 pub mod types;
+pub mod utils;
 
 // Re-export commonly used types and functions for easier access
 pub use db::{create_database, db_healthcheck};

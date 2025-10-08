@@ -5,6 +5,7 @@ members = [
     "crates/commitments",
     "crates/constraints",
     "crates/pricer",
+    "crates/relay",
     "tests",
 ]
 resolver = "2"
@@ -38,6 +39,7 @@ commit-boost = { git = "https://github.com/Commit-Boost/commit-boost-client", br
 cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
 urc = { path = "./crates/common/bindings/urc" }
 hex = "0.4"
+axum = { version = "0.8", features = ["macros", "multipart"] }
 
 [patch.crates-io]
 blstrs_plus = { git = "https://github.com/Commit-Boost/blstrs" }

@@ -2,7 +2,7 @@ use alloy::primitives::{Address, B256};
 use commit_boost::prelude::{
 	BlsPublicKey, StartCommitModuleConfig,
 	commit::{
-		request::{EncryptionScheme, SignProxyRequest},
+		request::SignProxyRequest,
 		response::{BlsSignResponse, EcdsaSignResponse},
 	},
 	verify_proposer_commitment_signature_ecdsa_for_message,

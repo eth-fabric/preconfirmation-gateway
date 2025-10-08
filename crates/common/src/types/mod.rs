@@ -14,4 +14,7 @@ pub use constraints::{
 pub use context::RpcContext;
 pub use database::DatabaseContext;
 pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};
-pub use responses::{HealthResponse, ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse};
+pub use responses::{
+	GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse,
+	ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse,
+};

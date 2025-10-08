@@ -49,6 +49,24 @@ pub mod routes {
 		/// Slot information endpoint
 		pub const SLOTS: &str = "/slots";
 	}
+
+	/// Relay-related routes
+	pub mod relay {
+		/// Health check endpoint
+		pub const HEALTH: &str = "/health";
+
+		/// Store delegation endpoint
+		pub const DELEGATION: &str = "/delegation";
+
+		/// Get delegations for a specific slot
+		pub const DELEGATIONS_SLOT: &str = "/delegations/:slot";
+
+		/// Store constraints endpoint
+		pub const CONSTRAINTS: &str = "/constraints";
+
+		/// Get constraints for a specific slot
+		pub const CONSTRAINTS_SLOT: &str = "/constraints/v0/relay/constraints/:slot";
+	}
 }
 
 /// Default configuration values

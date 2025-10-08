@@ -37,7 +37,7 @@ impl ConstraintsClient {
 
 	/// POST signed constraints to relay
 	pub async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<PostConstraintsResponse> {
-		let url = format!("{}{}", self.base_url, routes::constraints::BUILDER_CONSTRAINTS);
+		let url = format!("{}{}", self.base_url, routes::relay::CONSTRAINTS);
 
 		debug!("Posting constraints to: {}", url);
 
@@ -64,7 +64,7 @@ impl ConstraintsClient {
 
 	/// GET delegations from relay
 	pub async fn get_delegations(&self) -> Result<Vec<SignedDelegation>> {
-		let url = format!("{}{}", self.base_url, routes::constraints::RELAY_DELEGATIONS);
+		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace(":slot", ""));
 
 		debug!("Getting delegations from: {}", url);
 
@@ -91,7 +91,7 @@ impl ConstraintsClient {
 
 	/// GET delegations from relay for a specific slot
 	pub async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
-		let url = format!("{}{}/{}", self.base_url, routes::constraints::RELAY_DELEGATIONS, slot);
+		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace(":slot", &slot.to_string()));
 
 		debug!("Getting delegations for slot {} from: {}", slot, url);
 
@@ -118,7 +118,7 @@ impl ConstraintsClient {
 
 	/// Health check for the relay
 	pub async fn health_check(&self) -> Result<bool> {
-		let url = format!("{}{}", self.base_url, routes::HEALTH);
+		let url = format!("{}{}", self.base_url, routes::relay::HEALTH);
 
 		debug!("Checking relay health at: {}", url);
 

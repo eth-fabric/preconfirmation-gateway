@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 common = { path = "../crates/common" }
 commitments = { path = "../crates/commitments" }
+constraints = { path = "../crates/constraints" }
+relay = { path = "../crates/relay" }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 config = { workspace = true }
@@ -30,3 +32,5 @@ reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
 tempfile = "3.8"
 tokio-test = "0.4"
 rand = "0.8"
+axum = "0.8"
+hex = "0.4"

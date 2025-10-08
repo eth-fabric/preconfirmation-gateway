@@ -1,0 +1,8 @@
+[relay]
+port = 8080
+database_path = "data/relay-rocksdb"
+log_level = "info"
+
+[storage]
+max_delegations_per_slot = 100
+max_constraints_per_slot = 1000

@@ -228,7 +228,16 @@ pub fn convert_fp_to_uint256_pair(fp: &blst_fp) -> (B256, B256) {
 mod tests {
 	use super::*;
 	use alloy::primitives::{Bytes, hex};
-	use cb_common::utils::bls_pubkey_from_hex;
+
+	// Local implementation to avoid cb-common dependency
+	fn bls_pubkey_from_hex(hex_str: &str) -> BlsPublicKey {
+		let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+		let bytes = hex::decode(hex_str).expect("Could not decode BLS hex string");
+		if bytes.len() != 48 {
+			panic!("Invalid BLS public key length: expected 48 bytes, got {}", bytes.len());
+		}
+		BlsPublicKey::deserialize(&bytes).expect("Failed to deserialize BLS public key")
+	}
 
 	#[test]
 	fn test_message_type_to_uint256() {
@@ -243,12 +252,11 @@ mod tests {
 	fn test_delegation_to_object_root() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.unwrap();
+		);
+
 		let delegate = bls_pubkey_from_hex(
 			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
-		)
-		.unwrap();
+		);
 
 		let delegation = Delegation {
 			proposer: proposer,
@@ -266,20 +274,15 @@ mod tests {
 	fn test_constraints_message_to_object_root() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.unwrap();
+		);
 		let delegate = bls_pubkey_from_hex(
 			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
-		)
-		.unwrap();
+		);
 
 		// Create test BLS public keys
-		let receivers = vec![
-			bls_pubkey_from_hex(
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-			)
-			.unwrap(),
-		];
+		let receivers = vec![bls_pubkey_from_hex(
+			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)];
 
 		let constraints_message = ConstraintsMessage {
 			proposer: proposer,
