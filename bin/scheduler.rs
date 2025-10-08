@@ -1,5 +1,5 @@
 use eyre::Result;
-use scheduler::{SlotTimer, TaskCoordinator};
+use scheduler::{SchedulerConfig, SlotTimer, TaskCoordinator};
 use std::time::Duration;
 use tracing::{error, info};
 
@@ -10,9 +10,12 @@ async fn main() -> Result<()> {
 
 	info!("Starting scheduler service");
 
-	// Create slot timer (using mainnet genesis)
-	let genesis_timestamp = 1606824023; // Mainnet genesis
-	let slot_timer = SlotTimer::new(genesis_timestamp);
+	// Load scheduler config
+	let config = SchedulerConfig::mainnet();
+	info!("Using Ethereum genesis timestamp: {}", config.eth_genesis_timestamp);
+
+	// Create slot timer
+	let slot_timer = SlotTimer::new(config.eth_genesis_timestamp);
 
 	// Create task coordinator
 	let mut coordinator = TaskCoordinator::new();

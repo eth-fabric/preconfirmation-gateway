@@ -5990,6 +5990,7 @@ version = "0.1.0"
 dependencies = [
  "common",
  "eyre",
+ "serde",
  "tokio",
  "tracing",
 ]
