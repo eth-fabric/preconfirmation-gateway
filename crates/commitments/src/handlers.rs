@@ -58,6 +58,29 @@ pub async fn commitment_request_handler<T>(
 		}
 	};
 
+	// Verify that the slot has delegations before proceeding
+	match _context.database().is_delegated(slot) {
+		Ok(true) => {
+			info!("Slot {} has delegations, proceeding with commitment", slot);
+		}
+		Ok(false) => {
+			error!("No delegations found for slot {}, cannot create commitment", slot);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"No delegations for slot",
+				Some(format!("No delegations found for slot {}", slot)),
+			));
+		}
+		Err(e) => {
+			error!("Failed to check delegation status for slot {}: {}", slot, e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to check delegations",
+				Some(format!("{}", e)),
+			));
+		}
+	}
+
 	if let Err(e) = _context.database().store_commitment(slot, &request_hash, &signed_commitment) {
 		error!("Failed to store commitment in database: {}", e);
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
