@@ -36,7 +36,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"fee".to_string(),
 			"generateProxyKey".to_string(),
 		],
-		committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 		// Constraints config fields
 		constraints_server_host: "127.0.0.1".to_string(),
 		constraints_server_port: 8080,
@@ -72,7 +71,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		.map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))?;
 	let mut commit_config_guard = commit_config;
 	let proxy_address = commit_config_guard.signer_client.generate_proxy_key_ecdsa(test_bls_pubkey).await?;
-	let committer_address = proxy_address.message.proxy;
+	let _committer_address = proxy_address.message.proxy;
 
 	// Create RPC context with constraints fields
 	let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
@@ -81,14 +80,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let relay_url = "https://relay.example.com".to_string();
 	let api_key = None::<String>;
 
-	let rpc_context = common::types::RpcContext::new(
-		database,
-		commit_config_guard,
-		committer_address,
-		bls_public_key,
-		relay_url,
-		api_key,
-	);
+	let rpc_context = common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key);
 
 	// Start RPC server
 	let server_handle = tokio::spawn(async move {

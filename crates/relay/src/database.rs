@@ -19,27 +19,27 @@ impl RelayDatabase {
 		Ok(Self { db })
 	}
 
-	/// Store a verified delegation
+	/// Store a verified delegation (assumes only one delegation per slot)
 	pub fn store_delegation(&self, slot: u64, delegation_id: &str, delegation: &SignedDelegation) -> Result<()> {
-		let key = format!("delegation:{}:{}", slot, delegation_id);
+		// Use simple key format: "delegation:{slot}" (ignore delegation_id since we assume one per slot)
+		let key = format!("delegation:{}", slot);
 		let value = serde_json::to_vec(delegation)?;
 		self.db.put(key.as_bytes(), &value)?;
 		Ok(())
 	}
 
-	/// Get all delegations for a slot
-	pub fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
-		let mut delegations = Vec::new();
-		let prefix = format!("delegation:{}:", slot);
+	/// Get the delegation for a slot (assumes only one delegation per slot)
+	pub fn get_delegation_for_slot(&self, slot: u64) -> Result<Option<SignedDelegation>> {
+		// Use direct key lookup instead of iteration
+		let key = format!("delegation:{}", slot);
 
-		let iter = self.db.prefix_iterator(prefix.as_bytes());
-		for item in iter {
-			let (_, value) = item?;
-			let delegation: SignedDelegation = serde_json::from_slice(&value)?;
-			delegations.push(delegation);
+		match self.db.get(key.as_bytes())? {
+			Some(value) => {
+				let delegation: SignedDelegation = serde_json::from_slice(&value)?;
+				Ok(Some(delegation))
+			}
+			None => Ok(None),
 		}
-
-		Ok(delegations)
 	}
 
 	/// Store a verified constraint
@@ -156,12 +156,12 @@ mod tests {
 		// Store delegation
 		db.store_delegation(slot, delegation_id, &delegation).unwrap();
 
-		// Retrieve delegations for slot
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 1);
+		// Retrieve delegation for slot
+		let retrieved_delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(retrieved_delegation.is_some());
 
 		// Verify content matches
-		assert_eq!(delegations[0].message.committer, delegation.message.committer);
+		assert_eq!(retrieved_delegation.unwrap().message.committer, delegation.message.committer);
 	}
 
 	#[test]
@@ -178,9 +178,9 @@ mod tests {
 			db.store_delegation(slot, &format!("delegation_{}", i), &delegation).unwrap();
 		}
 
-		// Retrieve all delegations for slot
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 3);
+		// Retrieve delegation for slot (should be the last one stored)
+		let delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(delegation.is_some());
 	}
 
 	#[test]

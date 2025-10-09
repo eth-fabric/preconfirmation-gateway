@@ -141,13 +141,17 @@ pub async fn get_delegations_handler(
 ) -> Result<Json<GetDelegationsResponse>, StatusCode> {
 	info!("Getting delegations for slot {}", slot);
 
-	match state.database.get_delegations_for_slot(slot) {
-		Ok(delegations) => {
-			info!("Retrieved {} delegations for slot {}", delegations.len(), slot);
-			Ok(Json(GetDelegationsResponse { delegations }))
+	match state.database.get_delegation_for_slot(slot) {
+		Ok(Some(delegation)) => {
+			info!("Retrieved delegation for slot {}", slot);
+			Ok(Json(GetDelegationsResponse { delegations: vec![delegation] }))
+		}
+		Ok(None) => {
+			info!("No delegation found for slot {}", slot);
+			Ok(Json(GetDelegationsResponse { delegations: vec![] }))
 		}
 		Err(e) => {
-			error!("Failed to get delegations for slot {}: {}", slot, e);
+			error!("Failed to get delegation for slot {}: {}", slot, e);
 			Err(StatusCode::INTERNAL_SERVER_ERROR)
 		}
 	}

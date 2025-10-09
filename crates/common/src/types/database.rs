@@ -317,69 +317,40 @@ impl DatabaseContext {
 		Ok(())
 	}
 
-	/// Store a delegation for a specific slot
+	/// Store a delegation for a specific slot (assumes only one delegation per slot)
 	pub fn store_delegation(&self, slot: u64, delegation: &crate::types::constraints::SignedDelegation) -> Result<()> {
-		let key = format!("delegation:{}:{}", slot, delegation.message.committer);
+		// Use a simple, consistent key format: "delegation:{slot}"
+		let key = format!("delegation:{}", slot);
 		let value = serde_json::to_vec(delegation)?;
 		self.put(key.as_bytes(), &value)
 	}
 
-	/// Get all delegations for a specific slot
-	pub fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<crate::types::constraints::SignedDelegation>> {
-		let prefix = format!("delegation:{}:", slot);
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		let mut delegations = Vec::new();
+	/// Get the delegation for a specific slot (assumes only one delegation per slot)
+	pub fn get_delegation_for_slot(&self, slot: u64) -> Result<Option<crate::types::constraints::SignedDelegation>> {
+		// Use direct key lookup instead of iteration
+		let key = format!("delegation:{}", slot);
 
-		for item in iter {
-			let (key, value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			if key_str.starts_with(&prefix) {
+		match self.db.get(key.as_bytes())? {
+			Some(value) => {
 				let delegation: crate::types::constraints::SignedDelegation = serde_json::from_slice(&value)?;
-				delegations.push(delegation);
+				Ok(Some(delegation))
 			}
+			None => Ok(None),
 		}
-
-		Ok(delegations)
 	}
 
 	/// Check if there are any delegations for a specific slot
 	pub fn is_delegated(&self, slot: u64) -> Result<bool> {
-		let prefix = format!("delegation:{}:", slot);
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-
-		for item in iter {
-			let (key, _value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			if key_str.starts_with(&prefix) {
-				return Ok(true);
-			}
-		}
-
-		Ok(false)
+		// Use direct key lookup instead of iteration
+		let key = format!("delegation:{}", slot);
+		Ok(self.db.get(key.as_bytes())?.is_some())
 	}
 
 	/// Delete all delegations for a specific slot
 	pub fn delete_delegations_for_slot(&self, slot: u64) -> Result<()> {
-		let prefix = format!("delegation:{}:", slot);
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		let mut keys_to_delete = Vec::new();
-
-		for item in iter {
-			let (key, _value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			if key_str.starts_with(&prefix) {
-				keys_to_delete.push(key);
-			}
-		}
-
-		for key in keys_to_delete {
-			self.delete(&key)?;
-		}
-
-		Ok(())
+		// Use direct key deletion instead of iteration
+		let key = format!("delegation:{}", slot);
+		self.delete(key.as_bytes())
 	}
 }
 
@@ -1258,10 +1229,11 @@ mod tests {
 		db.store_delegation(slot, &delegation).unwrap();
 
 		// Verify delegation was stored
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 1);
-		assert_eq!(delegations[0].message.committer, delegation.message.committer);
-		assert_eq!(delegations[0].message.delegate, delegation.message.delegate);
+		let stored_delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(stored_delegation.is_some());
+		let stored_delegation = stored_delegation.unwrap();
+		assert_eq!(stored_delegation.message.committer, delegation.message.committer);
+		assert_eq!(stored_delegation.message.delegate, delegation.message.delegate);
 	}
 
 	#[test]
@@ -1271,28 +1243,31 @@ mod tests {
 		let delegation1 = create_test_delegation();
 		let delegation2 = create_test_delegation_with_committer(Address::from([2u8; 20]));
 
-		// Store multiple delegations for the same slot
+		// Store first delegation
 		db.store_delegation(slot, &delegation1).unwrap();
+
+		// Verify first delegation was stored
+		let stored_delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(stored_delegation.is_some());
+		assert_eq!(stored_delegation.unwrap().message.committer, delegation1.message.committer);
+
+		// Store second delegation (this should overwrite the first since we assume only one per slot)
 		db.store_delegation(slot, &delegation2).unwrap();
 
-		// Verify both delegations were stored
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 2);
-
-		// Check that both committers are present
-		let committers: Vec<Address> = delegations.iter().map(|d| d.message.committer).collect();
-		assert!(committers.contains(&delegation1.message.committer));
-		assert!(committers.contains(&delegation2.message.committer));
+		// Verify only the second delegation is stored
+		let stored_delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(stored_delegation.is_some());
+		assert_eq!(stored_delegation.unwrap().message.committer, delegation2.message.committer);
 	}
 
 	#[test]
-	fn test_get_delegations_for_slot_empty() {
+	fn test_get_delegation_for_slot_empty() {
 		let (_temp_dir, db) = create_test_db();
 		let slot = 12345;
 
-		// Get delegations for empty slot
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 0);
+		// Get delegation for empty slot
+		let delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(delegation.is_none());
 	}
 
 	#[test]
@@ -1333,16 +1308,16 @@ mod tests {
 
 		// Verify they exist
 		assert!(db.is_delegated(slot).unwrap());
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 2);
+		let delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(delegation.is_some());
 
 		// Delete all delegations for the slot
 		db.delete_delegations_for_slot(slot).unwrap();
 
 		// Verify they are gone
 		assert!(!db.is_delegated(slot).unwrap());
-		let delegations_after_delete = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations_after_delete.len(), 0);
+		let delegation_after_delete = db.get_delegation_for_slot(slot).unwrap();
+		assert!(delegation_after_delete.is_none());
 	}
 
 	#[test]
@@ -1368,10 +1343,10 @@ mod tests {
 		assert!(!db.is_delegated(slot1).unwrap());
 		assert!(db.is_delegated(slot2).unwrap());
 
-		let slot1_delegations = db.get_delegations_for_slot(slot1).unwrap();
-		let slot2_delegations = db.get_delegations_for_slot(slot2).unwrap();
-		assert_eq!(slot1_delegations.len(), 0);
-		assert_eq!(slot2_delegations.len(), 1);
+		let slot1_delegation = db.get_delegation_for_slot(slot1).unwrap();
+		let slot2_delegation = db.get_delegation_for_slot(slot2).unwrap();
+		assert!(slot1_delegation.is_none());
+		assert!(slot2_delegation.is_some());
 	}
 
 	#[test]
@@ -1386,17 +1361,16 @@ mod tests {
 		// Manually check the key format by iterating through the database
 		let iter = db.db.iterator(rocksdb::IteratorMode::Start);
 		let mut found_delegation_key = false;
-		let expected_prefix = format!("delegation:{}:", slot);
+		let expected_key = format!("delegation:{}", slot);
 
 		for item in iter {
 			let (key, _value) = item.unwrap();
 			let key_str = String::from_utf8_lossy(&key);
 
-			if key_str.starts_with(&expected_prefix) {
+			if key_str == expected_key {
 				found_delegation_key = true;
-				// Verify the key format: delegation:slot:committer
-				assert!(key_str.starts_with(&expected_prefix));
-				assert!(key_str.contains(&delegation.message.committer.to_string()));
+				// Verify the key format: delegation:slot
+				assert_eq!(key_str, expected_key);
 				break;
 			}
 		}
@@ -1414,9 +1388,9 @@ mod tests {
 		db.store_delegation(slot, &original_delegation).unwrap();
 
 		// Retrieve delegation
-		let delegations = db.get_delegations_for_slot(slot).unwrap();
-		assert_eq!(delegations.len(), 1);
-		let retrieved_delegation = &delegations[0];
+		let retrieved_delegation = db.get_delegation_for_slot(slot).unwrap();
+		assert!(retrieved_delegation.is_some());
+		let retrieved_delegation = retrieved_delegation.unwrap();
 
 		// Verify all fields match
 		assert_eq!(retrieved_delegation.message.committer, original_delegation.message.committer);

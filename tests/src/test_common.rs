@@ -279,7 +279,6 @@ pub mod test_helpers {
 		Ok(RpcContext {
 			database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
-			committer_address: Address::ZERO,
 			bls_public_key,
 			relay_url,
 			api_key,
@@ -313,7 +312,6 @@ pub mod test_helpers {
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: constraints_port,
 			constraints_relay_url: "https://relay.example.com".to_string(),
@@ -348,7 +346,6 @@ pub mod test_helpers {
 		Ok(RpcContext {
 			database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
-			committer_address: Address::ZERO,
 			bls_public_key,
 			relay_url,
 			api_key,

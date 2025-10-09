@@ -13,8 +13,8 @@ use common::types::{Commitment, CommitmentRequest, Constraint, FeeInfo, SignedCo
 /// Helper functions for RPC business logic
 /// This module contains utility functions that can be shared across multiple RPC handlers
 
-/// Validates a commitment request
-pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<()> {
+/// Validates a commitment request and returns the decoded InclusionPayload
+pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<InclusionPayload> {
 	if request.commitment_type != COMMITMENT_TYPE {
 		return Err(eyre::eyre!(
 			"Invalid commitment type: expected {}, got {}",
@@ -55,14 +55,14 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<()> {
 
 			// Validate signed_tx format and signature
 			verify_signed_tx(&inclusion_payload.signed_tx)?;
+
+			debug!("Commitment request validation passed");
+			Ok(inclusion_payload)
 		}
 		Err(e) => {
 			return Err(eyre::eyre!("Invalid payload format: {}", e));
 		}
 	}
-
-	debug!("Commitment request validation passed");
-	Ok(())
 }
 
 /// Verifies a signed transaction by decoding it and validating its signature

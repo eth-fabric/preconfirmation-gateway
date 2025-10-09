@@ -60,7 +60,6 @@ impl TestEnvironment {
 				"slots".to_string(),
 				"fee".to_string(),
 			],
-			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 			// Constraints config fields
 			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: 8080,
@@ -112,14 +111,8 @@ impl TestEnvironment {
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
-		let rpc_context = common::types::RpcContext::new(
-			database,
-			commit_config_guard,
-			committer_address,
-			bls_public_key,
-			relay_url,
-			api_key,
-		);
+		let rpc_context =
+			common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key);
 
 		// Start RPC server
 		let server_address = format!("127.0.0.1:{}", rpc_port);

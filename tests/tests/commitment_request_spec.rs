@@ -15,7 +15,7 @@ struct CommitmentRequestTestHarness {
 impl CommitmentRequestTestHarness {
 	/// Creates a new test harness with a properly configured context
 	async fn new() -> eyre::Result<Self> {
-		let mut context = test_helpers::create_test_context().await?;
+		let context = test_helpers::create_test_context().await?;
 
 		// Generate a proxy key for the committer using the signer from the context
 		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&PUBKEY).unwrap();
@@ -27,9 +27,6 @@ impl CommitmentRequestTestHarness {
 			.map_err(|e| eyre::eyre!("Failed to generate ECDSA proxy key: {}", e))?;
 		let committer_address = proxy_address.message.proxy;
 		drop(commit_config); // Release the lock
-
-		// Update the context with the committer address
-		context.committer_address = committer_address;
 
 		Ok(Self { context })
 	}
@@ -53,12 +50,22 @@ impl CommitmentRequestTestHarness {
 		// Use the test BLS public key from constants
 		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&PUBKEY).unwrap();
 
+		// Generate a proxy key for the committer using the signer from the context
+		let mut commit_config = self.context.commit_config.lock().await;
+		let proxy_address = commit_config
+			.signer_client
+			.generate_proxy_key_ecdsa(test_bls_pubkey.clone())
+			.await
+			.map_err(|e| eyre::eyre!("Failed to generate ECDSA proxy key: {}", e))?;
+		let committer_address = proxy_address.message.proxy;
+		drop(commit_config); // Release the lock
+
 		// Create a mock delegation for testing
 		let mock_delegation = SignedDelegation {
 			message: common::types::constraints::Delegation {
 				proposer: test_bls_pubkey.clone(),
 				delegate: test_bls_pubkey,
-				committer: self.context.committer_address,
+				committer: committer_address,
 				slot,
 				metadata: Bytes::new(),
 			},

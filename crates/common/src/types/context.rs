@@ -1,5 +1,4 @@
 use crate::types::database::DatabaseContext;
-use alloy::primitives::Address;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -11,8 +10,6 @@ pub struct RpcContext<T = ()> {
 	pub database: DatabaseContext,
 	/// Commit module configuration for commit-boost operations (Arc<Mutex> for thread safety)
 	pub commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
-	/// Committer address for signing operations
-	pub committer_address: Address,
 	/// BLS public key for signing constraints
 	pub bls_public_key: BlsPublicKey,
 	/// Relay URL for constraints communication
@@ -22,23 +19,15 @@ pub struct RpcContext<T = ()> {
 }
 
 impl<T> RpcContext<T> {
-	/// Create a new RPC context with the given database context, commit config, and committer address
+	/// Create a new RPC context with the given database context and commit config
 	pub fn new(
 		database: DatabaseContext,
 		commit_config: StartCommitModuleConfig<T>,
-		committer_address: Address,
 		bls_public_key: BlsPublicKey,
 		relay_url: String,
 		api_key: Option<String>,
 	) -> Self {
-		Self {
-			database,
-			commit_config: Arc::new(Mutex::new(commit_config)),
-			committer_address,
-			bls_public_key,
-			relay_url,
-			api_key,
-		}
+		Self { database, commit_config: Arc::new(Mutex::new(commit_config)), bls_public_key, relay_url, api_key }
 	}
 
 	/// Get a reference to the database

@@ -16,19 +16,48 @@ pub async fn commitment_request_handler<T>(
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.one()?;
 
-	// Validate the commitment request
-	if let Err(e) = utils::validate_commitment_request(&request) {
-		error!("Invalid commitment request: {}", e);
-		return Err(jsonrpsee::types::error::ErrorObject::owned(
-			-32602, // Invalid params
-			"Invalid commitment request",
-			Some(format!("{}", e)),
-		));
-	}
+	// Validate the commitment request and extract the inclusion payload
+	let inclusion_payload = match utils::validate_commitment_request(&request) {
+		Ok(payload) => payload,
+		Err(e) => {
+			error!("Invalid commitment request: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"Invalid commitment request",
+				Some(format!("{}", e)),
+			));
+		}
+	};
+
+	let slot = inclusion_payload.slot;
+
+	// Get the delegation for this slot
+	let signed_delegation = match _context.database().get_delegation_for_slot(slot) {
+		Ok(Some(delegation)) => {
+			info!("Found delegation for slot {}, proceeding with commitment", slot);
+			delegation
+		}
+		Ok(None) => {
+			error!("No delegation found for slot {}, cannot create commitment", slot);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32602, // Invalid params
+				"No delegation for slot",
+				Some(format!("No delegation found for slot {}", slot)),
+			));
+		}
+		Err(e) => {
+			error!("Failed to get delegation for slot {}: {}", slot, e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to get delegation",
+				Some(format!("{}", e)),
+			));
+		}
+	};
 
 	// Create and sign the commitment using ECDSA with commit-boost
 	let commit_config = _context.commit_config.clone();
-	let committer_address = _context.committer_address;
+	let committer_address = signed_delegation.message.committer;
 	let signed_commitment = match utils::create_signed_commitment(&request, commit_config, committer_address).await {
 		Ok(commitment) => commitment,
 		Err(e) => {
@@ -43,43 +72,6 @@ pub async fn commitment_request_handler<T>(
 
 	// Store the signed commitment in the database
 	let request_hash = signed_commitment.commitment.request_hash;
-
-	// Extract slot from the commitment request payload
-	use common::types::commitments::InclusionPayload;
-	let slot = match InclusionPayload::abi_decode(&request.payload) {
-		Ok(inclusion_payload) => inclusion_payload.slot,
-		Err(e) => {
-			error!("Failed to extract slot from commitment request: {}", e);
-			return Err(jsonrpsee::types::error::ErrorObject::owned(
-				-32603, // Internal error
-				"Failed to extract slot from commitment request",
-				Some(format!("{}", e)),
-			));
-		}
-	};
-
-	// Verify that the slot has delegations before proceeding
-	match _context.database().is_delegated(slot) {
-		Ok(true) => {
-			info!("Slot {} has delegations, proceeding with commitment", slot);
-		}
-		Ok(false) => {
-			error!("No delegations found for slot {}, cannot create commitment", slot);
-			return Err(jsonrpsee::types::error::ErrorObject::owned(
-				-32602, // Invalid params
-				"No delegations for slot",
-				Some(format!("No delegations found for slot {}", slot)),
-			));
-		}
-		Err(e) => {
-			error!("Failed to check delegation status for slot {}: {}", slot, e);
-			return Err(jsonrpsee::types::error::ErrorObject::owned(
-				-32603, // Internal error
-				"Failed to check delegations",
-				Some(format!("{}", e)),
-			));
-		}
-	}
 
 	if let Err(e) = _context.database().store_commitment(slot, &request_hash, &signed_commitment) {
 		error!("Failed to store commitment in database: {}", e);

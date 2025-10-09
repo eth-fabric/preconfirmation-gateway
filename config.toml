@@ -47,7 +47,6 @@ pricing_database_url = "./data/pricing-rocksdb"
 log_level = "info"
 enable_method_tracing = true
 traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
-committer_address = "0x0000000000000000000000000000000000000000"
 sleep_secs = 5
 use_ecdsa_keys = true
 

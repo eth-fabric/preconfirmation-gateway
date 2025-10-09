@@ -31,7 +31,6 @@ fn test_inclusion_preconf_config_methods() {
 		log_level: "debug".to_string(),
 		enable_method_tracing: false,
 		traced_methods: vec!["test_method".to_string()],
-		committer_address: "0x1234567890123456789012345678901234567890".to_string(),
 		constraints_server_host: "0.0.0.0".to_string(),
 		constraints_server_port: 8081,
 		constraints_relay_url: "https://relay.example.com".to_string(),

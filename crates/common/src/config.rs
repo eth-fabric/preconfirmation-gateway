@@ -20,11 +20,6 @@ pub struct LoggingConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct CommitterConfig {
-	pub address: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct ConstraintsConfig {
 	pub server_host: String,
 	pub server_port: u16,
@@ -51,9 +46,6 @@ pub struct InclusionPreconfConfig {
 	pub log_level: String,
 	pub enable_method_tracing: bool,
 	pub traced_methods: Vec<String>,
-
-	// Committer configuration
-	pub committer_address: String,
 
 	// Constraints configuration
 	pub constraints_server_host: String,
@@ -95,12 +87,6 @@ impl Default for LoggingConfig {
 	}
 }
 
-impl Default for CommitterConfig {
-	fn default() -> Self {
-		Self { address: "0x0000000000000000000000000000000000000000".to_string() }
-	}
-}
-
 impl Default for ConstraintsConfig {
 	fn default() -> Self {
 		Self {
@@ -138,10 +124,6 @@ impl InclusionPreconfConfig {
 			enable_method_tracing: self.enable_method_tracing,
 			traced_methods: self.traced_methods.clone(),
 		}
-	}
-
-	pub fn committer(&self) -> CommitterConfig {
-		CommitterConfig { address: self.committer_address.clone() }
 	}
 
 	pub fn constraints(&self) -> ConstraintsConfig {
@@ -199,7 +181,6 @@ mod tests {
 			log_level: "debug".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			committer_address: "0x0000000000000000000000000000000000000000".to_string(),
 			constraints_server_host: "127.0.0.1".to_string(),
 			constraints_server_port: 8080,
 			constraints_relay_url: "https://relay.example.com".to_string(),
