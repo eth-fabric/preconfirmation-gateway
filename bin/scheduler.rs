@@ -2,9 +2,9 @@ use commit_boost::prelude::*;
 use common::db::{DatabaseType, create_database};
 use common::{config, types};
 use eyre::Result;
-use scheduler::{DelegationTask, DelegationTaskConfig, SlotTimer, TaskCoordinator};
+use scheduler::{ConstraintsTask, DelegationTask, DelegationTaskConfig, SlotTimer, TaskCoordinator};
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -35,50 +35,29 @@ async fn main() -> Result<()> {
 	let delegation_config = DelegationTaskConfig {
 		check_interval_seconds: 1, // 1 second interval as requested
 		lookahead_window: 64,      // 64 slots lookahead
-		constraints_service_url: format!(
-			"http://{}:{}",
-			app_config.constraints_server_host, app_config.constraints_server_port
-		),
-		delegate_bls_public_key: app_config.constraints_delegate_public_key.clone(),
 	};
 
 	// Create delegation task
-	let delegation_task = DelegationTask::new(delegation_config, slot_timer.clone(), delegations_database);
+	let delegation_task =
+		DelegationTask::new(delegation_config, app_config.clone(), slot_timer.clone(), delegations_database.clone());
+
+	// Create constraints task
+	let constraints_task = ConstraintsTask::new(app_config.clone(), slot_timer.clone(), delegations_database.clone());
 
 	// Spawn delegation task
 	coordinator.spawn_task("delegation_task".to_string(), move || async move { delegation_task.run().await });
 
-	coordinator.spawn_task("constraints_task".to_string(), || async {
-		// Constraints processing logic
-		info!("Processing constraints");
-		Ok(())
-	});
+	// Spawn constraints task
+	coordinator.spawn_task("constraints_task".to_string(), move || async move { constraints_task.run().await });
 
 	info!("Scheduler initialized with {} tasks", coordinator.task_count());
 
-	// Run scheduler loop
+	// Run scheduler loop - tasks run independently with their own timing
 	loop {
 		let current_slot = slot_timer.get_current_slot();
 		info!("Current slot: {}", current_slot);
 
-		// Wait for constraint window
-		if !slot_timer.is_in_constraint_window() {
-			let wait_time = slot_timer.time_until_next_constraint_window();
-			info!("Waiting for next constraint window: {:?}", wait_time);
-			tokio::time::sleep(wait_time).await;
-			continue;
-		}
-
-		// Process tasks during constraint window
-		info!("In constraint window, processing tasks");
-
-		// Wait for all tasks to complete with timeout
-		let timeout = Duration::from_secs(8); // 8-second constraint window
-		if let Err(e) = coordinator.wait_for_all_with_timeout(timeout).await {
-			error!("Task execution failed: {}", e);
-		}
-
-		// Wait for next slot
+		// Tasks run independently, just log current slot periodically
 		tokio::time::sleep(Duration::from_secs(12)).await;
 	}
 }

@@ -4,14 +4,47 @@ use tracing::{error, info, warn};
 
 use super::client::ConstraintsClient;
 use crate::utils::{
-	create_constraints_error_response, create_constraints_message, create_signed_constraints,
-	parse_bls_public_key_with_error_response, parse_bls_public_key_with_status_code,
-	parse_bls_public_keys_with_error_response,
+	create_constraints_error_response, create_constraints_message, create_signed_constraints, parse_bls_public_key,
+	parse_bls_public_key_with_status_code, parse_bls_public_keys,
 };
+use commit_boost::prelude::BlsPublicKey;
 use common::types::{
 	ConstraintCapabilities, HealthResponse, ProcessConstraintsRequest, ProcessConstraintsResponse,
 	ProcessDelegationsRequest, ProcessDelegationsResponse, RpcContext, SignedDelegation,
 };
+
+/// Validate a process constraints request and extract BLS public keys
+pub fn validate_process_constraints_request(
+	request: &ProcessConstraintsRequest,
+) -> Result<(BlsPublicKey, BlsPublicKey, Vec<BlsPublicKey>), StatusCode> {
+	// Parse BLS public keys using the simpler parsing functions
+	let bls_public_key = match parse_bls_public_key(&request.bls_public_key, "delegate") {
+		Ok(key) => key,
+		Err(e) => {
+			error!("Invalid delegate BLS public key: {}", e);
+			return Err(StatusCode::BAD_REQUEST);
+		}
+	};
+
+	let proposer_public_key = match parse_bls_public_key(&request.proposer_public_key, "proposer") {
+		Ok(key) => key,
+		Err(e) => {
+			error!("Invalid proposer BLS public key: {}", e);
+			return Err(StatusCode::BAD_REQUEST);
+		}
+	};
+
+	// Parse receiver BLS public keys
+	let receivers = match parse_bls_public_keys(&request.receivers, "receiver") {
+		Ok(keys) => keys,
+		Err(e) => {
+			error!("Invalid receiver BLS public keys: {}", e);
+			return Err(StatusCode::BAD_REQUEST);
+		}
+	};
+
+	Ok((bls_public_key, proposer_public_key, receivers))
+}
 
 /// Scheduler endpoint: Process constraints for a specific slot
 pub async fn process_constraints_handler<T>(
@@ -20,23 +53,10 @@ pub async fn process_constraints_handler<T>(
 ) -> Result<Json<ProcessConstraintsResponse>, StatusCode> {
 	info!("Processing constraints for slot {} with BLS public key", request.slot);
 
-	// Parse BLS public keys
-	let bls_public_key =
-		match parse_bls_public_key_with_error_response(&request.bls_public_key, "delegate", request.slot) {
-			Ok(key) => key,
-			Err(error_response) => return error_response,
-		};
-
-	let proposer_public_key =
-		match parse_bls_public_key_with_error_response(&request.proposer_public_key, "proposer", request.slot) {
-			Ok(key) => key,
-			Err(error_response) => return error_response,
-		};
-
-	// Parse receiver BLS public keys
-	let receivers = match parse_bls_public_keys_with_error_response(&request.receivers, "receiver", request.slot) {
+	// Validate request and extract BLS public keys
+	let (bls_public_key, proposer_public_key, receivers) = match validate_process_constraints_request(&request) {
 		Ok(keys) => keys,
-		Err(error_response) => return error_response,
+		Err(status_code) => return Err(status_code),
 	};
 
 	// 1. Get constraints for the specific slot

@@ -49,6 +49,10 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
 		eth_genesis_timestamp: 1606824023,
+		constraints_receivers: vec![
+			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
+				.to_string(),
+		],
 	};
 
 	// Start local signer server with test configuration

@@ -4,6 +4,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
+use common::config::InclusionPreconfConfig;
 use common::constants::routes;
 use common::types::{DatabaseContext, ProcessDelegationsRequest, ProcessDelegationsResponse};
 use common::SlotTimer;
@@ -15,26 +16,12 @@ pub struct DelegationTaskConfig {
 	pub check_interval_seconds: u64,
 	/// Number of slots to look ahead
 	pub lookahead_window: u64,
-	/// URL of the constraints service
-	pub constraints_service_url: String,
-	/// BLS public key for the delegate
-	pub delegate_bls_public_key: String,
-}
-
-impl Default for DelegationTaskConfig {
-	fn default() -> Self {
-		Self {
-			check_interval_seconds: 1,
-			lookahead_window: 64,
-			constraints_service_url: "http://localhost:8081".to_string(),
-			delegate_bls_public_key: String::new(),
-		}
-	}
 }
 
 /// Delegation task that periodically checks for delegations in upcoming slots
 pub struct DelegationTask {
 	config: DelegationTaskConfig,
+	app_config: InclusionPreconfConfig,
 	slot_timer: SlotTimer,
 	http_client: Client,
 	database: DatabaseContext,
@@ -42,8 +29,13 @@ pub struct DelegationTask {
 
 impl DelegationTask {
 	/// Create a new delegation task
-	pub fn new(config: DelegationTaskConfig, slot_timer: SlotTimer, database: DatabaseContext) -> Self {
-		Self { config, slot_timer, http_client: Client::new(), database }
+	pub fn new(
+		config: DelegationTaskConfig,
+		app_config: InclusionPreconfConfig,
+		slot_timer: SlotTimer,
+		database: DatabaseContext,
+	) -> Self {
+		Self { config, app_config, slot_timer, http_client: Client::new(), database }
 	}
 
 	/// Run the delegation task continuously
@@ -94,10 +86,17 @@ impl DelegationTask {
 
 	/// Process delegations for a specific slot
 	async fn process_delegations_for_slot(&self, slot: u64) -> Result<()> {
-		let request =
-			ProcessDelegationsRequest { slot, delegate_bls_public_key: self.config.delegate_bls_public_key.clone() };
+		let request = ProcessDelegationsRequest {
+			slot,
+			delegate_bls_public_key: self.app_config.constraints_delegate_public_key.clone(),
+		};
 
-		let url = format!("{}{}", self.config.constraints_service_url, routes::constraints::PROCESS_DELEGATIONS);
+		let url = format!(
+			"http://{}:{}{}",
+			self.app_config.constraints_server_host,
+			self.app_config.constraints_server_port,
+			routes::constraints::PROCESS_DELEGATIONS
+		);
 
 		info!("Calling process_delegations for slot {} at {}", slot, url);
 
@@ -130,15 +129,40 @@ mod tests {
 
 	#[test]
 	fn test_delegation_task_config_default() {
-		let config = DelegationTaskConfig::default();
+		let config = DelegationTaskConfig { check_interval_seconds: 1, lookahead_window: 64 };
 		assert_eq!(config.check_interval_seconds, 1);
 		assert_eq!(config.lookahead_window, 64);
-		assert_eq!(config.constraints_service_url, "http://localhost:8081");
 	}
 
 	#[test]
 	fn test_delegation_task_creation() {
-		let config = DelegationTaskConfig::default();
+		let config = DelegationTaskConfig { check_interval_seconds: 1, lookahead_window: 64 };
+		let app_config = InclusionPreconfConfig {
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: 8080,
+			commitments_database_url: "test.db".to_string(),
+			constraints_database_url: "constraints.db".to_string(),
+			delegations_database_url: "delegations.db".to_string(),
+			pricing_database_url: "pricing.db".to_string(),
+			log_level: "info".to_string(),
+			enable_method_tracing: false,
+			traced_methods: vec![],
+			constraints_server_host: "127.0.0.1".to_string(),
+			constraints_server_port: 8081,
+			constraints_relay_url: "https://relay.example.com".to_string(),
+			constraints_api_key: None,
+			constraints_bls_public_key:
+				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+					.to_string(),
+			constraints_delegate_public_key:
+				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+					.to_string(),
+			eth_genesis_timestamp: 1606824023,
+			constraints_receivers: vec![
+				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+					.to_string(),
+			],
+		};
 		let slot_timer = SlotTimer::new(1606824023); // Mainnet genesis
 											   // Create a mock database context for testing
 		use common::types::DatabaseContext;
@@ -153,7 +177,7 @@ mod tests {
 		let db = DB::open(&opts, &db_path).unwrap();
 		let database = DatabaseContext::new(Arc::new(db));
 
-		let _task = DelegationTask::new(config, slot_timer, database);
+		let _task = DelegationTask::new(config, app_config, slot_timer, database);
 		// Test passes if creation doesn't panic
 	}
 }

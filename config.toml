@@ -60,3 +60,6 @@ constraints_delegate_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57b
 
 # Scheduler configuration
 eth_genesis_timestamp = 1606824023
+
+# Constraints receivers configuration
+constraints_receivers = ["0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"]

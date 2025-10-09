@@ -57,6 +57,9 @@ pub struct InclusionPreconfConfig {
 
 	// Scheduler configuration
 	pub eth_genesis_timestamp: u64,
+
+	// Constraints receivers configuration
+	pub constraints_receivers: Vec<String>,
 }
 
 // Default implementations for individual config structs
@@ -192,6 +195,10 @@ mod tests {
 				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
 					.to_string(),
 			eth_genesis_timestamp: 1606824023, // Mainnet genesis
+			constraints_receivers: vec![
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
+			],
 		};
 
 		// Test constraints config access

@@ -328,6 +328,10 @@ pub mod test_helpers {
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
 			eth_genesis_timestamp: 1606824023,
+			constraints_receivers: vec![
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
+			],
 		};
 
 		// Start local signer server with config
