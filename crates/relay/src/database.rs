@@ -20,8 +20,8 @@ impl RelayDatabase {
 	}
 
 	/// Store a verified delegation (assumes only one delegation per slot)
-	pub fn store_delegation(&self, slot: u64, delegation_id: &str, delegation: &SignedDelegation) -> Result<()> {
-		// Use simple key format: "delegation:{slot}" (ignore delegation_id since we assume one per slot)
+	pub fn store_delegation(&self, slot: u64, delegation: &SignedDelegation) -> Result<()> {
+		// Use simple key format: "delegation:{slot}"
 		let key = format!("delegation:{}", slot);
 		let value = serde_json::to_vec(delegation)?;
 		self.db.put(key.as_bytes(), &value)?;
@@ -151,10 +151,9 @@ mod tests {
 
 		let delegation = create_test_delegation();
 		let slot = 12345;
-		let delegation_id = "test_delegation_1";
 
 		// Store delegation
-		db.store_delegation(slot, delegation_id, &delegation).unwrap();
+		db.store_delegation(slot, &delegation).unwrap();
 
 		// Retrieve delegation for slot
 		let retrieved_delegation = db.get_delegation_for_slot(slot).unwrap();
@@ -172,10 +171,10 @@ mod tests {
 
 		let slot = 12345;
 
-		// Store multiple delegations
-		for i in 0..3 {
+		// Store multiple delegations (they will overwrite each other since we only store one per slot)
+		for _i in 0..3 {
 			let delegation = create_test_delegation();
-			db.store_delegation(slot, &format!("delegation_{}", i), &delegation).unwrap();
+			db.store_delegation(slot, &delegation).unwrap();
 		}
 
 		// Retrieve delegation for slot (should be the last one stored)
@@ -197,7 +196,7 @@ mod tests {
 
 		// Add some data
 		let delegation = create_test_delegation();
-		db.store_delegation(12345, "test", &delegation).unwrap();
+		db.store_delegation(12345, &delegation).unwrap();
 
 		let health = db.get_health_status().unwrap();
 		assert_eq!(health.total_delegations, 1);

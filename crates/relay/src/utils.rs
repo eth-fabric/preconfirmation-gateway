@@ -99,6 +99,19 @@ pub fn validate_delegation_message(delegation: &Delegation) -> Result<bool> {
 	Ok(true)
 }
 
+/// Validate that the given public key is the scheduled proposer for the given slot
+/// TODO: Call beacon node API to verify this pubkey is the scheduled proposer for this slot
+pub fn validate_is_proposer(pubkey: &BlsPublicKey, slot: u64) -> Result<bool> {
+	debug!("Validating proposer for slot {} with pubkey: {:?}", slot, pubkey.serialize());
+
+	// TODO: Call beacon node API to verify this pubkey is the scheduled proposer for this slot
+	// For now, always return true to allow all valid signatures through
+	// This should be replaced with actual beacon node validation
+	info!("Proposer validation for slot {} - currently allowing all (TODO: implement beacon node check)", slot);
+
+	Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

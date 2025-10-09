@@ -9,7 +9,7 @@ use tracing::{debug, error, info};
 
 use crate::database::RelayDatabase;
 use crate::utils::{
-	validate_constraints_message, validate_delegation_message, verify_constraints_signature,
+	validate_constraints_message, validate_delegation_message, validate_is_proposer, verify_constraints_signature,
 	verify_delegation_signature,
 };
 
@@ -118,11 +118,53 @@ pub async fn store_delegation_handler(
 		}
 	}
 
-	// Generate a delegation ID (using a hash of the delegation content)
-	let delegation_id = format!("delegation_{}", delegation.message.slot);
+	// Validate that the proposer is scheduled for this slot
+	match validate_is_proposer(&delegation.message.proposer, delegation.message.slot) {
+		Ok(true) => {
+			info!("Proposer validation successful for slot {}", delegation.message.slot);
+		}
+		Ok(false) => {
+			error!("Proposer public key is not scheduled for slot {}", delegation.message.slot);
+			return Ok(Json(PostDelegationResponse {
+				success: false,
+				message: "Proposer public key is not scheduled for this slot".to_string(),
+			}));
+		}
+		Err(e) => {
+			error!("Error validating proposer for slot {}: {}", delegation.message.slot, e);
+			return Ok(Json(PostDelegationResponse {
+				success: false,
+				message: format!("Error validating proposer: {}", e),
+			}));
+		}
+	}
+
+	// Check for existing delegation to prevent equivocation
+	match state.database.get_delegation_for_slot(delegation.message.slot) {
+		Ok(Some(_existing_delegation)) => {
+			error!(
+				"Delegation already exists for slot {} - rejecting to prevent equivocation",
+				delegation.message.slot
+			);
+			return Ok(Json(PostDelegationResponse {
+				success: false,
+				message: "Delegation already exists for this slot. Cannot accept another delegation (equivocation protection)".to_string(),
+			}));
+		}
+		Ok(None) => {
+			debug!("No existing delegation found for slot {}", delegation.message.slot);
+		}
+		Err(e) => {
+			error!("Error checking for existing delegation for slot {}: {}", delegation.message.slot, e);
+			return Ok(Json(PostDelegationResponse {
+				success: false,
+				message: format!("Error checking for existing delegation: {}", e),
+			}));
+		}
+	}
 
 	// Store delegation in database
-	match state.database.store_delegation(delegation.message.slot, &delegation_id, &delegation) {
+	match state.database.store_delegation(delegation.message.slot, &delegation) {
 		Ok(_) => {
 			info!("Delegation stored successfully for slot {}", delegation.message.slot);
 			Ok(Json(PostDelegationResponse { success: true, message: "Delegation stored successfully".to_string() }))
