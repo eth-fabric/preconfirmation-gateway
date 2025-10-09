@@ -5,7 +5,9 @@ use tracing::{error, info, instrument};
 use super::utils;
 use alloy::primitives::B256;
 use commit_boost::prelude::commit::request::EncryptionScheme;
-use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse};
+use common::constants::COMMITMENT_TYPE;
+use common::types::commitments::Offering;
+use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfo, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
 pub async fn commitment_request_handler<T>(
@@ -158,8 +160,55 @@ pub fn slots_handler<T>(
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
 	info!("Processing slots request");
-	// TODO: Implement actual slots logic
-	let response = SlotInfoResponse { slots: vec![] };
+
+	// Get current slot
+	let current_slot = _context.slot_timer().get_current_slot();
+	info!("Current slot: {}", current_slot);
+
+	// Get chain ID once from commit config
+	let chain_id_uint = _context
+		.commit_config
+		.try_lock()
+		.map_err(|_| {
+			jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to access commit config",
+				Some("Could not acquire lock on commit config".to_string()),
+			)
+		})?
+		.chain
+		.id();
+
+	// Convert Uint<256> to u64
+	let chain_id = chain_id_uint.to::<u64>();
+
+	// Check next 64 slots for delegations
+	let mut slots = Vec::new();
+	for slot in current_slot..current_slot + 64 {
+		match _context.database().is_delegated(slot) {
+			Ok(true) => {
+				info!("Found delegation for slot {}", slot);
+
+				// Create offering with chain ID and commitment type
+				let offering = Offering { chain_id, commitment_types: vec![COMMITMENT_TYPE] };
+
+				// Create slot info
+				let slot_info = SlotInfo { slot, offerings: vec![offering] };
+
+				slots.push(slot_info);
+			}
+			Ok(false) => {
+				// No delegation for this slot, skip
+			}
+			Err(e) => {
+				error!("Failed to check delegation for slot {}: {}", slot, e);
+				// Continue with other slots even if one fails
+			}
+		}
+	}
+
+	info!("Found {} slots with delegations", slots.len());
+	let response = SlotInfoResponse { slots };
 
 	info!("Slots request processed successfully");
 	Ok(response)

@@ -5,7 +5,7 @@ const SLOT_TIME_SECONDS: u64 = 12;
 const CONSTRAINT_WINDOW_OFFSET: u64 = 4; // 4 seconds into slot
 
 /// Manages Ethereum slot timing and constraint windows
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SlotTimer {
 	genesis_timestamp: u64,
 }

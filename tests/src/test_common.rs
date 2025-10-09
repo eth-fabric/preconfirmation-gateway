@@ -5,6 +5,7 @@ use cb_common::{
 	types::{Jwt, ModuleId},
 };
 use commit_boost::prelude::StartCommitModuleConfig;
+use common::SlotTimer;
 use common::config::InclusionPreconfConfig;
 use common::types::commitments::InclusionPayload;
 use common::types::{Commitment, CommitmentRequest, DatabaseContext, RpcContext, SignedCommitment};
@@ -276,12 +277,16 @@ pub mod test_helpers {
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
+		// Create slot timer with test genesis timestamp
+		let slot_timer = SlotTimer::new(1606824023);
+
 		Ok(RpcContext {
 			database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
 			api_key,
+			slot_timer,
 		})
 	}
 
@@ -343,12 +348,16 @@ pub mod test_helpers {
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
+		// Create slot timer with test genesis timestamp
+		let slot_timer = SlotTimer::new(1606824023);
+
 		Ok(RpcContext {
 			database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
 			api_key,
+			slot_timer,
 		})
 	}
 }

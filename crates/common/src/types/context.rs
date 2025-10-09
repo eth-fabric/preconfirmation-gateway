@@ -1,3 +1,4 @@
+use crate::SlotTimer;
 use crate::types::database::DatabaseContext;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
 use std::sync::Arc;
@@ -16,6 +17,8 @@ pub struct RpcContext<T = ()> {
 	pub relay_url: String,
 	/// API key for relay authentication
 	pub api_key: Option<String>,
+	/// Slot timer for Ethereum slot timing
+	pub slot_timer: SlotTimer,
 }
 
 impl<T> RpcContext<T> {
@@ -26,12 +29,25 @@ impl<T> RpcContext<T> {
 		bls_public_key: BlsPublicKey,
 		relay_url: String,
 		api_key: Option<String>,
+		slot_timer: SlotTimer,
 	) -> Self {
-		Self { database, commit_config: Arc::new(Mutex::new(commit_config)), bls_public_key, relay_url, api_key }
+		Self {
+			database,
+			commit_config: Arc::new(Mutex::new(commit_config)),
+			bls_public_key,
+			relay_url,
+			api_key,
+			slot_timer,
+		}
 	}
 
 	/// Get a reference to the database
 	pub fn database(&self) -> &DatabaseContext {
 		&self.database
+	}
+
+	/// Get a reference to the slot timer
+	pub fn slot_timer(&self) -> &SlotTimer {
+		&self.slot_timer
 	}
 }

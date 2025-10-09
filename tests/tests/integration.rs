@@ -1,4 +1,5 @@
 use alloy::primitives::B256;
+use common::SlotTimer;
 use common::types::{CommitmentRequest, SignedCommitment};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
@@ -30,6 +31,7 @@ struct TestEnvironment {
 	client: HttpClient,
 	server_handle: tokio::task::JoinHandle<()>,
 	temp_dir: TempDir,
+	test_slots: Vec<u64>,
 }
 
 impl TestEnvironment {
@@ -99,8 +101,13 @@ impl TestEnvironment {
 			.map_err(|e| eyre::eyre!("Failed to generate proxy key: {}", e))?;
 		let committer_address = proxy_address.message.proxy;
 
-		// Set up test delegations for common test slots
-		setup_test_delegations(&database, &committer_address).await?;
+		// Create test slots relative to current time
+		let slot_timer = common::SlotTimer::new(1606824023);
+		let current_slot = slot_timer.get_current_slot();
+		let test_slots: Vec<u64> = (current_slot..current_slot + 10).collect();
+
+		// Set up test delegations for the test slots
+		setup_test_delegations_with_slots(&database, &committer_address, &test_slots).await?;
 
 		// Create RPC context with constraints fields
 		// Use a valid BLS public key for testing
@@ -111,8 +118,17 @@ impl TestEnvironment {
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
-		let rpc_context =
-			common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key);
+		// Create slot timer with test genesis timestamp
+		let slot_timer = SlotTimer::new(1606824023);
+
+		let rpc_context = common::types::RpcContext::new(
+			database,
+			commit_config_guard,
+			bls_public_key,
+			relay_url,
+			api_key,
+			slot_timer,
+		);
 
 		// Start RPC server
 		let server_address = format!("127.0.0.1:{}", rpc_port);
@@ -132,21 +148,19 @@ impl TestEnvironment {
 			.build(&server_url)
 			.map_err(|e| eyre::eyre!("Failed to create HTTP client: {}", e))?;
 
-		Ok(Self { client, server_handle, temp_dir })
+		Ok(Self { client, server_handle, temp_dir, test_slots })
 	}
 }
 
-/// Sets up test delegations for common test slots
-async fn setup_test_delegations(
+/// Sets up test delegations for provided test slots
+async fn setup_test_delegations_with_slots(
 	database: &common::types::DatabaseContext,
 	committer_address: &alloy::primitives::Address,
+	test_slots: &[u64],
 ) -> eyre::Result<()> {
 	use alloy::primitives::{B256, Bytes};
 	use commit_boost::prelude::{BlsPublicKey, BlsSignature};
 	use common::types::constraints::SignedDelegation;
-
-	// Common test slots that integration tests use
-	let test_slots = vec![10000, 10001, 10002, 10003, 10004, 99999, 12345, 67890, 11111, 22222, 33333];
 
 	for slot in test_slots {
 		// Create a mock delegation for testing
@@ -157,7 +171,7 @@ async fn setup_test_delegations(
 				delegate: BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
 					.map_err(|e| eyre::eyre!("Failed to create BLS public key: {:?}", e))?,
 				committer: *committer_address,
-				slot,
+				slot: *slot,
 				metadata: Bytes::new(),
 			},
 			nonce: 1,
@@ -168,7 +182,7 @@ async fn setup_test_delegations(
 
 		// Store the delegation in the database
 		database
-			.store_delegation(slot, &mock_delegation)
+			.store_delegation(*slot, &mock_delegation)
 			.map_err(|e| eyre::eyre!("Failed to store test delegation for slot {}: {}", slot, e))?;
 	}
 
@@ -191,8 +205,9 @@ fn create_test_database(db_path: &std::path::Path) -> eyre::Result<rocksdb::DB> 
 async fn test_commitment_request_flow(env: &TestEnvironment) -> eyre::Result<()> {
 	println!("Testing commitmentRequest RPC method...");
 
-	// Create a valid commitment request
-	let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
+	// Create a valid commitment request using the first test slot
+	let test_slot = env.test_slots[0];
+	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
 	let slasher = test_helpers::create_valid_slasher();
 	let commitment_type = test_helpers::create_valid_commitment_type();
 
@@ -223,8 +238,9 @@ async fn test_commitment_request_flow(env: &TestEnvironment) -> eyre::Result<()>
 async fn test_commitment_result_flow(env: &TestEnvironment) -> eyre::Result<()> {
 	println!("Testing commitmentResult RPC method...");
 
-	// First, create a commitment request to get a request hash
-	let payload = test_helpers::create_valid_inclusion_payload(67890, test_helpers::create_valid_signed_tx())?;
+	// First, create a commitment request to get a request hash using the second test slot
+	let test_slot = env.test_slots[1];
+	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
 	let slasher = test_helpers::create_valid_slasher();
 	let commitment_type = test_helpers::create_valid_commitment_type();
 
@@ -267,11 +283,11 @@ async fn test_commitment_result_flow(env: &TestEnvironment) -> eyre::Result<()> 
 async fn test_end_to_end_flow(env: &TestEnvironment) -> eyre::Result<()> {
 	println!("Testing complete end-to-end flow...");
 
-	// Create multiple commitment requests
+	// Create multiple commitment requests using test slots
 	let test_cases = vec![
-		(11111, test_helpers::create_valid_signed_tx()),
-		(22222, test_helpers::create_valid_signed_tx()),
-		(33333, test_helpers::create_valid_signed_tx()),
+		(env.test_slots[0], test_helpers::create_valid_signed_tx()),
+		(env.test_slots[1], test_helpers::create_valid_signed_tx()),
+		(env.test_slots[2], test_helpers::create_valid_signed_tx()),
 	];
 
 	let mut request_hashes = Vec::new();
@@ -348,9 +364,10 @@ async fn test_concurrent_commitment_requests() -> eyre::Result<()> {
 
 	for i in 0..5 {
 		let client = test_env.client.clone();
+		let test_slot = test_env.test_slots[i];
 		let handle = tokio::spawn(async move {
 			let payload =
-				test_helpers::create_valid_inclusion_payload(10000 + i, test_helpers::create_valid_signed_tx())
+				test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())
 					.unwrap();
 			let slasher = test_helpers::create_valid_slasher();
 			let commitment_type = test_helpers::create_valid_commitment_type();
@@ -387,8 +404,9 @@ async fn test_concurrent_commitment_requests() -> eyre::Result<()> {
 async fn test_server_health() -> eyre::Result<()> {
 	let test_env = TestEnvironment::setup().await?;
 
-	// Test that the server is working correctly
-	let payload = test_helpers::create_valid_inclusion_payload(99999, test_helpers::create_valid_signed_tx())?;
+	// Test that the server is working correctly using the first test slot
+	let test_slot = test_env.test_slots[0];
+	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
 	let slasher = test_helpers::create_valid_slasher();
 	let commitment_type = test_helpers::create_valid_commitment_type();
 

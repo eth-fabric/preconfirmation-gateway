@@ -2,7 +2,7 @@ use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::server;
 use common::db::DatabaseType;
-use common::{config, db, types};
+use common::{SlotTimer, config, db, types};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,8 +25,11 @@ async fn main() -> anyhow::Result<()> {
 	let relay_url = constraints_config.relay_url.clone();
 	let api_key = constraints_config.api_key.clone();
 
+	// Create slot timer with genesis timestamp
+	let slot_timer = SlotTimer::new(commit_config.extra.eth_genesis_timestamp());
+
 	// Create RPC context with database context and commit config
-	let rpc_context = types::RpcContext::new(db_context, commit_config, bls_public_key, relay_url, api_key);
+	let rpc_context = types::RpcContext::new(db_context, commit_config, bls_public_key, relay_url, api_key, slot_timer);
 
 	server::run_server(rpc_context).await?;
 

@@ -1,3 +1,4 @@
+use common::SlotTimer;
 use eyre::Result;
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
@@ -80,7 +81,11 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let relay_url = "https://relay.example.com".to_string();
 	let api_key = None::<String>;
 
-	let rpc_context = common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key);
+	// Create slot timer with test genesis timestamp
+	let slot_timer = SlotTimer::new(1606824023);
+
+	let rpc_context =
+		common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key, slot_timer);
 
 	// Start RPC server
 	let server_handle = tokio::spawn(async move {

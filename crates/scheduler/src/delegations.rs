@@ -4,9 +4,9 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-use crate::slot_timer::SlotTimer;
 use common::constants::routes;
 use common::types::{DatabaseContext, ProcessDelegationsRequest, ProcessDelegationsResponse};
+use common::SlotTimer;
 
 /// Configuration for the delegation task
 #[derive(Debug, Clone)]
