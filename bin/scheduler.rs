@@ -1,6 +1,8 @@
-use common::config::InclusionPreconfConfig;
+use commit_boost::prelude::*;
+use common::db::{DatabaseType, create_database};
+use common::{config, types};
 use eyre::Result;
-use scheduler::{SlotTimer, TaskCoordinator};
+use scheduler::{DelegationTask, DelegationTaskConfig, SlotTimer, TaskCoordinator};
 use std::time::Duration;
 use tracing::{error, info};
 
@@ -11,44 +13,40 @@ async fn main() -> Result<()> {
 
 	info!("Starting scheduler service");
 
-	// Load scheduler config
-	let config = InclusionPreconfConfig {
-		commitments_server_host: "127.0.0.1".to_string(),
-		commitments_server_port: 8080,
-		commitments_database_url: "./data/rocksdb".to_string(),
-		constraints_database_url: "./data/constraints-rocksdb".to_string(),
-		delegations_database_url: "./data/delegations-rocksdb".to_string(),
-		pricing_database_url: "./data/pricing-rocksdb".to_string(),
-		log_level: "info".to_string(),
-		enable_method_tracing: false,
-		traced_methods: vec![],
-		committer_address: "0x0000000000000000000000000000000000000000".to_string(),
-		constraints_server_host: "127.0.0.1".to_string(),
-		constraints_server_port: 8081,
-		constraints_relay_url: "https://relay.example.com".to_string(),
-		constraints_api_key: None,
-		constraints_bls_public_key:
-			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-				.to_string(),
-		constraints_delegate_public_key:
-			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-				.to_string(),
-		eth_genesis_timestamp: 1606824023, // Mainnet genesis
-	};
-	info!("Using Ethereum genesis timestamp: {}", config.eth_genesis_timestamp());
+	// Load consolidated configuration using commit-boost's config loader
+	let commit_config = load_commit_module_config::<config::InclusionPreconfConfig>()
+		.map_err(|e| eyre::eyre!("Failed to load commit module config: {}", e))?;
+
+	let app_config = &commit_config.extra;
+	info!("Using Ethereum genesis timestamp: {}", app_config.eth_genesis_timestamp);
 
 	// Create slot timer
-	let slot_timer = SlotTimer::new(config.eth_genesis_timestamp());
+	let slot_timer = SlotTimer::new(app_config.eth_genesis_timestamp);
+
+	// Create delegations database
+	let delegations_db = create_database(&commit_config, DatabaseType::Delegations)
+		.map_err(|e| eyre::eyre!("Failed to create delegations database: {}", e))?;
+	let delegations_database = types::DatabaseContext::new(delegations_db);
 
 	// Create task coordinator
 	let mut coordinator = TaskCoordinator::new();
 
-	// Spawn tasks here
-	coordinator.spawn_task("delegation_task".to_string(), || async {
-		// Delegation processing logic
-		info!("Processing delegations");
-		Ok(())
-	});
+	// Create delegation task configuration
+	let delegation_config = DelegationTaskConfig {
+		check_interval_seconds: 1, // 1 second interval as requested
+		lookahead_window: 64,      // 64 slots lookahead
+		constraints_service_url: format!(
+			"http://{}:{}",
+			app_config.constraints_server_host, app_config.constraints_server_port
+		),
+		delegate_bls_public_key: app_config.constraints_delegate_public_key.clone(),
+	};
+
+	// Create delegation task
+	let delegation_task = DelegationTask::new(delegation_config, slot_timer.clone(), delegations_database);
+
+	// Spawn delegation task
+	coordinator.spawn_task("delegation_task".to_string(), move || async move { delegation_task.run().await });
 
 	coordinator.spawn_task("constraints_task".to_string(), || async {
 		// Constraints processing logic

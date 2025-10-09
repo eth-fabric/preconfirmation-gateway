@@ -100,6 +100,9 @@ impl TestEnvironment {
 			.map_err(|e| eyre::eyre!("Failed to generate proxy key: {}", e))?;
 		let committer_address = proxy_address.message.proxy;
 
+		// Set up test delegations for common test slots
+		setup_test_delegations(&database, &committer_address).await?;
+
 		// Create RPC context with constraints fields
 		// Use a valid BLS public key for testing
 		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
@@ -138,6 +141,45 @@ impl TestEnvironment {
 
 		Ok(Self { client, server_handle, temp_dir })
 	}
+}
+
+/// Sets up test delegations for common test slots
+async fn setup_test_delegations(
+	database: &common::types::DatabaseContext,
+	committer_address: &alloy::primitives::Address,
+) -> eyre::Result<()> {
+	use alloy::primitives::{B256, Bytes};
+	use commit_boost::prelude::{BlsPublicKey, BlsSignature};
+	use common::types::constraints::SignedDelegation;
+
+	// Common test slots that integration tests use
+	let test_slots = vec![10000, 10001, 10002, 10003, 10004, 99999, 12345, 67890, 11111, 22222, 33333];
+
+	for slot in test_slots {
+		// Create a mock delegation for testing
+		let mock_delegation = SignedDelegation {
+			message: common::types::constraints::Delegation {
+				proposer: BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
+					.map_err(|e| eyre::eyre!("Failed to create BLS public key: {:?}", e))?,
+				delegate: BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
+					.map_err(|e| eyre::eyre!("Failed to create BLS public key: {:?}", e))?,
+				committer: *committer_address,
+				slot,
+				metadata: Bytes::new(),
+			},
+			nonce: 1,
+			signing_id: B256::default(),
+			signature: BlsSignature::deserialize(&[0u8; 96])
+				.map_err(|e| eyre::eyre!("Failed to create BLS signature: {:?}", e))?,
+		};
+
+		// Store the delegation in the database
+		database
+			.store_delegation(slot, &mock_delegation)
+			.map_err(|e| eyre::eyre!("Failed to store test delegation for slot {}: {}", slot, e))?;
+	}
+
+	Ok(())
 }
 
 /// Creates a test RocksDB database

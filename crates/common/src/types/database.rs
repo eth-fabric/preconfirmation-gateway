@@ -316,6 +316,71 @@ impl DatabaseContext {
 
 		Ok(())
 	}
+
+	/// Store a delegation for a specific slot
+	pub fn store_delegation(&self, slot: u64, delegation: &crate::types::constraints::SignedDelegation) -> Result<()> {
+		let key = format!("delegation:{}:{}", slot, delegation.message.committer);
+		let value = serde_json::to_vec(delegation)?;
+		self.put(key.as_bytes(), &value)
+	}
+
+	/// Get all delegations for a specific slot
+	pub fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<crate::types::constraints::SignedDelegation>> {
+		let prefix = format!("delegation:{}:", slot);
+		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+		let mut delegations = Vec::new();
+
+		for item in iter {
+			let (key, value) = item?;
+			let key_str = String::from_utf8_lossy(&key);
+
+			if key_str.starts_with(&prefix) {
+				let delegation: crate::types::constraints::SignedDelegation = serde_json::from_slice(&value)?;
+				delegations.push(delegation);
+			}
+		}
+
+		Ok(delegations)
+	}
+
+	/// Check if there are any delegations for a specific slot
+	pub fn is_delegated(&self, slot: u64) -> Result<bool> {
+		let prefix = format!("delegation:{}:", slot);
+		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+
+		for item in iter {
+			let (key, _value) = item?;
+			let key_str = String::from_utf8_lossy(&key);
+
+			if key_str.starts_with(&prefix) {
+				return Ok(true);
+			}
+		}
+
+		Ok(false)
+	}
+
+	/// Delete all delegations for a specific slot
+	pub fn delete_delegations_for_slot(&self, slot: u64) -> Result<()> {
+		let prefix = format!("delegation:{}:", slot);
+		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+		let mut keys_to_delete = Vec::new();
+
+		for item in iter {
+			let (key, _value) = item?;
+			let key_str = String::from_utf8_lossy(&key);
+
+			if key_str.starts_with(&prefix) {
+				keys_to_delete.push(key);
+			}
+		}
+
+		for key in keys_to_delete {
+			self.delete(&key)?;
+		}
+
+		Ok(())
+	}
 }
 
 impl std::fmt::Debug for DatabaseContext {
@@ -1180,5 +1245,242 @@ mod tests {
 
 	fn create_test_constraint(constraint_type: u64) -> crate::types::Constraint {
 		crate::types::Constraint { constraint_type, payload: Bytes::from(vec![constraint_type as u8]) }
+	}
+
+	// Delegation tests
+	#[test]
+	fn test_store_delegation() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let delegation = create_test_delegation();
+
+		// Store delegation
+		db.store_delegation(slot, &delegation).unwrap();
+
+		// Verify delegation was stored
+		let delegations = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations.len(), 1);
+		assert_eq!(delegations[0].message.committer, delegation.message.committer);
+		assert_eq!(delegations[0].message.delegate, delegation.message.delegate);
+	}
+
+	#[test]
+	fn test_store_multiple_delegations_same_slot() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let delegation1 = create_test_delegation();
+		let delegation2 = create_test_delegation_with_committer(Address::from([2u8; 20]));
+
+		// Store multiple delegations for the same slot
+		db.store_delegation(slot, &delegation1).unwrap();
+		db.store_delegation(slot, &delegation2).unwrap();
+
+		// Verify both delegations were stored
+		let delegations = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations.len(), 2);
+
+		// Check that both committers are present
+		let committers: Vec<Address> = delegations.iter().map(|d| d.message.committer).collect();
+		assert!(committers.contains(&delegation1.message.committer));
+		assert!(committers.contains(&delegation2.message.committer));
+	}
+
+	#[test]
+	fn test_get_delegations_for_slot_empty() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+
+		// Get delegations for empty slot
+		let delegations = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations.len(), 0);
+	}
+
+	#[test]
+	fn test_is_delegated_true() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let delegation = create_test_delegation();
+
+		// Initially no delegations
+		assert!(!db.is_delegated(slot).unwrap());
+
+		// Store delegation
+		db.store_delegation(slot, &delegation).unwrap();
+
+		// Now should have delegations
+		assert!(db.is_delegated(slot).unwrap());
+	}
+
+	#[test]
+	fn test_is_delegated_false() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+
+		// No delegations stored
+		assert!(!db.is_delegated(slot).unwrap());
+	}
+
+	#[test]
+	fn test_delete_delegations_for_slot() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let delegation1 = create_test_delegation();
+		let delegation2 = create_test_delegation_with_committer(Address::from([2u8; 20]));
+
+		// Store multiple delegations
+		db.store_delegation(slot, &delegation1).unwrap();
+		db.store_delegation(slot, &delegation2).unwrap();
+
+		// Verify they exist
+		assert!(db.is_delegated(slot).unwrap());
+		let delegations = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations.len(), 2);
+
+		// Delete all delegations for the slot
+		db.delete_delegations_for_slot(slot).unwrap();
+
+		// Verify they are gone
+		assert!(!db.is_delegated(slot).unwrap());
+		let delegations_after_delete = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations_after_delete.len(), 0);
+	}
+
+	#[test]
+	fn test_delete_delegations_for_slot_partial() {
+		let (_temp_dir, db) = create_test_db();
+		let slot1 = 12345;
+		let slot2 = 67890;
+		let delegation1 = create_test_delegation();
+		let delegation2 = create_test_delegation_with_committer(Address::from([2u8; 20]));
+
+		// Store delegations for both slots
+		db.store_delegation(slot1, &delegation1).unwrap();
+		db.store_delegation(slot2, &delegation2).unwrap();
+
+		// Verify both slots have delegations
+		assert!(db.is_delegated(slot1).unwrap());
+		assert!(db.is_delegated(slot2).unwrap());
+
+		// Delete delegations for slot1 only
+		db.delete_delegations_for_slot(slot1).unwrap();
+
+		// Verify slot1 is empty but slot2 still has delegations
+		assert!(!db.is_delegated(slot1).unwrap());
+		assert!(db.is_delegated(slot2).unwrap());
+
+		let slot1_delegations = db.get_delegations_for_slot(slot1).unwrap();
+		let slot2_delegations = db.get_delegations_for_slot(slot2).unwrap();
+		assert_eq!(slot1_delegations.len(), 0);
+		assert_eq!(slot2_delegations.len(), 1);
+	}
+
+	#[test]
+	fn test_delegation_key_format() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let delegation = create_test_delegation();
+
+		// Store delegation
+		db.store_delegation(slot, &delegation).unwrap();
+
+		// Manually check the key format by iterating through the database
+		let iter = db.db.iterator(rocksdb::IteratorMode::Start);
+		let mut found_delegation_key = false;
+		let expected_prefix = format!("delegation:{}:", slot);
+
+		for item in iter {
+			let (key, _value) = item.unwrap();
+			let key_str = String::from_utf8_lossy(&key);
+
+			if key_str.starts_with(&expected_prefix) {
+				found_delegation_key = true;
+				// Verify the key format: delegation:slot:committer
+				assert!(key_str.starts_with(&expected_prefix));
+				assert!(key_str.contains(&delegation.message.committer.to_string()));
+				break;
+			}
+		}
+
+		assert!(found_delegation_key, "Delegation key not found in database");
+	}
+
+	#[test]
+	fn test_delegation_serialization_roundtrip() {
+		let (_temp_dir, db) = create_test_db();
+		let slot = 12345;
+		let original_delegation = create_test_delegation();
+
+		// Store delegation
+		db.store_delegation(slot, &original_delegation).unwrap();
+
+		// Retrieve delegation
+		let delegations = db.get_delegations_for_slot(slot).unwrap();
+		assert_eq!(delegations.len(), 1);
+		let retrieved_delegation = &delegations[0];
+
+		// Verify all fields match
+		assert_eq!(retrieved_delegation.message.committer, original_delegation.message.committer);
+		assert_eq!(retrieved_delegation.message.delegate, original_delegation.message.delegate);
+		assert_eq!(retrieved_delegation.message.slot, original_delegation.message.slot);
+		assert_eq!(retrieved_delegation.signature, original_delegation.signature);
+	}
+
+	// Helper functions for delegation tests
+	fn create_test_delegation() -> crate::types::constraints::SignedDelegation {
+		use crate::types::constraints::{Delegation, SignedDelegation};
+		use commit_boost::prelude::{BlsPublicKey, BlsSignature};
+
+		let committer = Address::from([1u8; 20]);
+
+		// Use the actual test data from integration tests
+		let pubkey_bytes = [
+			0x88, 0x38, 0x27, 0x19, 0x3f, 0x76, 0x27, 0xcd, 0x04, 0xe6, 0x21, 0xe1, 0xe8, 0xd5, 0x64, 0x98, 0x36, 0x2a,
+			0x52, 0xb2, 0xa3, 0x0c, 0x9a, 0x1c, 0x72, 0x03, 0x6e, 0xb9, 0x35, 0xc4, 0x27, 0x8d, 0xee, 0x23, 0xd3, 0x8a,
+			0x24, 0xd2, 0xf7, 0xdd, 0xa6, 0x26, 0x89, 0x88, 0x6f, 0x0c, 0x39, 0xf4,
+		];
+		let proposer = BlsPublicKey::deserialize(&pubkey_bytes).unwrap();
+		let delegate = BlsPublicKey::deserialize(&pubkey_bytes).unwrap();
+
+		let slot = 12345;
+		let metadata = Bytes::from(vec![0x01, 0x02, 0x03]);
+
+		// Create a mock signature - we'll use a simple approach for testing
+		let signature_bytes = [0u8; 96]; // This will fail BLS validation but that's OK for database tests
+		let signature = BlsSignature::deserialize(&signature_bytes).unwrap();
+
+		let nonce = 12345;
+		let signing_id = B256::from_slice(&[3u8; 32]);
+
+		let delegation = Delegation { proposer, delegate, committer, slot, metadata };
+
+		SignedDelegation { message: delegation, nonce, signing_id, signature }
+	}
+
+	fn create_test_delegation_with_committer(committer: Address) -> crate::types::constraints::SignedDelegation {
+		use crate::types::constraints::{Delegation, SignedDelegation};
+		use commit_boost::prelude::{BlsPublicKey, BlsSignature};
+
+		// Use the actual test data from integration tests
+		let pubkey_bytes = [
+			0x88, 0x38, 0x27, 0x19, 0x3f, 0x76, 0x27, 0xcd, 0x04, 0xe6, 0x21, 0xe1, 0xe8, 0xd5, 0x64, 0x98, 0x36, 0x2a,
+			0x52, 0xb2, 0xa3, 0x0c, 0x9a, 0x1c, 0x72, 0x03, 0x6e, 0xb9, 0x35, 0xc4, 0x27, 0x8d, 0xee, 0x23, 0xd3, 0x8a,
+			0x24, 0xd2, 0xf7, 0xdd, 0xa6, 0x26, 0x89, 0x88, 0x6f, 0x0c, 0x39, 0xf4,
+		];
+		let proposer = BlsPublicKey::deserialize(&pubkey_bytes).unwrap();
+		let delegate = BlsPublicKey::deserialize(&pubkey_bytes).unwrap();
+
+		let slot = 12345;
+		let metadata = Bytes::from(vec![0x04, 0x05, 0x06]);
+
+		// Create a mock signature - we'll use a simple approach for testing
+		let signature_bytes = [0u8; 96]; // This will fail BLS validation but that's OK for database tests
+		let signature = BlsSignature::deserialize(&signature_bytes).unwrap();
+
+		let nonce = 67890;
+		let signing_id = B256::from_slice(&[5u8; 32]);
+
+		let delegation = Delegation { proposer, delegate, committer, slot, metadata };
+
+		SignedDelegation { message: delegation, nonce, signing_id, signature }
 	}
 }

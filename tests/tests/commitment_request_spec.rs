@@ -34,6 +34,49 @@ impl CommitmentRequestTestHarness {
 		Ok(Self { context })
 	}
 
+	/// Creates a new test harness with a delegation set up for the given slot
+	async fn new_with_delegation(slot: u64) -> eyre::Result<Self> {
+		let harness = Self::new().await?;
+
+		// Add a delegation for the slot to the database
+		harness.setup_delegation_for_slot(slot).await?;
+
+		Ok(harness)
+	}
+
+	/// Sets up a delegation for a specific slot in the database
+	async fn setup_delegation_for_slot(&self, slot: u64) -> eyre::Result<()> {
+		use alloy::primitives::{B256, Bytes};
+		use commit_boost::prelude::BlsSignature;
+		use common::types::constraints::SignedDelegation;
+
+		// Use the test BLS public key from constants
+		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&PUBKEY).unwrap();
+
+		// Create a mock delegation for testing
+		let mock_delegation = SignedDelegation {
+			message: common::types::constraints::Delegation {
+				proposer: test_bls_pubkey.clone(),
+				delegate: test_bls_pubkey,
+				committer: self.context.committer_address,
+				slot,
+				metadata: Bytes::new(),
+			},
+			nonce: 1,
+			signing_id: B256::default(),
+			signature: BlsSignature::deserialize(&[0u8; 96])
+				.map_err(|e| eyre::eyre!("Failed to create BLS signature: {:?}", e))?,
+		};
+
+		// Store the delegation in the database
+		self.context
+			.database
+			.store_delegation(slot, &mock_delegation)
+			.map_err(|e| eyre::eyre!("Failed to store test delegation: {}", e))?;
+
+		Ok(())
+	}
+
 	/// Tests a commitment request and returns the result
 	async fn test_commitment_request(
 		&self,
@@ -78,10 +121,11 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_valid_commitment_request() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
+		let slot = 12345;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
 
 		// Create a valid test request
-		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
@@ -99,6 +143,25 @@ mod test_cases {
 		assert_eq!(result.commitment.commitment_type, commitment_type);
 		assert!(result.nonce > 0, "Nonce should be greater than 0");
 		assert!(!result.signature.to_string().is_empty(), "Signature should not be empty");
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_commitment_request_without_delegation() -> eyre::Result<()> {
+		let harness = CommitmentRequestTestHarness::new().await?;
+
+		// Create a valid test request for a slot without delegation
+		// Use a slot that's not in the common test slots list (10000, 10001, 10002, 10003, 10004, 99999, 12345, 67890, 11111, 22222, 33333)
+		let slot = 999999;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
+		let slasher = test_helpers::create_valid_slasher();
+		let commitment_type = test_helpers::create_valid_commitment_type();
+		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
+
+		// Test the request - should fail because no delegation exists
+		harness.test_commitment_request_should_fail(request).await?;
+		println!("Successfully verified that commitment request fails without delegation");
 
 		Ok(())
 	}
@@ -212,8 +275,6 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_multiple_valid_requests() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Test multiple valid requests with different parameters
 		let test_cases = vec![
 			(12345, test_helpers::create_valid_signed_tx()),
@@ -222,6 +283,7 @@ mod test_cases {
 		];
 
 		for (slot, signed_tx) in test_cases {
+			let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
 			let payload = test_helpers::create_valid_inclusion_payload(slot, signed_tx)?;
 			let request = test_helpers::create_valid_commitment_request(
 				test_helpers::create_valid_commitment_type(),
@@ -242,10 +304,10 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_database_storage_after_successful_request() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create a valid test request
-		let payload = test_helpers::create_valid_inclusion_payload(12345, test_helpers::create_valid_signed_tx())?;
+		let slot = 12345;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
@@ -279,8 +341,6 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_database_persistence_across_multiple_requests() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create multiple requests with different parameters
 		let test_requests = vec![
 			(11111, test_helpers::create_valid_signed_tx()),
@@ -290,9 +350,11 @@ mod test_cases {
 
 		let mut request_hashes = Vec::new();
 		let mut expected_results = Vec::new();
+		let mut harnesses = Vec::new();
 
 		// Process all requests and collect their hashes and results
 		for (slot, signed_tx) in test_requests {
+			let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
 			let payload = test_helpers::create_valid_inclusion_payload(slot, signed_tx)?;
 			let request = test_helpers::create_valid_commitment_request(
 				test_helpers::create_valid_commitment_type(),
@@ -305,11 +367,12 @@ mod test_cases {
 
 			request_hashes.push(request_hash);
 			expected_results.push(result);
+			harnesses.push(harness);
 		}
 
 		// Verify all commitments are stored in the database
 		for (i, request_hash) in request_hashes.iter().enumerate() {
-			let stored_commitment = harness.context.database().get_commitment(request_hash).unwrap();
+			let stored_commitment = harnesses[i].context.database().get_commitment(request_hash).unwrap();
 			assert!(stored_commitment.is_some(), "Commitment {} should be stored in database", i);
 
 			let stored = stored_commitment.unwrap();
@@ -343,10 +406,10 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_request_hash_consistency() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create a test request
-		let payload = test_helpers::create_valid_inclusion_payload(99999, test_helpers::create_valid_signed_tx())?;
+		let slot = 99999;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
@@ -369,10 +432,10 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_database_serialization_roundtrip() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create and process a request
-		let payload = test_helpers::create_valid_inclusion_payload(77777, test_helpers::create_valid_signed_tx())?;
+		let slot = 77777;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
+		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
 		let request = test_helpers::create_valid_commitment_request(commitment_type, payload, slasher);
@@ -401,10 +464,9 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_constraint_saved_after_commitment() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create and process a commitment request
 		let slot = 12345;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
 		let payload = test_helpers::create_valid_inclusion_payload(slot, test_helpers::create_valid_signed_tx())?;
 		let slasher = test_helpers::create_valid_slasher();
 		let commitment_type = test_helpers::create_valid_commitment_type();
@@ -446,10 +508,9 @@ mod test_cases {
 
 	#[tokio::test]
 	async fn test_multiple_constraints_same_slot() -> eyre::Result<()> {
-		let harness = CommitmentRequestTestHarness::new().await?;
-
 		// Create multiple commitment requests with the same slot but different payloads
 		let slot = 54321;
+		let harness = CommitmentRequestTestHarness::new_with_delegation(slot).await?;
 		let num_requests = 3;
 
 		for i in 0..num_requests {

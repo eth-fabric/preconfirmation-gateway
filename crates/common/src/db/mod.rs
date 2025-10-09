@@ -1,4 +1,3 @@
-use std::env;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -7,11 +6,33 @@ use rocksdb::{DB, Options};
 use crate::config::InclusionPreconfConfig;
 use commit_boost::prelude::StartCommitModuleConfig;
 
+/// Database types for different services
+#[derive(Debug, Clone, Copy)]
+pub enum DatabaseType {
+	/// Commitments database
+	Commitments,
+	/// Constraints database
+	Constraints,
+	/// Delegations database
+	Delegations,
+	/// Pricing database
+	Pricing,
+}
+
 /// Create a RocksDB database from commit-boost config
-pub fn create_database(commit_config: &StartCommitModuleConfig<InclusionPreconfConfig>) -> Result<Arc<DB>> {
+pub fn create_database(
+	commit_config: &StartCommitModuleConfig<InclusionPreconfConfig>,
+	db_type: DatabaseType,
+) -> Result<Arc<DB>> {
 	let app_config = &commit_config.extra;
-	// Environment variable takes precedence over config file
-	let database_path = env::var("DATABASE_PATH").unwrap_or_else(|_| app_config.commitments_database_url.clone());
+
+	// Get the appropriate database path based on type
+	let database_path = match db_type {
+		DatabaseType::Commitments => app_config.commitments_database_url.clone(),
+		DatabaseType::Constraints => app_config.constraints_database_url.clone(),
+		DatabaseType::Delegations => app_config.delegations_database_url.clone(),
+		DatabaseType::Pricing => app_config.pricing_database_url.clone(),
+	};
 
 	// Create database directory if it doesn't exist
 	std::fs::create_dir_all(&database_path)
@@ -26,7 +47,11 @@ pub fn create_database(commit_config: &StartCommitModuleConfig<InclusionPreconfC
 	let db = DB::open(&opts, &database_path)
 		.with_context(|| format!("Failed to open RocksDB database at: {}", database_path))?;
 
-	tracing::info!("RocksDB database opened successfully at: {}", database_path);
+	tracing::info!(
+		"RocksDB {} database opened successfully at: {}",
+		format!("{:?}", db_type).to_lowercase(),
+		database_path
+	);
 	Ok(Arc::new(db))
 }
 

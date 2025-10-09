@@ -1,6 +1,7 @@
 use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::server;
+use common::db::DatabaseType;
 use common::{config, db, types};
 
 #[tokio::main]
@@ -13,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
 	server::setup_logging(&commit_config)?;
 
 	// Initialize RocksDB database
-	let db = db::create_database(&commit_config)?;
+	let db = db::create_database(&commit_config, DatabaseType::Commitments)?;
 	db::db_healthcheck(&db).await?;
 	let db_context = types::DatabaseContext::new(db);
 

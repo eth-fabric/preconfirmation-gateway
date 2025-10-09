@@ -194,6 +194,16 @@ pub async fn process_delegations_handler<T>(
 	let matching_count = matching_delegations.len();
 	info!("Found {} matching delegations for delegate {}", matching_count, request.delegate_bls_public_key);
 
+	// Store matching delegations in the database
+	for delegation in &matching_delegations {
+		if let Err(e) = context.database.store_delegation(request.slot, delegation) {
+			error!("Failed to store delegation for slot {}: {}", request.slot, e);
+			// Continue processing other delegations even if one fails
+		} else {
+			info!("Stored delegation for slot {} with committer {}", request.slot, delegation.message.committer);
+		}
+	}
+
 	Ok(Json(ProcessDelegationsResponse {
 		success: true,
 		slot: request.slot,
