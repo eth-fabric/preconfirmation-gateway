@@ -1,34 +1,5 @@
 use serde::Deserialize;
 
-// Individual configuration structs for backward compatibility
-#[derive(Debug, Clone, Deserialize)]
-pub struct ServerConfig {
-	pub host: String,
-	pub port: u16,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DatabaseConfig {
-	pub url: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct LoggingConfig {
-	pub level: String,
-	pub enable_method_tracing: bool,
-	pub traced_methods: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ConstraintsConfig {
-	pub server_host: String,
-	pub server_port: u16,
-	pub relay_url: String,
-	pub api_key: Option<String>,
-	pub bls_public_key: String,
-	pub delegate_public_key: String,
-}
-
 // Consolidated configuration that will be loaded by load_commit_module_config
 #[derive(Debug, Clone, Deserialize)]
 pub struct InclusionPreconfConfig {
@@ -60,84 +31,8 @@ pub struct InclusionPreconfConfig {
 	pub constraints_receivers: Vec<String>,
 }
 
-// Default implementations for individual config structs
-impl Default for ServerConfig {
-	fn default() -> Self {
-		Self { host: "127.0.0.1".to_string(), port: 8080 }
-	}
-}
-
-impl Default for DatabaseConfig {
-	fn default() -> Self {
-		Self { url: "./data/rocksdb".to_string() }
-	}
-}
-
-impl Default for LoggingConfig {
-	fn default() -> Self {
-		Self {
-			level: "info".to_string(),
-			enable_method_tracing: true,
-			traced_methods: vec![
-				"commitmentRequest".to_string(),
-				"commitmentResult".to_string(),
-				"slots".to_string(),
-				"fee".to_string(),
-			],
-		}
-	}
-}
-
-impl Default for ConstraintsConfig {
-	fn default() -> Self {
-		Self {
-			server_host: "127.0.0.1".to_string(),
-			server_port: 8081,
-			relay_url: "https://relay.example.com".to_string(),
-			api_key: None,
-			bls_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
-			delegate_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
-		}
-	}
-}
-
-// Methods to extract individual config structs from InclusionPreconfConfig
+// Configuration access methods
 impl InclusionPreconfConfig {
-	pub fn server(&self) -> ServerConfig {
-		ServerConfig { host: self.commitments_server_host.clone(), port: self.commitments_server_port }
-	}
-
-	pub fn database(&self) -> DatabaseConfig {
-		DatabaseConfig { url: self.commitments_database_url.clone() }
-	}
-
-	pub fn logging(&self) -> LoggingConfig {
-		LoggingConfig {
-			level: self.log_level.clone(),
-			enable_method_tracing: self.enable_method_tracing,
-			traced_methods: self.traced_methods.clone(),
-		}
-	}
-
-	pub fn constraints(&self) -> ConstraintsConfig {
-		ConstraintsConfig {
-			server_host: "127.0.0.1".to_string(), // Not used anymore
-			server_port: 8081,                    // Not used anymore
-			relay_url: self.constraints_relay_url.clone(),
-			api_key: self.constraints_api_key.clone(),
-			bls_public_key: self.constraints_bls_public_key.clone(),
-			delegate_public_key: self.constraints_delegate_public_key.clone(),
-		}
-	}
-
-	pub fn database_url(&self) -> &str {
-		&self.commitments_database_url
-	}
-
 	// New methods for accessing specific database URLs
 	pub fn commitments_database_url(&self) -> &str {
 		&self.commitments_database_url
@@ -193,12 +88,11 @@ mod tests {
 			],
 		};
 
-		// Test constraints config access
-		let constraints_config = config.constraints();
+		// Test direct field access
+		assert_eq!(config.constraints_relay_url, "https://relay.example.com");
+		assert_eq!(config.constraints_api_key, Some("test-api-key".to_string()));
 
 		// Test scheduler config access
 		assert_eq!(config.eth_genesis_timestamp(), 1606824023);
-		assert_eq!(constraints_config.relay_url, "https://relay.example.com");
-		assert_eq!(constraints_config.api_key, Some("test-api-key".to_string()));
 	}
 }

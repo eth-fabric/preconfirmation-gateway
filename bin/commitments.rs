@@ -25,11 +25,11 @@ async fn main() -> eyre::Result<()> {
 	let pricing_db_context = types::DatabaseContext::new(pricing_db);
 
 	// Get constraints configuration for BLS keys and relay settings
-	let constraints_config = commit_config.extra.constraints();
-	let bls_public_key = bls_pubkey_from_hex(&constraints_config.bls_public_key)
+	let app_config = &commit_config.extra;
+	let bls_public_key = bls_pubkey_from_hex(&app_config.constraints_bls_public_key)
 		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
-	let relay_url = constraints_config.relay_url.clone();
-	let api_key = constraints_config.api_key.clone();
+	let relay_url = app_config.constraints_relay_url.clone();
+	let api_key = app_config.constraints_api_key.clone();
 
 	// Create slot timer with genesis timestamp
 	let slot_timer = SlotTimer::new(commit_config.extra.eth_genesis_timestamp());

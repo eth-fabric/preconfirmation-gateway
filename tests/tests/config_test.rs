@@ -1,21 +1,45 @@
-use common::config::{DatabaseConfig, InclusionPreconfConfig, LoggingConfig, ServerConfig};
+use common::config::InclusionPreconfConfig;
 
 #[test]
 fn test_config_load_from_existing_file() {
-	// Since we now use commit-boost's config loader, we need to test the individual structs
-	// This test would need to be updated to work with the commit-boost config format
-	// For now, let's test the individual config structs
-	let server_config = ServerConfig::default();
-	assert_eq!(server_config.host, "127.0.0.1");
-	assert_eq!(server_config.port, 8080);
+	// Test direct field access on InclusionPreconfConfig
+	let config = InclusionPreconfConfig {
+		commitments_server_host: "127.0.0.1".to_string(),
+		commitments_server_port: 8080,
+		commitments_database_url: "./data/rocksdb".to_string(),
+		constraints_database_url: "./data/constraints-rocksdb".to_string(),
+		delegations_database_url: "./data/delegations-rocksdb".to_string(),
+		pricing_database_url: "./data/pricing-rocksdb".to_string(),
+		log_level: "info".to_string(),
+		enable_method_tracing: true,
+		traced_methods: vec![
+			"commitmentRequest".to_string(),
+			"commitmentResult".to_string(),
+			"slots".to_string(),
+			"fee".to_string(),
+		],
+		constraints_relay_url: "https://relay.example.com".to_string(),
+		constraints_api_key: None,
+		constraints_bls_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		constraints_delegate_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		eth_genesis_timestamp: 1606824023,
+		constraints_receivers: vec![
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		],
+	};
 
-	let db_config = DatabaseConfig::default();
-	assert_eq!(db_config.url, "./data/rocksdb");
-
-	let logging_config = LoggingConfig::default();
-	assert_eq!(logging_config.level, "info");
-	assert_eq!(logging_config.enable_method_tracing, true);
-	assert_eq!(logging_config.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
+	// Test direct field access
+	assert_eq!(config.commitments_server_host, "127.0.0.1");
+	assert_eq!(config.commitments_server_port, 8080);
+	assert_eq!(config.commitments_database_url, "./data/rocksdb");
+	assert_eq!(config.log_level, "info");
+	assert_eq!(config.enable_method_tracing, true);
+	assert_eq!(config.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
 }
 
 #[test]
@@ -46,48 +70,74 @@ fn test_inclusion_preconf_config_methods() {
 		],
 	};
 
-	// Test the individual config methods
-	let server_config = config.server();
-	assert_eq!(server_config.host, "0.0.0.0");
-	assert_eq!(server_config.port, 9090);
+	// Test direct field access instead of removed methods
+	assert_eq!(config.commitments_server_host, "0.0.0.0");
+	assert_eq!(config.commitments_server_port, 9090);
+	assert_eq!(config.commitments_database_url, "postgresql://test/testdb");
+	assert_eq!(config.log_level, "debug");
+	assert_eq!(config.enable_method_tracing, false);
+	assert_eq!(config.traced_methods, vec!["test_method"]);
 
-	let db_config = config.database();
-	assert_eq!(db_config.url, "postgresql://test/testdb");
-
-	let logging_config = config.logging();
-	assert_eq!(logging_config.level, "debug");
-	assert_eq!(logging_config.enable_method_tracing, false);
-	assert_eq!(logging_config.traced_methods, vec!["test_method"]);
-
-	assert_eq!(config.database_url(), "postgresql://test/testdb");
+	// Test the remaining accessor methods
 	assert_eq!(config.commitments_database_url(), "postgresql://test/testdb");
 	assert_eq!(config.constraints_database_url(), "postgresql://test/constraints");
 	assert_eq!(config.delegations_database_url(), "postgresql://test/delegations");
 	assert_eq!(config.pricing_database_url(), "postgresql://test/pricing");
 
-	// Test constraints config (server fields removed)
+	// Test constraints config fields
+	assert_eq!(config.constraints_relay_url, "https://relay.example.com");
+	assert_eq!(config.constraints_api_key, None);
+	assert_eq!(
+		config.constraints_bls_public_key,
+		"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+	);
 
 	// Test scheduler config
 	assert_eq!(config.eth_genesis_timestamp(), 1606824023);
 }
 
 #[test]
-fn test_server_config_default() {
-	let server_config = ServerConfig::default();
-	assert_eq!(server_config.host, "127.0.0.1");
-	assert_eq!(server_config.port, 8080);
-}
+fn test_config_field_access() {
+	// Test that we can access all the fields directly
+	let config = InclusionPreconfConfig {
+		commitments_server_host: "127.0.0.1".to_string(),
+		commitments_server_port: 8080,
+		commitments_database_url: "./data/rocksdb".to_string(),
+		constraints_database_url: "./data/constraints-rocksdb".to_string(),
+		delegations_database_url: "./data/delegations-rocksdb".to_string(),
+		pricing_database_url: "./data/pricing-rocksdb".to_string(),
+		log_level: "info".to_string(),
+		enable_method_tracing: true,
+		traced_methods: vec![
+			"commitmentRequest".to_string(),
+			"commitmentResult".to_string(),
+			"slots".to_string(),
+			"fee".to_string(),
+		],
+		constraints_relay_url: "https://relay.example.com".to_string(),
+		constraints_api_key: None,
+		constraints_bls_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		constraints_delegate_public_key:
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		eth_genesis_timestamp: 1606824023,
+		constraints_receivers: vec![
+			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				.to_string(),
+		],
+	};
 
-#[test]
-fn test_database_config_default() {
-	let db_config = DatabaseConfig::default();
-	assert_eq!(db_config.url, "./data/rocksdb");
-}
+	// Test server config fields
+	assert_eq!(config.commitments_server_host, "127.0.0.1");
+	assert_eq!(config.commitments_server_port, 8080);
 
-#[test]
-fn test_logging_config_default() {
-	let logging_config = LoggingConfig::default();
-	assert_eq!(logging_config.level, "info");
-	assert_eq!(logging_config.enable_method_tracing, true);
-	assert_eq!(logging_config.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
+	// Test database config fields
+	assert_eq!(config.commitments_database_url, "./data/rocksdb");
+
+	// Test logging config fields
+	assert_eq!(config.log_level, "info");
+	assert_eq!(config.enable_method_tracing, true);
+	assert_eq!(config.traced_methods, vec!["commitmentRequest", "commitmentResult", "slots", "fee"]);
 }
