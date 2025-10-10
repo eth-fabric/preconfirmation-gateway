@@ -13,20 +13,12 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 blst = "0.3"
 
-# HTTP client
+# HTTP client for relay communication
 reqwest = { version = "0.11", features = ["json"] }
-
-# HTTP server
-axum = "0.7"
-tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# Logging
-tracing-subscriber = "0.3"
 
 #  todo eventually remove
 cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }

@@ -48,8 +48,6 @@ pub struct InclusionPreconfConfig {
 	pub traced_methods: Vec<String>,
 
 	// Constraints configuration
-	pub constraints_server_host: String,
-	pub constraints_server_port: u16,
 	pub constraints_relay_url: String,
 	pub constraints_api_key: Option<String>,
 	pub constraints_bls_public_key: String,
@@ -113,10 +111,6 @@ impl InclusionPreconfConfig {
 		ServerConfig { host: self.commitments_server_host.clone(), port: self.commitments_server_port }
 	}
 
-	pub fn constraints_server(&self) -> ServerConfig {
-		ServerConfig { host: self.constraints_server_host.clone(), port: self.constraints_server_port }
-	}
-
 	pub fn database(&self) -> DatabaseConfig {
 		DatabaseConfig { url: self.commitments_database_url.clone() }
 	}
@@ -131,8 +125,8 @@ impl InclusionPreconfConfig {
 
 	pub fn constraints(&self) -> ConstraintsConfig {
 		ConstraintsConfig {
-			server_host: self.constraints_server_host.clone(),
-			server_port: self.constraints_server_port,
+			server_host: "127.0.0.1".to_string(), // Not used anymore
+			server_port: 8081,                    // Not used anymore
 			relay_url: self.constraints_relay_url.clone(),
 			api_key: self.constraints_api_key.clone(),
 			bls_public_key: self.constraints_bls_public_key.clone(),
@@ -184,8 +178,6 @@ mod tests {
 			log_level: "debug".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_server_host: "127.0.0.1".to_string(),
-			constraints_server_port: 8080,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: Some("test-api-key".to_string()),
 			constraints_bls_public_key:
@@ -203,7 +195,6 @@ mod tests {
 
 		// Test constraints config access
 		let constraints_config = config.constraints();
-		assert_eq!(constraints_config.server_port, 8080);
 
 		// Test scheduler config access
 		assert_eq!(config.eth_genesis_timestamp(), 1606824023);

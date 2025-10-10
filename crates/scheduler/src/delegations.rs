@@ -1,13 +1,12 @@
 use eyre::Result;
-use reqwest::Client;
 use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use common::config::InclusionPreconfConfig;
-use common::constants::routes;
-use common::types::{DatabaseContext, ProcessDelegationsRequest, ProcessDelegationsResponse};
+use common::types::DatabaseContext;
 use common::SlotTimer;
+use constraints::{parse_bls_public_key, process_delegations};
 
 /// Configuration for the delegation task
 #[derive(Debug, Clone)]
@@ -23,8 +22,9 @@ pub struct DelegationTask {
 	config: DelegationTaskConfig,
 	app_config: InclusionPreconfConfig,
 	slot_timer: SlotTimer,
-	http_client: Client,
 	database: DatabaseContext,
+	relay_url: String,
+	api_key: Option<String>,
 }
 
 impl DelegationTask {
@@ -34,8 +34,10 @@ impl DelegationTask {
 		app_config: InclusionPreconfConfig,
 		slot_timer: SlotTimer,
 		database: DatabaseContext,
+		relay_url: String,
+		api_key: Option<String>,
 	) -> Self {
-		Self { config, app_config, slot_timer, http_client: Client::new(), database }
+		Self { config, app_config, slot_timer, database, relay_url, api_key }
 	}
 
 	/// Run the delegation task continuously
@@ -86,37 +88,26 @@ impl DelegationTask {
 
 	/// Process delegations for a specific slot
 	async fn process_delegations_for_slot(&self, slot: u64) -> Result<()> {
-		let request = ProcessDelegationsRequest {
+		// Parse the delegate BLS public key
+		let delegate_bls_public_key =
+			parse_bls_public_key(&self.app_config.constraints_delegate_public_key, "delegate")?;
+
+		info!("Processing delegations for slot {}", slot);
+
+		// Call constraints processing function directly
+		let response = process_delegations(
 			slot,
-			delegate_bls_public_key: self.app_config.constraints_delegate_public_key.clone(),
-		};
+			delegate_bls_public_key,
+			&self.database,
+			self.relay_url.clone(),
+			self.api_key.clone(),
+		)
+		.await?;
 
-		let url = format!(
-			"http://{}:{}{}",
-			self.app_config.constraints_server_host,
-			self.app_config.constraints_server_port,
-			routes::constraints::PROCESS_DELEGATIONS
-		);
-
-		info!("Calling process_delegations for slot {} at {}", slot, url);
-
-		let response = self.http_client.post(&url).json(&request).send().await?;
-
-		if !response.status().is_success() {
-			return Err(eyre::eyre!("HTTP error: {}", response.status()));
-		}
-
-		let process_response: ProcessDelegationsResponse = response.json().await?;
-
-		if process_response.success {
-			info!(
-				"Successfully processed {} delegations for slot {}",
-				process_response.matching_delegations.len(),
-				slot
-			);
-			// Note: Delegations are already stored by the process_delegations_handler
+		if response.success {
+			info!("Successfully processed {} delegations for slot {}", response.matching_delegations.len(), slot);
 		} else {
-			warn!("Process delegations failed for slot {}: {}", slot, process_response.message);
+			warn!("Process delegations failed for slot {}: {}", slot, response.message);
 		}
 
 		Ok(())
@@ -147,8 +138,6 @@ mod tests {
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_server_host: "127.0.0.1".to_string(),
-			constraints_server_port: 8081,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
 			constraints_bls_public_key:
@@ -177,7 +166,14 @@ mod tests {
 		let db = DB::open(&opts, &db_path).unwrap();
 		let database = DatabaseContext::new(Arc::new(db));
 
-		let _task = DelegationTask::new(config, app_config, slot_timer, database);
+		let _task = DelegationTask::new(
+			config,
+			app_config,
+			slot_timer,
+			database,
+			"https://relay.example.com".to_string(),
+			None,
+		);
 		// Test passes if creation doesn't panic
 	}
 }

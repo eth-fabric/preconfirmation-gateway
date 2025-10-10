@@ -38,8 +38,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"generateProxyKey".to_string(),
 		],
 		// Constraints config fields
-		constraints_server_host: "127.0.0.1".to_string(),
-		constraints_server_port: 8080,
 		constraints_relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
 		constraints_bls_public_key:

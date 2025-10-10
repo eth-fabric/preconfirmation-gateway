@@ -1271,8 +1271,6 @@ dependencies = [
  "http 1.3.1",
  "http-body 1.0.1",
  "http-body-util",
- "hyper 1.7.0",
- "hyper-util",
  "itoa",
  "matchit 0.7.3",
  "memchr",
@@ -1281,15 +1279,10 @@ dependencies = [
  "pin-project-lite",
  "rustversion",
  "serde",
- "serde_json",
- "serde_path_to_error",
- "serde_urlencoded",
  "sync_wrapper 1.0.2",
- "tokio",
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -1345,7 +1338,6 @@ dependencies = [
  "sync_wrapper 1.0.2",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -2228,7 +2220,6 @@ name = "constraints"
 version = "0.1.0"
 dependencies = [
  "alloy",
- "axum 0.7.9",
  "blst",
  "cb-common",
  "commit-boost",
@@ -2238,10 +2229,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tower 0.4.13",
- "tower-http 0.5.2",
  "tracing",
- "tracing-subscriber",
  "urc",
 ]
 
@@ -5990,6 +5978,7 @@ version = "0.1.0"
 dependencies = [
  "commit-boost",
  "common",
+ "constraints",
  "eyre",
  "hex",
  "reqwest 0.11.27",

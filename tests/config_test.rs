@@ -31,8 +31,6 @@ fn test_inclusion_preconf_config_methods() {
 		log_level: "debug".to_string(),
 		enable_method_tracing: false,
 		traced_methods: vec!["test_method".to_string()],
-		constraints_server_host: "0.0.0.0".to_string(),
-		constraints_server_port: 8081,
 		constraints_relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
 		constraints_bls_public_key: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -62,10 +60,7 @@ fn test_inclusion_preconf_config_methods() {
 	assert_eq!(config.delegations_database_url(), "postgresql://test/delegations");
 	assert_eq!(config.pricing_database_url(), "postgresql://test/pricing");
 
-	// Test constraints server config
-	let constraints_server_config = config.constraints_server();
-	assert_eq!(constraints_server_config.host, "0.0.0.0");
-	assert_eq!(constraints_server_config.port, 8081);
+	// Test constraints config (server fields removed)
 
 	// Test scheduler config
 	assert_eq!(config.eth_genesis_timestamp(), 1606824023);

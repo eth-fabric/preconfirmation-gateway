@@ -17,3 +17,4 @@ commit-boost = { workspace = true }
 
 # Workspace dependencies
 common = { path = "../common" }
+constraints = { path = "../constraints" }

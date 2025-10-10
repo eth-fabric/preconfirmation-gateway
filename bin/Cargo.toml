@@ -7,9 +7,6 @@ edition = "2024"
 name = "commitments"
 path = "commitments.rs"
 
-[[bin]]
-name = "constraints"
-path = "constraints.rs"
 
 [[bin]]
 name = "relay"

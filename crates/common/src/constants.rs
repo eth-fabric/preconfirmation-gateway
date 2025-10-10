@@ -14,14 +14,8 @@ pub mod routes {
 	/// Health check endpoint
 	pub const HEALTH: &str = "/health";
 
-	/// Constraints-related routes
+	/// Constraints-related routes (for external API use)
 	pub mod constraints {
-		/// Process constraints endpoint (for scheduler)
-		pub const PROCESS: &str = "/process-constraints";
-
-		/// Process delegations endpoint (for scheduler)
-		pub const PROCESS_DELEGATIONS: &str = "/process-delegations";
-
 		/// Constraints capabilities endpoint
 		pub const CAPABILITIES: &str = "/constraints/capabilities";
 
@@ -74,9 +68,6 @@ pub mod routes {
 
 /// Default configuration values
 pub mod defaults {
-	/// Default constraints server port
-	pub const CONSTRAINTS_SERVER_PORT: u16 = 8081;
-
 	/// Default relay URL for testing
 	pub const RELAY_URL: &str = "https://relay.example.com";
 

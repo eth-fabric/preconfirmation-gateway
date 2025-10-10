@@ -304,7 +304,7 @@ pub mod test_helpers {
 		// Generate a random port to avoid conflicts
 		let mut rng = rand::thread_rng();
 		let rpc_port = rng.gen_range(3000..65535);
-		let constraints_port = rpc_port + 1;
+		let _constraints_port = rpc_port + 1;
 
 		// Create test config
 		let app_config = InclusionPreconfConfig {
@@ -317,8 +317,6 @@ pub mod test_helpers {
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_server_host: "127.0.0.1".to_string(),
-			constraints_server_port: constraints_port,
 			constraints_relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
 			constraints_bls_public_key:
