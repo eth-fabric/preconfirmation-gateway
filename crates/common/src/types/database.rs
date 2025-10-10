@@ -53,6 +53,11 @@ impl DatabaseContext {
 		format!("constraint_status:{}", constraint_id)
 	}
 
+	/// Helper function to format constraint posted flag key
+	fn format_constraint_posted_flag_key(slot: u64) -> String {
+		format!("constraint_posted:{}", slot)
+	}
+
 	/// Helper function to calculate constraint ID from request hash
 	/// This is used when storing constraints that are derived from commitment requests
 	fn calculate_constraint_id_from_request_hash(request_hash: &B256) -> B256 {
@@ -331,6 +336,25 @@ impl DatabaseContext {
 	/// Delete all delegations for a specific slot
 	pub fn delete_delegations_for_slot(&self, slot: u64) -> Result<()> {
 		let key = Self::format_delegation_key(slot);
+		self.delete(key.as_bytes())
+	}
+
+	/// Check if constraints have already been posted for a specific slot
+	pub fn are_constraints_posted_for_slot(&self, slot: u64) -> Result<bool> {
+		let key = Self::format_constraint_posted_flag_key(slot);
+		Ok(self.db.get(key.as_bytes())?.is_some())
+	}
+
+	/// Mark that constraints have been posted for a specific slot
+	pub fn mark_constraints_posted_for_slot(&self, slot: u64) -> Result<()> {
+		let key = Self::format_constraint_posted_flag_key(slot);
+		let value = b"posted"; // Simple flag value
+		self.put(key.as_bytes(), value)
+	}
+
+	/// Clear the constraint posted flag for a specific slot (useful for cleanup)
+	pub fn clear_constraints_posted_flag_for_slot(&self, slot: u64) -> Result<()> {
+		let key = Self::format_constraint_posted_flag_key(slot);
 		self.delete(key.as_bytes())
 	}
 

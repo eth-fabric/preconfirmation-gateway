@@ -5,7 +5,7 @@ use tracing::{error, info, warn};
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::config::InclusionPreconfConfig;
 use common::types::DatabaseContext;
-use common::SlotTimer;
+use common::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
 use constraints::process_constraints;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -56,27 +56,48 @@ impl ConstraintsTask {
 		// Check if target slot is delegated
 		match self.database.is_delegated(target_slot) {
 			Ok(true) => {
-				// Calculate time until 2 seconds before target slot starts
-				let target_slot_start = self.config.eth_genesis_timestamp + (target_slot * 12);
-				let trigger_time = target_slot_start - 2; // 2 seconds before slot starts
-				let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-
-				if now >= trigger_time {
-					// Time to process constraints for this slot
-					info!("Triggering constraints processing for slot {} (2 seconds before slot start)", target_slot);
-					if let Err(e) = self.post_constraints(target_slot).await {
-						warn!("Failed to process constraints for slot {}: {}", target_slot, e);
+				// Check if constraints have already been posted for this slot to prevent reprocessing
+				match self.database.are_constraints_posted_for_slot(target_slot) {
+					Ok(true) => {
+						info!("Constraints already posted for slot {}, skipping", target_slot);
+						// Sleep for a longer interval since we don't need to process this slot
+						tokio::time::sleep(Duration::from_secs(1)).await;
+						return Ok(());
 					}
-				} else {
-					// Wait until it's time to trigger
-					let wait_duration = trigger_time - now;
-					info!("Slot {} is delegated, waiting {} seconds until trigger time", target_slot, wait_duration);
-					tokio::time::sleep(Duration::from_secs(wait_duration)).await;
+					Ok(false) => {
+						// Calculate time until trigger offset before target slot starts
+						let target_slot_start = self.config.eth_genesis_timestamp + (target_slot * SLOT_TIME_SECONDS);
+						let trigger_time = target_slot_start - CONSTRAINT_TRIGGER_OFFSET; // trigger offset before slot starts
+						let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
-					// Now process constraints
-					info!("Triggering constraints processing for slot {}", target_slot);
-					if let Err(e) = self.post_constraints(target_slot).await {
-						warn!("Failed to process constraints for slot {}: {}", target_slot, e);
+						if now >= trigger_time {
+							// Time to process constraints for this slot
+							info!(
+								"Triggering constraints processing for slot {} ({} seconds before slot start)",
+								target_slot, CONSTRAINT_TRIGGER_OFFSET
+							);
+							if let Err(e) = self.post_constraints(target_slot).await {
+								warn!("Failed to process constraints for slot {}: {}", target_slot, e);
+							}
+						} else {
+							// Wait until it's time to trigger
+							let wait_duration = trigger_time - now;
+							info!(
+								"Slot {} is delegated, waiting {} seconds until trigger time",
+								target_slot, wait_duration
+							);
+							tokio::time::sleep(Duration::from_secs(wait_duration)).await;
+
+							// Now process constraints
+							info!("Triggering constraints processing for slot {}", target_slot);
+							if let Err(e) = self.post_constraints(target_slot).await {
+								warn!("Failed to process constraints for slot {}: {}", target_slot, e);
+							}
+						}
+					}
+					Err(e) => {
+						error!("Failed to check constraint posted status for slot {}: {}", target_slot, e);
+						// Continue with processing despite the error
 					}
 				}
 			}
@@ -134,6 +155,13 @@ impl ConstraintsTask {
 
 		if response.success {
 			info!("Successfully processed {} constraints for slot {}", response.processed_count, slot);
+
+			// Mark constraints as posted for this slot to prevent reprocessing
+			if let Err(e) = self.database.mark_constraints_posted_for_slot(slot) {
+				error!("Failed to mark constraints as posted for slot {}: {}", slot, e);
+			} else {
+				info!("Marked constraints as posted for slot {}", slot);
+			}
 		} else {
 			warn!("Process constraints failed for slot {}: {}", slot, response.message);
 		}
