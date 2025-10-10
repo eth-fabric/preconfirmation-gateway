@@ -72,27 +72,11 @@ pub async fn commitment_request_handler<T>(
 		}
 	};
 
-	// Store the signed commitment in the database
-	let request_hash = signed_commitment.commitment.request_hash;
-
-	if let Err(e) = _context.database().store_commitment(slot, &request_hash, &signed_commitment) {
-		error!("Failed to store commitment in database: {}", e);
-		return Err(jsonrpsee::types::error::ErrorObject::owned(
-			-32603, // Internal error
-			"Failed to store commitment",
-			Some(format!("{}", e)),
-		));
-	}
-
-	// Create the constraint after successful commitment signing
+	// Create the constraint before storing anything to avoid race conditions
 	let constraint = match utils::create_constraint_from_commitment_request(&request, slot) {
 		Ok(constraint) => constraint,
 		Err(e) => {
 			error!("Failed to create constraint from commitment request: {}", e);
-			// If constraint creation fails, we need to clean up the stored commitment
-			if let Err(cleanup_err) = _context.database().delete_commitment(slot, &request_hash) {
-				error!("Failed to clean up commitment after constraint creation failure: {}", cleanup_err);
-			}
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32603, // Internal error
 				"Failed to create constraint",
@@ -101,16 +85,15 @@ pub async fn commitment_request_handler<T>(
 		}
 	};
 
-	// Store the constraint in the database using request_hash as constraint_id
-	if let Err(e) = _context.database().store_constraint(slot, &request_hash, &constraint) {
-		error!("Failed to store constraint in database: {}", e);
-		// If constraint storage fails, we need to clean up the stored commitment
-		if let Err(cleanup_err) = _context.database().delete_commitment(slot, &request_hash) {
-			error!("Failed to clean up commitment after constraint storage failure: {}", cleanup_err);
-		}
+	// Store both commitment and constraint atomically to prevent race conditions
+	let request_hash = signed_commitment.commitment.request_hash;
+	if let Err(e) =
+		_context.database().store_commitment_and_constraint(slot, &request_hash, &signed_commitment, &constraint)
+	{
+		error!("Failed to store commitment and constraint atomically: {}", e);
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
 			-32603, // Internal error
-			"Failed to store constraint",
+			"Failed to store commitment and constraint",
 			Some(format!("{}", e)),
 		));
 	}

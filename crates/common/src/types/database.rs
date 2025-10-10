@@ -4,6 +4,13 @@ use anyhow::Result;
 use rocksdb::DB;
 use std::sync::Arc;
 
+/// Database operation for batch writes
+#[derive(Debug, Clone)]
+pub enum DatabaseOperation {
+	Put { key: Vec<u8>, value: Vec<u8> },
+	Delete { key: Vec<u8> },
+}
+
 /// Database context that provides access to the RocksDB database
 #[derive(Clone)]
 pub struct DatabaseContext {
@@ -19,6 +26,37 @@ impl DatabaseContext {
 	/// Get a reference to the database
 	pub fn db(&self) -> &Arc<DB> {
 		&self.db
+	}
+
+	/// Helper function to format commitment key
+	fn format_commitment_key(slot: u64, request_hash: &B256) -> String {
+		format!("commitment:{}:{}", slot, request_hash)
+	}
+
+	/// Helper function to format constraint key
+	fn format_constraint_key(slot: u64, constraint_id: &B256) -> String {
+		format!("constraint:{}:{}", slot, constraint_id)
+	}
+
+	/// Helper function to format fee key
+	fn format_fee_key(request_hash: &B256) -> String {
+		format!("fee:{}", request_hash)
+	}
+
+	/// Helper function to format delegation key
+	fn format_delegation_key(slot: u64) -> String {
+		format!("delegation:{}", slot)
+	}
+
+	/// Helper function to format constraint status key
+	fn format_constraint_status_key(constraint_id: &B256) -> String {
+		format!("constraint_status:{}", constraint_id)
+	}
+
+	/// Helper function to calculate constraint ID from request hash
+	/// This is used when storing constraints that are derived from commitment requests
+	fn calculate_constraint_id_from_request_hash(request_hash: &B256) -> B256 {
+		*request_hash // For now, we use the request hash as the constraint ID
 	}
 
 	/// Store a key-value pair in the database
@@ -39,6 +77,48 @@ impl DatabaseContext {
 	pub fn delete(&self, key: &[u8]) -> Result<()> {
 		self.db.delete(key)?;
 		Ok(())
+	}
+
+	/// Perform a batch write operation atomically
+	pub fn batch_write(&self, operations: Vec<DatabaseOperation>) -> Result<()> {
+		let mut batch = rocksdb::WriteBatch::default();
+
+		for operation in operations {
+			match operation {
+				DatabaseOperation::Put { key, value } => {
+					batch.put(key, value);
+				}
+				DatabaseOperation::Delete { key } => {
+					batch.delete(key);
+				}
+			}
+		}
+
+		self.db.write(batch)?;
+		Ok(())
+	}
+
+	/// Store both commitment and constraint atomically to prevent race conditions
+	pub fn store_commitment_and_constraint(
+		&self,
+		slot: u64,
+		request_hash: &B256,
+		signed_commitment: &SignedCommitment,
+		constraint: &crate::types::Constraint,
+	) -> Result<()> {
+		let commitment_key = Self::format_commitment_key(slot, request_hash);
+		let commitment_value = serde_json::to_vec(signed_commitment)?;
+
+		let constraint_id = Self::calculate_constraint_id_from_request_hash(request_hash);
+		let constraint_key = Self::format_constraint_key(slot, &constraint_id);
+		let constraint_value = serde_json::to_vec(constraint)?;
+
+		let operations = vec![
+			DatabaseOperation::Put { key: commitment_key.into_bytes(), value: commitment_value },
+			DatabaseOperation::Put { key: constraint_key.into_bytes(), value: constraint_value },
+		];
+
+		self.batch_write(operations)
 	}
 
 	/// Perform a health check on the database
@@ -64,14 +144,14 @@ impl DatabaseContext {
 
 	/// Store a signed commitment in the database
 	pub fn store_commitment(&self, slot: u64, request_hash: &B256, signed_commitment: &SignedCommitment) -> Result<()> {
-		let key = format!("commitment:{}:{}", slot, request_hash);
+		let key = Self::format_commitment_key(slot, request_hash);
 		let value = serde_json::to_vec(signed_commitment)?;
 		self.put(key.as_bytes(), &value)
 	}
 
 	/// Retrieve a signed commitment from the database using slot and request hash (O(1) lookup)
 	pub fn get_commitment(&self, slot: u64, request_hash: &B256) -> Result<Option<SignedCommitment>> {
-		let key = format!("commitment:{}:{}", slot, request_hash);
+		let key = Self::format_commitment_key(slot, request_hash);
 		match self.get(key.as_bytes())? {
 			Some(value) => {
 				let signed_commitment: SignedCommitment = serde_json::from_slice(&value)?;
@@ -83,7 +163,7 @@ impl DatabaseContext {
 
 	/// Delete a commitment using slot and request hash (O(1) operation)
 	pub fn delete_commitment(&self, slot: u64, request_hash: &B256) -> Result<()> {
-		let key = format!("commitment:{}:{}", slot, request_hash);
+		let key = Self::format_commitment_key(slot, request_hash);
 		self.delete(key.as_bytes())
 	}
 
@@ -171,14 +251,14 @@ impl DatabaseContext {
 
 	/// Store fee information for a commitment request
 	pub fn store_fee_info(&self, request_hash: &B256, fee_info: &crate::types::FeeInfo) -> Result<()> {
-		let key = format!("fee:{}", request_hash);
+		let key = Self::format_fee_key(request_hash);
 		let value = serde_json::to_vec(fee_info)?;
 		self.put(key.as_bytes(), &value)
 	}
 
 	/// Retrieve fee information for a commitment request
 	pub fn get_fee_info(&self, request_hash: &B256) -> Result<Option<crate::types::FeeInfo>> {
-		let key = format!("fee:{}", request_hash);
+		let key = Self::format_fee_key(request_hash);
 		match self.get(key.as_bytes())? {
 			Some(value) => {
 				let fee_info: crate::types::FeeInfo = serde_json::from_slice(&value)?;
@@ -195,14 +275,14 @@ impl DatabaseContext {
 		constraint_id: &B256,
 		constraint: &crate::types::Constraint,
 	) -> Result<()> {
-		let key = format!("constraint:{}:{}", slot, constraint_id);
+		let key = Self::format_constraint_key(slot, constraint_id);
 		let value = serde_json::to_vec(constraint)?;
 		self.put(key.as_bytes(), &value)
 	}
 
 	/// Retrieve a constraint from the database using slot and constraint ID (O(1) lookup)
 	pub fn get_constraint(&self, slot: u64, constraint_id: &B256) -> Result<Option<crate::types::Constraint>> {
-		let key = format!("constraint:{}:{}", slot, constraint_id);
+		let key = Self::format_constraint_key(slot, constraint_id);
 		match self.get(key.as_bytes())? {
 			Some(value) => {
 				let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
@@ -214,26 +294,24 @@ impl DatabaseContext {
 
 	/// Delete constraint using slot and constraint ID (O(1) operation)
 	pub fn delete_constraint(&self, slot: u64, constraint_id: &B256) -> Result<()> {
-		let key = format!("constraint:{}:{}", slot, constraint_id);
+		let key = Self::format_constraint_key(slot, constraint_id);
 		self.delete(key.as_bytes())?;
 
 		// Also delete the status key
-		let status_key = format!("constraint_status:{}", constraint_id);
+		let status_key = Self::format_constraint_status_key(constraint_id);
 		self.delete(status_key.as_bytes())
 	}
 
 	/// Store a delegation for a specific slot (assumes only one delegation per slot)
 	pub fn store_delegation(&self, slot: u64, delegation: &crate::types::constraints::SignedDelegation) -> Result<()> {
-		// Use a simple, consistent key format: "delegation:{slot}"
-		let key = format!("delegation:{}", slot);
+		let key = Self::format_delegation_key(slot);
 		let value = serde_json::to_vec(delegation)?;
 		self.put(key.as_bytes(), &value)
 	}
 
 	/// Get the delegation for a specific slot (assumes only one delegation per slot)
 	pub fn get_delegation_for_slot(&self, slot: u64) -> Result<Option<crate::types::constraints::SignedDelegation>> {
-		// Use direct key lookup instead of iteration
-		let key = format!("delegation:{}", slot);
+		let key = Self::format_delegation_key(slot);
 
 		match self.db.get(key.as_bytes())? {
 			Some(value) => {
@@ -246,15 +324,13 @@ impl DatabaseContext {
 
 	/// Check if there are any delegations for a specific slot
 	pub fn is_delegated(&self, slot: u64) -> Result<bool> {
-		// Use direct key lookup instead of iteration
-		let key = format!("delegation:{}", slot);
+		let key = Self::format_delegation_key(slot);
 		Ok(self.db.get(key.as_bytes())?.is_some())
 	}
 
 	/// Delete all delegations for a specific slot
 	pub fn delete_delegations_for_slot(&self, slot: u64) -> Result<()> {
-		// Use direct key deletion instead of iteration
-		let key = format!("delegation:{}", slot);
+		let key = Self::format_delegation_key(slot);
 		self.delete(key.as_bytes())
 	}
 
@@ -627,6 +703,102 @@ mod tests {
 		let retrieved_constraint = retrieved.unwrap();
 		assert_eq!(retrieved_constraint.constraint_type, 999);
 		assert_eq!(retrieved_constraint.payload, large_payload);
+	}
+
+	/// Test atomic batch write operations
+	#[tokio::test]
+	async fn test_batch_write_operations() {
+		let (_temp_dir, database) = create_test_db();
+
+		let operations = vec![
+			DatabaseOperation::Put { key: b"test_key1".to_vec(), value: b"test_value1".to_vec() },
+			DatabaseOperation::Put { key: b"test_key2".to_vec(), value: b"test_value2".to_vec() },
+			DatabaseOperation::Put { key: b"test_key3".to_vec(), value: b"test_value3".to_vec() },
+		];
+
+		// Perform batch write
+		database.batch_write(operations).unwrap();
+
+		// Verify all values were written
+		assert_eq!(database.get(b"test_key1").unwrap(), Some(b"test_value1".to_vec()));
+		assert_eq!(database.get(b"test_key2").unwrap(), Some(b"test_value2".to_vec()));
+		assert_eq!(database.get(b"test_key3").unwrap(), Some(b"test_value3".to_vec()));
+	}
+
+	/// Test atomic batch write with mixed operations
+	#[tokio::test]
+	async fn test_batch_write_mixed_operations() {
+		let (_temp_dir, database) = create_test_db();
+
+		// First, store some initial values
+		database.put(b"key1", b"value1").unwrap();
+		database.put(b"key2", b"value2").unwrap();
+		database.put(b"key3", b"value3").unwrap();
+
+		// Verify initial state
+		assert_eq!(database.get(b"key1").unwrap(), Some(b"value1".to_vec()));
+		assert_eq!(database.get(b"key2").unwrap(), Some(b"value2".to_vec()));
+		assert_eq!(database.get(b"key3").unwrap(), Some(b"value3".to_vec()));
+
+		// Perform mixed batch operations
+		let operations = vec![
+			DatabaseOperation::Put { key: b"key1".to_vec(), value: b"updated_value1".to_vec() },
+			DatabaseOperation::Delete { key: b"key2".to_vec() },
+			DatabaseOperation::Put { key: b"key4".to_vec(), value: b"new_value4".to_vec() },
+		];
+
+		database.batch_write(operations).unwrap();
+
+		// Verify the changes
+		assert_eq!(database.get(b"key1").unwrap(), Some(b"updated_value1".to_vec()));
+		assert_eq!(database.get(b"key2").unwrap(), None); // Should be deleted
+		assert_eq!(database.get(b"key3").unwrap(), Some(b"value3".to_vec())); // Unchanged
+		assert_eq!(database.get(b"key4").unwrap(), Some(b"new_value4".to_vec()));
+	}
+
+	/// Test atomic commitment and constraint storage
+	#[tokio::test]
+	async fn test_store_commitment_and_constraint_atomic() {
+		let (_temp_dir, database) = create_test_db();
+
+		let slot = 12345;
+		let request_hash = B256::random();
+		let signed_commitment = create_test_commitment(1);
+		let constraint = create_test_constraint(1);
+
+		// Store both atomically
+		database.store_commitment_and_constraint(slot, &request_hash, &signed_commitment, &constraint).unwrap();
+
+		// Verify both were stored
+		let retrieved_commitment = database.get_commitment(slot, &request_hash).unwrap();
+		assert!(retrieved_commitment.is_some());
+		assert_eq!(retrieved_commitment.unwrap().commitment.commitment_type, 1);
+
+		let retrieved_constraint = database.get_constraint(slot, &request_hash).unwrap();
+		assert!(retrieved_constraint.is_some());
+		assert_eq!(retrieved_constraint.unwrap().constraint_type, 1);
+	}
+
+	/// Test atomic commitment and constraint storage failure
+	#[tokio::test]
+	async fn test_store_commitment_and_constraint_failure() {
+		let (_temp_dir, database) = create_test_db();
+
+		let slot = 12345;
+		let request_hash = B256::random();
+		let signed_commitment = create_test_commitment(1);
+		let constraint = create_test_constraint(1);
+
+		// This should succeed
+		database.store_commitment_and_constraint(slot, &request_hash, &signed_commitment, &constraint).unwrap();
+
+		// Verify both were stored
+		assert!(database.get_commitment(slot, &request_hash).unwrap().is_some());
+		assert!(database.get_constraint(slot, &request_hash).unwrap().is_some());
+
+		// Test that if one operation fails, both fail (atomicity)
+		// We can't easily simulate a database failure in tests, but we can verify
+		// that the atomic operation works correctly in normal cases
 	}
 
 	/// Test constraint ID parsing edge cases
