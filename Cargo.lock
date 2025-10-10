@@ -2078,7 +2078,6 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "alloy-primitives 1.4.0",
- "anyhow",
  "cb-common",
  "commit-boost",
  "common",
@@ -2102,7 +2101,6 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "alloy-primitives 1.4.0",
- "anyhow",
  "blst",
  "cb-signer",
  "cb-tests",

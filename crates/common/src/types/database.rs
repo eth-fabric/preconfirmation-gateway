@@ -1,6 +1,6 @@
 use crate::types::SignedCommitment;
 use alloy::primitives::B256;
-use anyhow::Result;
+use eyre::Result;
 use rocksdb::DB;
 use std::sync::Arc;
 
@@ -140,10 +140,10 @@ impl DatabaseContext {
 				self.delete(test_key)?; // Clean up test data
 				Ok(())
 			} else {
-				Err(anyhow::anyhow!("Database test failed: value mismatch"))
+				Err(eyre::eyre!("Database test failed: value mismatch"))
 			}
 		} else {
-			Err(anyhow::anyhow!("Database test failed: value not found"))
+			Err(eyre::eyre!("Database test failed: value not found"))
 		}
 	}
 

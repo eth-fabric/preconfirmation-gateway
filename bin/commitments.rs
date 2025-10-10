@@ -3,12 +3,13 @@ use commit_boost::prelude::*;
 use commitments::server;
 use common::db::DatabaseType;
 use common::{SlotTimer, config, db, types};
+use eyre;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> eyre::Result<()> {
 	// Load consolidated configuration using commit-boost's config loader
 	let commit_config = load_commit_module_config::<config::InclusionPreconfConfig>()
-		.map_err(|e| anyhow::anyhow!("Failed to load commit module config: {}", e))?;
+		.map_err(|e| eyre::eyre!("Failed to load commit module config: {}", e))?;
 
 	// Setup logging with configuration
 	server::setup_logging(&commit_config)?;
@@ -26,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 	// Get constraints configuration for BLS keys and relay settings
 	let constraints_config = commit_config.extra.constraints();
 	let bls_public_key = bls_pubkey_from_hex(&constraints_config.bls_public_key)
-		.map_err(|e| anyhow::anyhow!("Failed to create BLS public key: {}", e))?;
+		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 	let relay_url = constraints_config.relay_url.clone();
 	let api_key = constraints_config.api_key.clone();
 

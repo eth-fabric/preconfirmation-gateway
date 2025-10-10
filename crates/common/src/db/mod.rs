@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use eyre::{Context, Result};
 use rocksdb::{DB, Options};
 
 use crate::config::InclusionPreconfConfig;
@@ -71,9 +71,9 @@ pub async fn db_healthcheck(db: &Arc<DB>) -> Result<()> {
 			tracing::info!("Database connection test successful");
 			Ok(())
 		} else {
-			Err(anyhow::anyhow!("Database test failed: value mismatch"))
+			Err(eyre::eyre!("Database test failed: value mismatch"))
 		}
 	} else {
-		Err(anyhow::anyhow!("Database test failed: value not found"))
+		Err(eyre::eyre!("Database test failed: value not found"))
 	}
 }

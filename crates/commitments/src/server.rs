@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use anyhow::Result;
+use eyre::Result;
 use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
