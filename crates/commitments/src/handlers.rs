@@ -90,7 +90,7 @@ pub async fn commitment_request_handler<T>(
 		Err(e) => {
 			error!("Failed to create constraint from commitment request: {}", e);
 			// If constraint creation fails, we need to clean up the stored commitment
-			if let Err(cleanup_err) = _context.database().delete_commitment(&request_hash) {
+			if let Err(cleanup_err) = _context.database().delete_commitment(slot, &request_hash) {
 				error!("Failed to clean up commitment after constraint creation failure: {}", cleanup_err);
 			}
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
@@ -105,7 +105,7 @@ pub async fn commitment_request_handler<T>(
 	if let Err(e) = _context.database().store_constraint(slot, &request_hash, &constraint) {
 		error!("Failed to store constraint in database: {}", e);
 		// If constraint storage fails, we need to clean up the stored commitment
-		if let Err(cleanup_err) = _context.database().delete_commitment(&request_hash) {
+		if let Err(cleanup_err) = _context.database().delete_commitment(slot, &request_hash) {
 			error!("Failed to clean up commitment after constraint storage failure: {}", cleanup_err);
 		}
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
@@ -128,8 +128,8 @@ pub fn commitment_result_handler<T>(
 	info!("Processing commitment result request");
 	let request_hash: B256 = params.one()?;
 
-	// Retrieve the commitment from the database
-	match _context.database().get_commitment(&request_hash) {
+	// Retrieve the commitment from the database using just the request hash
+	match _context.database().get_commitment_by_hash(&request_hash) {
 		Ok(Some(signed_commitment)) => {
 			info!("Commitment result request processed successfully");
 			Ok(signed_commitment)

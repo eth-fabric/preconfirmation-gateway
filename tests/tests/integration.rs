@@ -298,6 +298,7 @@ async fn test_end_to_end_flow(env: &TestEnvironment) -> eyre::Result<()> {
 	];
 
 	let mut request_hashes = Vec::new();
+	let mut slots = Vec::new();
 
 	// Process all commitment requests
 	for (slot, signed_tx) in test_cases {
@@ -315,6 +316,7 @@ async fn test_end_to_end_flow(env: &TestEnvironment) -> eyre::Result<()> {
 			.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
 
 		request_hashes.push(signed_commitment.commitment.request_hash);
+		slots.push(slot);
 
 		println!("  - Processed commitment for slot {} with hash {}", slot, signed_commitment.commitment.request_hash);
 	}

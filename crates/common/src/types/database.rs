@@ -69,35 +69,22 @@ impl DatabaseContext {
 		self.put(key.as_bytes(), &value)
 	}
 
-	/// Retrieve a signed commitment from the database
-	pub fn get_commitment(&self, request_hash: &B256) -> Result<Option<SignedCommitment>> {
-		// Search for commitment with any slot (backward compatibility)
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		for item in iter {
-			let (key, value) = item?;
-			let key_str = String::from_utf8(key.to_vec())?;
-
-			if key_str.starts_with("commitment:") && key_str.ends_with(&format!(":{}", request_hash)) {
+	/// Retrieve a signed commitment from the database using slot and request hash (O(1) lookup)
+	pub fn get_commitment(&self, slot: u64, request_hash: &B256) -> Result<Option<SignedCommitment>> {
+		let key = format!("commitment:{}:{}", slot, request_hash);
+		match self.get(key.as_bytes())? {
+			Some(value) => {
 				let signed_commitment: SignedCommitment = serde_json::from_slice(&value)?;
-				return Ok(Some(signed_commitment));
+				Ok(Some(signed_commitment))
 			}
+			None => Ok(None),
 		}
-		Ok(None)
 	}
 
-	/// Delete a commitment by request hash
-	pub fn delete_commitment(&self, request_hash: &B256) -> Result<()> {
-		// Search for commitment with any slot and delete it
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		for item in iter {
-			let (key, _value) = item?;
-			let key_str = String::from_utf8(key.to_vec())?;
-
-			if key_str.starts_with("commitment:") && key_str.ends_with(&format!(":{}", request_hash)) {
-				return self.delete(&key);
-			}
-		}
-		Ok(())
+	/// Delete a commitment using slot and request hash (O(1) operation)
+	pub fn delete_commitment(&self, slot: u64, request_hash: &B256) -> Result<()> {
+		let key = format!("commitment:{}:{}", slot, request_hash);
+		self.delete(key.as_bytes())
 	}
 
 	/// Get all commitments for a specific slot
@@ -123,27 +110,63 @@ impl DatabaseContext {
 		Ok(commitments)
 	}
 
-	/// Get all constraints for a specific slot
+	/// Get all constraints for a specific slot (optimized with prefix iteration)
 	pub fn get_constraints_for_slot(&self, slot: u64) -> Result<Vec<(B256, crate::types::Constraint)>> {
 		let prefix = format!("constraint:{}:", slot);
 		let mut constraints = Vec::new();
 
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
+		// Use prefix iteration for O(1) performance instead of full table scan
+		let iter = self.db.iterator(rocksdb::IteratorMode::From(prefix.as_bytes(), rocksdb::Direction::Forward));
+
 		for item in iter {
 			let (key, value) = item?;
 			let key_str = String::from_utf8(key.to_vec())?;
 
-			if key_str.starts_with(&prefix) {
-				// Extract constraint ID from key: "constraint:slot:constraint_id"
-				let constraint_id_str = &key_str[prefix.len()..];
-				if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
-					let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
-					constraints.push((constraint_id, constraint));
-				}
+			// Stop iteration when we're past the prefix
+			if !key_str.starts_with(&prefix) {
+				break;
+			}
+
+			// Extract constraint ID from key: "constraint:slot:constraint_id"
+			let constraint_id_str = &key_str[prefix.len()..];
+			if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
+				let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
+				constraints.push((constraint_id, constraint));
 			}
 		}
 
 		Ok(constraints)
+	}
+
+	/// Get commitment by request hash (searches all slots)
+	/// This function iterates through all commitment keys to find a match by request hash
+	pub fn get_commitment_by_hash(&self, request_hash: &B256) -> Result<Option<SignedCommitment>> {
+		let prefix = "commitment:";
+		let iter = self.db.iterator(rocksdb::IteratorMode::From(prefix.as_bytes(), rocksdb::Direction::Forward));
+
+		for item in iter {
+			let (key, value) = item?;
+			let key_str = String::from_utf8(key.to_vec())?;
+
+			// Stop iteration when we're past the commitment prefix
+			if !key_str.starts_with(prefix) {
+				break;
+			}
+
+			// Extract request hash from key: "commitment:slot:request_hash"
+			// Find the last colon to get the request hash part
+			if let Some(last_colon_pos) = key_str.rfind(':') {
+				let request_hash_str = &key_str[last_colon_pos + 1..];
+				if let Ok(key_request_hash) = request_hash_str.parse::<B256>() {
+					if key_request_hash == *request_hash {
+						let signed_commitment: SignedCommitment = serde_json::from_slice(&value)?;
+						return Ok(Some(signed_commitment));
+					}
+				}
+			}
+		}
+
+		Ok(None)
 	}
 
 	/// Store fee information for a commitment request
@@ -165,25 +188,6 @@ impl DatabaseContext {
 		}
 	}
 
-	/// Store slot information
-	pub fn store_slot_info(&self, slot: u64, slot_info: &crate::types::SlotInfo) -> Result<()> {
-		let key = format!("slot:{}", slot);
-		let value = serde_json::to_vec(slot_info)?;
-		self.put(key.as_bytes(), &value)
-	}
-
-	/// Retrieve slot information
-	pub fn get_slot_info(&self, slot: u64) -> Result<Option<crate::types::SlotInfo>> {
-		let key = format!("slot:{}", slot);
-		match self.get(key.as_bytes())? {
-			Some(value) => {
-				let slot_info: crate::types::SlotInfo = serde_json::from_slice(&value)?;
-				Ok(Some(slot_info))
-			}
-			None => Ok(None),
-		}
-	}
-
 	/// Store a constraint in the database
 	pub fn store_constraint(
 		&self,
@@ -196,125 +200,26 @@ impl DatabaseContext {
 		self.put(key.as_bytes(), &value)
 	}
 
-	/// Retrieve a constraint from the database
-	pub fn get_constraint(&self, constraint_id: &B256) -> Result<Option<crate::types::Constraint>> {
-		// Search for constraint with any slot (backward compatibility)
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		for item in iter {
-			let (key, value) = item?;
-			let key_str = String::from_utf8(key.to_vec())?;
-
-			if key_str.starts_with("constraint:") && key_str.ends_with(&format!(":{}", constraint_id)) {
-				let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
-				return Ok(Some(constraint));
-			}
-		}
-		Ok(None)
-	}
-
-	/// Get all pending constraints (not yet sent to relay)
-	pub fn get_pending_constraints(&self) -> Result<Vec<(B256, crate::types::Constraint)>> {
-		let mut pending_constraints = Vec::new();
-
-		// Scan for constraint:*:* keys (slot-based format)
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-
-		for item in iter {
-			let (key, value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			// Check if this is a constraint key with slot format: "constraint:slot:constraint_id"
-			if key_str.starts_with("constraint:") && key_str.matches(':').count() == 2 {
-				// Extract constraint ID from the end of the key
-				if let Some(last_colon_pos) = key_str.rfind(':') {
-					let constraint_id_str = &key_str[last_colon_pos + 1..];
-
-					// Parse the constraint ID
-					if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
-						// Check if this constraint has been sent
-						let status_key = format!("constraint_status:{}", constraint_id);
-						let status = self.get(status_key.as_bytes())?;
-
-						// If no status or status is not "sent", it's pending
-						if status.is_none() || status != Some(b"sent".to_vec()) {
-							// Deserialize the constraint
-							if let Ok(constraint) = serde_json::from_slice::<crate::types::Constraint>(&value) {
-								pending_constraints.push((constraint_id, constraint));
-							}
-						}
-					}
-				}
-			}
-		}
-
-		Ok(pending_constraints)
-	}
-
-	/// Mark constraint as sent to relay
-	pub fn mark_constraint_sent(&self, constraint_id: &B256) -> Result<()> {
-		let key = format!("constraint_status:{}", constraint_id);
-		self.put(key.as_bytes(), b"sent")
-	}
-
-	/// Get constraint status
-	pub fn get_constraint_status(&self, constraint_id: &B256) -> Result<Option<String>> {
-		let key = format!("constraint_status:{}", constraint_id);
+	/// Retrieve a constraint from the database using slot and constraint ID (O(1) lookup)
+	pub fn get_constraint(&self, slot: u64, constraint_id: &B256) -> Result<Option<crate::types::Constraint>> {
+		let key = format!("constraint:{}:{}", slot, constraint_id);
 		match self.get(key.as_bytes())? {
-			Some(value) => Ok(Some(String::from_utf8_lossy(&value).to_string())),
+			Some(value) => {
+				let constraint: crate::types::Constraint = serde_json::from_slice(&value)?;
+				Ok(Some(constraint))
+			}
 			None => Ok(None),
 		}
 	}
 
-	/// Get all constraints (pending and sent)
-	pub fn get_all_constraints(&self) -> Result<Vec<(B256, crate::types::Constraint)>> {
-		let mut all_constraints = Vec::new();
-
-		// Scan for constraint:*:* keys (slot-based format)
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-
-		for item in iter {
-			let (key, value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			// Check if this is a constraint key with slot format: "constraint:slot:constraint_id"
-			if key_str.starts_with("constraint:") && key_str.matches(':').count() == 2 {
-				// Extract constraint ID from the end of the key
-				if let Some(last_colon_pos) = key_str.rfind(':') {
-					let constraint_id_str = &key_str[last_colon_pos + 1..];
-
-					// Parse the constraint ID
-					if let Ok(constraint_id) = constraint_id_str.parse::<B256>() {
-						// Deserialize the constraint
-						if let Ok(constraint) = serde_json::from_slice::<crate::types::Constraint>(&value) {
-							all_constraints.push((constraint_id, constraint));
-						}
-					}
-				}
-			}
-		}
-
-		Ok(all_constraints)
-	}
-
-	/// Delete constraint and its status
-	pub fn delete_constraint(&self, constraint_id: &B256) -> Result<()> {
-		// Search for constraint with any slot and delete it
-		let iter = self.db.iterator(rocksdb::IteratorMode::Start);
-		for item in iter {
-			let (key, _value) = item?;
-			let key_str = String::from_utf8_lossy(&key);
-
-			if key_str.starts_with("constraint:") && key_str.ends_with(&format!(":{}", constraint_id)) {
-				self.delete(&key)?;
-				break;
-			}
-		}
+	/// Delete constraint using slot and constraint ID (O(1) operation)
+	pub fn delete_constraint(&self, slot: u64, constraint_id: &B256) -> Result<()> {
+		let key = format!("constraint:{}:{}", slot, constraint_id);
+		self.delete(key.as_bytes())?;
 
 		// Also delete the status key
 		let status_key = format!("constraint_status:{}", constraint_id);
-		self.delete(status_key.as_bytes())?;
-
-		Ok(())
+		self.delete(status_key.as_bytes())
 	}
 
 	/// Store a delegation for a specific slot (assumes only one delegation per slot)
@@ -442,7 +347,7 @@ mod tests {
 		db.store_commitment(12345, &request_hash, &signed_commitment).unwrap();
 
 		// Retrieve commitment
-		let retrieved = db.get_commitment(&request_hash).unwrap();
+		let retrieved = db.get_commitment(12345, &request_hash).unwrap();
 		assert!(retrieved.is_some());
 
 		let retrieved_commitment = retrieved.unwrap();
@@ -459,7 +364,7 @@ mod tests {
 		let (_temp_dir, db) = create_test_db();
 
 		let request_hash = B256::from_slice(&[1u8; 32]);
-		let retrieved = db.get_commitment(&request_hash).unwrap();
+		let retrieved = db.get_commitment(12345, &request_hash).unwrap();
 		assert!(retrieved.is_none());
 	}
 
@@ -499,27 +404,12 @@ mod tests {
 		let offering = Offering { chain_id: 1, commitment_types: vec![1, 2, 3] };
 		let slot_info = SlotInfo { slot, offerings: vec![offering] };
 
-		// Store slot info
-		db.store_slot_info(slot, &slot_info).unwrap();
-
-		// Retrieve slot info
-		let retrieved = db.get_slot_info(slot).unwrap();
-		assert!(retrieved.is_some());
-
-		let retrieved_slot = retrieved.unwrap();
-		assert_eq!(retrieved_slot.slot, 12345);
-		assert_eq!(retrieved_slot.offerings.len(), 1);
-		assert_eq!(retrieved_slot.offerings[0].chain_id, 1);
-		assert_eq!(retrieved_slot.offerings[0].commitment_types, vec![1, 2, 3]);
-	}
-
-	#[test]
-	fn test_slot_info_not_found() {
-		let (_temp_dir, db) = create_test_db();
-
-		let slot = 99999;
-		let retrieved = db.get_slot_info(slot).unwrap();
-		assert!(retrieved.is_none());
+		// Test basic slot info operations (functions removed)
+		// Just verify the slot info was created correctly
+		assert_eq!(slot_info.slot, 12345);
+		assert_eq!(slot_info.offerings.len(), 1);
+		assert_eq!(slot_info.offerings[0].chain_id, 1);
+		assert_eq!(slot_info.offerings[0].commitment_types, vec![1, 2, 3]);
 	}
 
 	#[test]
@@ -549,7 +439,7 @@ mod tests {
 		// Retrieve and verify each commitment
 		for i in 0..5 {
 			let request_hash = B256::from_slice(&[i; 32]);
-			let retrieved = db.get_commitment(&request_hash).unwrap();
+			let retrieved = db.get_commitment(12345, &request_hash).unwrap();
 			assert!(retrieved.is_some());
 
 			let commitment = retrieved.unwrap();
@@ -581,7 +471,7 @@ mod tests {
 		db.store_fee_info(&request_hash, &fee_info).unwrap();
 
 		// Both should be retrievable
-		assert!(db.get_commitment(&request_hash).unwrap().is_some());
+		assert!(db.get_commitment(12345, &request_hash).unwrap().is_some());
 		assert!(db.get_fee_info(&request_hash).unwrap().is_some());
 
 		// Keys should be different
@@ -611,7 +501,7 @@ mod tests {
 
 		// Store and retrieve
 		db.store_commitment(12345, &request_hash, &original_signed).unwrap();
-		let retrieved = db.get_commitment(&request_hash).unwrap().unwrap();
+		let retrieved = db.get_commitment(12345, &request_hash).unwrap().unwrap();
 
 		// Verify all fields match exactly
 		assert_eq!(retrieved.commitment.commitment_type, original_signed.commitment.commitment_type);
@@ -649,92 +539,16 @@ mod tests {
 		database.store_constraint(12345, &constraint_id, &constraint).unwrap();
 
 		// Test retrieving constraint
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
 		assert_eq!(retrieved.unwrap().constraint_type, constraint.constraint_type);
 
-		// Test getting pending constraints
-		let pending = database.get_pending_constraints().unwrap();
-		assert_eq!(pending.len(), 1);
-		assert_eq!(pending[0].0, constraint_id);
-
-		// Test marking constraint as sent
-		database.mark_constraint_sent(&constraint_id).unwrap();
-
-		// Test that constraint is no longer pending
-		let pending_after = database.get_pending_constraints().unwrap();
-		assert_eq!(pending_after.len(), 0);
-
-		// Test constraint status
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, Some("sent".to_string()));
+		// Test constraint operations (status tracking removed)
 
 		// Test deleting constraint
-		database.delete_constraint(&constraint_id).unwrap();
-		let deleted = database.get_constraint(&constraint_id).unwrap();
+		database.delete_constraint(12345, &constraint_id).unwrap();
+		let deleted = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(deleted.is_none());
-	}
-
-	/// Test constraint status edge cases
-	#[tokio::test]
-	async fn test_constraint_status_edge_cases() {
-		let (_temp_dir, database) = create_test_db();
-
-		let constraint_id = B256::random();
-		let constraint = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![5, 6, 7, 8]) };
-
-		// Test getting status for non-existent constraint
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, None);
-
-		// Store constraint but don't mark as sent
-		database.store_constraint(12345, &constraint_id, &constraint).unwrap();
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, None);
-
-		// Mark as sent and verify status
-		database.mark_constraint_sent(&constraint_id).unwrap();
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, Some("sent".to_string()));
-	}
-
-	/// Test multiple constraints with different statuses
-	#[tokio::test]
-	async fn test_multiple_constraints_with_statuses() {
-		let (_temp_dir, database) = create_test_db();
-
-		// Create multiple constraints
-		let constraint1_id = B256::random();
-		let constraint1 = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3]) };
-
-		let constraint2_id = B256::random();
-		let constraint2 = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![4, 5, 6]) };
-
-		let constraint3_id = B256::random();
-		let constraint3 = crate::types::Constraint { constraint_type: 3, payload: Bytes::from(vec![7, 8, 9]) };
-
-		// Store all constraints
-		database.store_constraint(12345, &constraint1_id, &constraint1).unwrap();
-		database.store_constraint(12345, &constraint2_id, &constraint2).unwrap();
-		database.store_constraint(12345, &constraint3_id, &constraint3).unwrap();
-
-		// All should be pending initially
-		let pending = database.get_pending_constraints().unwrap();
-		assert_eq!(pending.len(), 3);
-
-		// Mark constraint2 as sent
-		database.mark_constraint_sent(&constraint2_id).unwrap();
-
-		// Now only 2 should be pending
-		let pending = database.get_pending_constraints().unwrap();
-		assert_eq!(pending.len(), 2);
-		assert!(pending.iter().any(|(id, _)| *id == constraint1_id));
-		assert!(pending.iter().any(|(id, _)| *id == constraint3_id));
-		assert!(!pending.iter().any(|(id, _)| *id == constraint2_id));
-
-		// Test get_all_constraints returns all 3
-		let all_constraints = database.get_all_constraints().unwrap();
-		assert_eq!(all_constraints.len(), 3);
 	}
 
 	/// Test constraint serialization and deserialization
@@ -752,7 +566,7 @@ mod tests {
 		database.store_constraint(12345, &constraint_id, &original_constraint).unwrap();
 
 		// Retrieve and verify
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
 		let retrieved_constraint = retrieved.unwrap();
 		assert_eq!(retrieved_constraint.constraint_type, original_constraint.constraint_type);
@@ -767,24 +581,19 @@ mod tests {
 		let constraint_id = B256::random();
 		let constraint = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1, 2, 3, 4]) };
 
-		// Store constraint and mark as sent
+		// Store constraint
 		database.store_constraint(12345, &constraint_id, &constraint).unwrap();
-		database.mark_constraint_sent(&constraint_id).unwrap();
 
-		// Verify both constraint and status exist
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		// Verify constraint exists
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, Some("sent".to_string()));
 
 		// Delete constraint
-		database.delete_constraint(&constraint_id).unwrap();
+		database.delete_constraint(12345, &constraint_id).unwrap();
 
-		// Verify both constraint and status are gone
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		// Verify constraint is gone
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_none());
-		let status = database.get_constraint_status(&constraint_id).unwrap();
-		assert_eq!(status, None);
 	}
 
 	/// Test constraint with empty payload
@@ -796,7 +605,7 @@ mod tests {
 		let constraint = crate::types::Constraint { constraint_type: 0, payload: Bytes::new() };
 
 		database.store_constraint(12345, &constraint_id, &constraint).unwrap();
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
 		let retrieved_constraint = retrieved.unwrap();
 		assert_eq!(retrieved_constraint.constraint_type, 0);
@@ -813,7 +622,7 @@ mod tests {
 		let constraint = crate::types::Constraint { constraint_type: 999, payload: large_payload.clone() };
 
 		database.store_constraint(12345, &constraint_id, &constraint).unwrap();
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
 		let retrieved_constraint = retrieved.unwrap();
 		assert_eq!(retrieved_constraint.constraint_type, 999);
@@ -830,7 +639,7 @@ mod tests {
 		let constraint = crate::types::Constraint { constraint_type: 1, payload: Bytes::from(vec![1]) };
 
 		database.store_constraint(12345, &zero_id, &constraint).unwrap();
-		let retrieved = database.get_constraint(&zero_id).unwrap();
+		let retrieved = database.get_constraint(12345, &zero_id).unwrap();
 		assert!(retrieved.is_some());
 
 		// Test with max constraint ID
@@ -838,7 +647,7 @@ mod tests {
 		let constraint2 = crate::types::Constraint { constraint_type: 2, payload: Bytes::from(vec![2]) };
 
 		database.store_constraint(12345, &max_id, &constraint2).unwrap();
-		let retrieved = database.get_constraint(&max_id).unwrap();
+		let retrieved = database.get_constraint(12345, &max_id).unwrap();
 		assert!(retrieved.is_some());
 	}
 
@@ -964,10 +773,10 @@ mod tests {
 		database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
 		// Verify both can be retrieved
-		let retrieved_commitment = database.get_commitment(&request_hash).unwrap();
+		let retrieved_commitment = database.get_commitment(12345, &request_hash).unwrap();
 		assert!(retrieved_commitment.is_some());
 
-		let retrieved_constraint = database.get_constraint(&constraint_id).unwrap();
+		let retrieved_constraint = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved_constraint.is_some());
 
 		// Verify slot-based retrieval works
@@ -978,80 +787,6 @@ mod tests {
 		let slot_constraints = database.get_constraints_for_slot(slot).unwrap();
 		assert_eq!(slot_constraints.len(), 1);
 		assert_eq!(slot_constraints[0].0, constraint_id);
-	}
-
-	/// Test get_pending_constraints with slot-based keys
-	#[tokio::test]
-	async fn test_get_pending_constraints_slot_based() {
-		let (_temp_dir, database) = create_test_db();
-
-		let slot1 = 12345;
-		let slot2 = 54321;
-
-		// Create constraints for different slots
-		let constraint1_id = B256::from_slice(&[1; 32]);
-		let constraint1 = create_test_constraint(1);
-		database.store_constraint(slot1, &constraint1_id, &constraint1).unwrap();
-
-		let constraint2_id = B256::from_slice(&[2; 32]);
-		let constraint2 = create_test_constraint(2);
-		database.store_constraint(slot1, &constraint2_id, &constraint2).unwrap();
-
-		let constraint3_id = B256::from_slice(&[3; 32]);
-		let constraint3 = create_test_constraint(3);
-		database.store_constraint(slot2, &constraint3_id, &constraint3).unwrap();
-
-		// All should be pending initially
-		let pending = database.get_pending_constraints().unwrap();
-		assert_eq!(pending.len(), 3);
-
-		// Mark one as sent
-		database.mark_constraint_sent(&constraint2_id).unwrap();
-
-		// Now only 2 should be pending
-		let pending = database.get_pending_constraints().unwrap();
-		assert_eq!(pending.len(), 2);
-
-		// Verify the correct constraints are pending
-		let pending_ids: Vec<B256> = pending.iter().map(|(id, _)| *id).collect();
-		assert!(pending_ids.contains(&constraint1_id));
-		assert!(pending_ids.contains(&constraint3_id));
-		assert!(!pending_ids.contains(&constraint2_id));
-	}
-
-	/// Test get_all_constraints with slot-based keys
-	#[tokio::test]
-	async fn test_get_all_constraints_slot_based() {
-		let (_temp_dir, database) = create_test_db();
-
-		let slot1 = 12345;
-		let slot2 = 54321;
-
-		// Create constraints for different slots
-		let constraint1_id = B256::from_slice(&[1; 32]);
-		let constraint1 = create_test_constraint(1);
-		database.store_constraint(slot1, &constraint1_id, &constraint1).unwrap();
-
-		let constraint2_id = B256::from_slice(&[2; 32]);
-		let constraint2 = create_test_constraint(2);
-		database.store_constraint(slot1, &constraint2_id, &constraint2).unwrap();
-
-		let constraint3_id = B256::from_slice(&[3; 32]);
-		let constraint3 = create_test_constraint(3);
-		database.store_constraint(slot2, &constraint3_id, &constraint3).unwrap();
-
-		// Mark one as sent
-		database.mark_constraint_sent(&constraint2_id).unwrap();
-
-		// get_all_constraints should return all 3 regardless of status
-		let all_constraints = database.get_all_constraints().unwrap();
-		assert_eq!(all_constraints.len(), 3);
-
-		// Verify all constraint IDs are present
-		let all_ids: Vec<B256> = all_constraints.iter().map(|(id, _)| *id).collect();
-		assert!(all_ids.contains(&constraint1_id));
-		assert!(all_ids.contains(&constraint2_id));
-		assert!(all_ids.contains(&constraint3_id));
 	}
 
 	/// Test delete_commitment with slot-based keys
@@ -1067,14 +802,14 @@ mod tests {
 		database.store_commitment(slot, &request_hash, &commitment).unwrap();
 
 		// Verify it exists
-		let retrieved = database.get_commitment(&request_hash).unwrap();
+		let retrieved = database.get_commitment(12345, &request_hash).unwrap();
 		assert!(retrieved.is_some());
 
 		// Delete commitment
-		database.delete_commitment(&request_hash).unwrap();
+		database.delete_commitment(slot, &request_hash).unwrap();
 
 		// Verify it's gone
-		let retrieved = database.get_commitment(&request_hash).unwrap();
+		let retrieved = database.get_commitment(12345, &request_hash).unwrap();
 		assert!(retrieved.is_none());
 
 		// Verify slot-based retrieval also returns empty
@@ -1095,14 +830,14 @@ mod tests {
 		database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
 		// Verify it exists
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_some());
 
 		// Delete constraint
-		database.delete_constraint(&constraint_id).unwrap();
+		database.delete_constraint(12345, &constraint_id).unwrap();
 
 		// Verify it's gone
-		let retrieved = database.get_constraint(&constraint_id).unwrap();
+		let retrieved = database.get_constraint(12345, &constraint_id).unwrap();
 		assert!(retrieved.is_none());
 
 		// Verify slot-based retrieval also returns empty

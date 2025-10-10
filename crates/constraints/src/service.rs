@@ -1,5 +1,5 @@
 use eyre::Result;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use super::client::ConstraintsClient;
 use crate::utils::{create_constraints_message, create_signed_constraints};
@@ -55,20 +55,6 @@ pub async fn process_constraints(
 	match client.post_constraints(&signed_constraints).await {
 		Ok(_) => {
 			info!("Successfully sent constraints for slot {} to relay", slot);
-
-			// 5. Mark constraints as sent (atomic operation)
-			let mut all_marked = true;
-			for (constraint_id, _) in &slot_constraints {
-				if let Err(e) = database.mark_constraint_sent(constraint_id) {
-					error!("Failed to mark constraint {} as sent: {}", constraint_id, e);
-					all_marked = false;
-					// Continue processing other constraints
-				}
-			}
-
-			if !all_marked {
-				warn!("Some constraints could not be marked as sent for slot {}", slot);
-			}
 
 			Ok(ProcessConstraintsResponse {
 				success: true,

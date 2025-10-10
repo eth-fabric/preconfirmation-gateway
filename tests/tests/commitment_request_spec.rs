@@ -326,7 +326,7 @@ mod test_cases {
 		let result = harness.test_commitment_request(request).await?;
 
 		// Verify the result was stored in the database
-		let stored_commitment = harness.context.database().get_commitment(&expected_request_hash).unwrap();
+		let stored_commitment = harness.context.database().get_commitment(slot, &expected_request_hash).unwrap();
 		assert!(stored_commitment.is_some(), "SignedCommitment should be stored in database");
 
 		let stored = stored_commitment.unwrap();
@@ -358,6 +358,7 @@ mod test_cases {
 		let mut request_hashes = Vec::new();
 		let mut expected_results = Vec::new();
 		let mut harnesses = Vec::new();
+		let mut slots = Vec::new();
 
 		// Process all requests and collect their hashes and results
 		for (slot, signed_tx) in test_requests {
@@ -375,11 +376,12 @@ mod test_cases {
 			request_hashes.push(request_hash);
 			expected_results.push(result);
 			harnesses.push(harness);
+			slots.push(slot);
 		}
 
 		// Verify all commitments are stored in the database
 		for (i, request_hash) in request_hashes.iter().enumerate() {
-			let stored_commitment = harnesses[i].context.database().get_commitment(request_hash).unwrap();
+			let stored_commitment = harnesses[i].context.database().get_commitment(slots[i], request_hash).unwrap();
 			assert!(stored_commitment.is_some(), "Commitment {} should be stored in database", i);
 
 			let stored = stored_commitment.unwrap();
@@ -401,10 +403,11 @@ mod test_cases {
 	#[tokio::test]
 	async fn test_database_retrieval_nonexistent_hash() -> eyre::Result<()> {
 		let harness = CommitmentRequestTestHarness::new().await?;
+		let slot = 12345;
 
 		// Try to retrieve a commitment with a non-existent hash
 		let nonexistent_hash = alloy::primitives::B256::from_slice(&[0x99; 32]);
-		let retrieved_commitment = harness.context.database().get_commitment(&nonexistent_hash).unwrap();
+		let retrieved_commitment = harness.context.database().get_commitment(slot, &nonexistent_hash).unwrap();
 
 		assert!(retrieved_commitment.is_none(), "Should return None for non-existent commitment");
 
@@ -431,7 +434,7 @@ mod test_cases {
 		assert_eq!(result.commitment.request_hash, expected_hash);
 
 		// Verify we can retrieve the commitment using the calculated hash
-		let retrieved = harness.context.database().get_commitment(&expected_hash).unwrap();
+		let retrieved = harness.context.database().get_commitment(slot, &expected_hash).unwrap();
 		assert!(retrieved.is_some(), "Should be able to retrieve using calculated hash");
 
 		Ok(())
@@ -451,7 +454,7 @@ mod test_cases {
 		let request_hash = result.commitment.request_hash;
 
 		// Retrieve from database
-		let stored = harness.context.database().get_commitment(&request_hash).unwrap().unwrap();
+		let stored = harness.context.database().get_commitment(slot, &request_hash).unwrap().unwrap();
 
 		// Verify serialization/deserialization roundtrip maintains data integrity
 		assert_eq!(stored.commitment.commitment_type, result.commitment.commitment_type);
@@ -484,12 +487,12 @@ mod test_cases {
 
 		// Verify the commitment was stored
 		let request_hash = result.commitment.request_hash;
-		let stored_commitment = harness.context.database().get_commitment(&request_hash).unwrap();
+		let stored_commitment = harness.context.database().get_commitment(slot, &request_hash).unwrap();
 		assert!(stored_commitment.is_some(), "Commitment should be stored in database");
 
 		// Verify that a constraint was also saved
 		// We need to check if there are any constraints in the database for this slot
-		let constraints = harness.context.database().get_pending_constraints().unwrap();
+		let constraints = harness.context.database().get_constraints_for_slot(slot).unwrap();
 		assert!(!constraints.is_empty(), "At least one constraint should be saved");
 
 		// Find the constraint that matches our slot
@@ -536,25 +539,15 @@ mod test_cases {
 
 			// Verify the commitment was stored
 			let request_hash = result.commitment.request_hash;
-			let stored_commitment = harness.context.database().get_commitment(&request_hash).unwrap();
+			let stored_commitment = harness.context.database().get_commitment(slot, &request_hash).unwrap();
 			assert!(stored_commitment.is_some(), "Commitment {} should be stored in database", i + 1);
 		}
 
 		// Verify that multiple constraints were saved for the same slot
-		let constraints = harness.context.database().get_pending_constraints().unwrap();
+		let constraints = harness.context.database().get_constraints_for_slot(slot).unwrap();
 
-		// Count constraints for our specific slot
-		let slot_constraints: Vec<_> = constraints
-			.iter()
-			.filter(|(_, constraint)| {
-				use common::types::commitments::InclusionPayload;
-				if let Ok(inclusion_payload) = InclusionPayload::abi_decode(&constraint.payload) {
-					inclusion_payload.slot == slot
-				} else {
-					false
-				}
-			})
-			.collect();
+		// All constraints should be for our slot since we're using get_constraints_for_slot
+		let slot_constraints: Vec<_> = constraints.iter().collect();
 
 		assert_eq!(slot_constraints.len(), num_requests, "Should have {} constraints for slot {}", num_requests, slot);
 
