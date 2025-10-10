@@ -224,7 +224,7 @@ pub fn fee_handler<T>(
 	let request: CommitmentRequest = params.parse()?;
 
 	// Use helper function to calculate fee
-	let fee_info = match utils::calculate_fee_info(&request) {
+	let fee_info = match utils::calculate_fee_info(&request, _context.pricing_database()) {
 		Ok(fee_info) => fee_info,
 		Err(e) => {
 			error!("Failed to calculate fee info: {}", e);

@@ -9,6 +9,8 @@ use tokio::sync::Mutex;
 pub struct RpcContext<T = ()> {
 	/// Database context for PostgreSQL operations
 	pub database: DatabaseContext,
+	/// Pricing database context for price storage
+	pub pricing_database: DatabaseContext,
 	/// Commit module configuration for commit-boost operations (Arc<Mutex> for thread safety)
 	pub commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
 	/// BLS public key for signing constraints
@@ -25,6 +27,7 @@ impl<T> RpcContext<T> {
 	/// Create a new RPC context with the given database context and commit config
 	pub fn new(
 		database: DatabaseContext,
+		pricing_database: DatabaseContext,
 		commit_config: StartCommitModuleConfig<T>,
 		bls_public_key: BlsPublicKey,
 		relay_url: String,
@@ -33,6 +36,7 @@ impl<T> RpcContext<T> {
 	) -> Self {
 		Self {
 			database,
+			pricing_database,
 			commit_config: Arc::new(Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
@@ -44,6 +48,11 @@ impl<T> RpcContext<T> {
 	/// Get a reference to the database
 	pub fn database(&self) -> &DatabaseContext {
 		&self.database
+	}
+
+	/// Get a reference to the pricing database
+	pub fn pricing_database(&self) -> &DatabaseContext {
+		&self.pricing_database
 	}
 
 	/// Get a reference to the slot timer

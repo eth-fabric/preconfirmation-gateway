@@ -41,6 +41,7 @@ cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branc
 urc = { path = "./crates/common/bindings/urc" }
 hex = "0.4"
 axum = { version = "0.8", features = ["macros", "multipart"] }
+tempfile = "3.8"
 
 [patch.crates-io]
 blstrs_plus = { git = "https://github.com/Commit-Boost/blstrs" }

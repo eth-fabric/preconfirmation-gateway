@@ -69,6 +69,11 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let db = rocksdb::DB::open(&opts, &db_path)?;
 	let database = common::types::DatabaseContext::new(std::sync::Arc::new(db));
 
+	// Create pricing database
+	let pricing_db_path = temp_dir.path().join("test_pricing_db");
+	let pricing_db = rocksdb::DB::open(&opts, &pricing_db_path)?;
+	let pricing_database = common::types::DatabaseContext::new(std::sync::Arc::new(pricing_db));
+
 	// Generate proxy key for committer using the registered BLS public key
 	let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
 		.map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))?;
@@ -86,8 +91,15 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	// Create slot timer with test genesis timestamp
 	let slot_timer = SlotTimer::new(1606824023);
 
-	let rpc_context =
-		common::types::RpcContext::new(database, commit_config_guard, bls_public_key, relay_url, api_key, slot_timer);
+	let rpc_context = common::types::RpcContext::new(
+		database,
+		pricing_database,
+		commit_config_guard,
+		bls_public_key,
+		relay_url,
+		api_key,
+		slot_timer,
+	);
 
 	// Start RPC server
 	let server_handle = tokio::spawn(async move {

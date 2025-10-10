@@ -280,8 +280,13 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
+		// Create pricing database for testing
+		let pricing_db = DB::open(&opts, &temp_dir.path().join("test_pricing_db")).unwrap();
+		let pricing_database = DatabaseContext::new(Arc::new(pricing_db));
+
 		Ok(RpcContext {
 			database,
+			pricing_database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
@@ -353,8 +358,13 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
+		// Create pricing database for testing
+		let pricing_db = DB::open(&opts, &temp_dir.path().join("test_pricing_db")).unwrap();
+		let pricing_database = DatabaseContext::new(Arc::new(pricing_db));
+
 		Ok(RpcContext {
 			database,
+			pricing_database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,

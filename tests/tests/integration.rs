@@ -123,8 +123,13 @@ impl TestEnvironment {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
+		// Create pricing database for testing
+		let pricing_db = create_test_database(&temp_dir.path().join("test_pricing_db"))?;
+		let pricing_database = common::types::DatabaseContext::new(std::sync::Arc::new(pricing_db));
+
 		let rpc_context = common::types::RpcContext::new(
 			database,
+			pricing_database,
 			commit_config_guard,
 			bls_public_key,
 			relay_url,

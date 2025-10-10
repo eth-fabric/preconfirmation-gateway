@@ -169,19 +169,32 @@ pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
 }
 
 /// Calculates fee information for a commitment request
-pub fn calculate_fee_info(request: &CommitmentRequest) -> Result<FeeInfo> {
+pub fn calculate_fee_info(
+	request: &CommitmentRequest,
+	pricing_database: &common::types::DatabaseContext,
+) -> Result<FeeInfo> {
 	debug!("Calculating fee for commitment type: {}", request.commitment_type);
 
-	// Todo calculate price_gwei
-	let price_gwei = 1;
+	// Read latest price from pricing database
+	let price_gwei = get_latest_price_from_database(pricing_database)?;
 
 	let request_hash = request.request_hash()?;
 
 	let fee_payload = FeePayload { request_hash: request_hash, price_gwei: price_gwei };
 
-	// TODO: Implement actual fee calculation logic
-	// This is a placeholder implementation
+	debug!("Calculated fee with price {} gwei", price_gwei);
 	Ok(FeeInfo { fee_payload: fee_payload.abi_encode()?, commitment_type: request.commitment_type })
+}
+
+/// Get the latest price from the pricing database
+fn get_latest_price_from_database(pricing_database: &common::types::DatabaseContext) -> Result<u64> {
+	match pricing_database.get_latest_price().map_err(|e| eyre::eyre!("Database error: {}", e))? {
+		Some(price) => {
+			debug!("Retrieved price {} gwei from pricing database", price);
+			Ok(price)
+		}
+		None => Err(eyre::eyre!("No price found in pricing database")),
+	}
 }
 
 /// Validates a request hash format
@@ -457,16 +470,32 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_calculate_fee_info() -> Result<()> {
+		use common::types::DatabaseContext;
+		use rocksdb::{DB, Options};
+		use std::sync::Arc;
+		use tempfile::TempDir;
+
 		let request = CommitmentRequest {
 			commitment_type: 3,
 			payload: Bytes::from(vec![0x07, 0x08, 0x09]),
 			slasher: "0x9876543210987654321098765432109876543210".parse()?,
 		};
 
-		let fee_info = calculate_fee_info(&request).unwrap();
+		// Create a test pricing database
+		let temp_dir = TempDir::new().unwrap();
+		let db_path = temp_dir.path().join("test_pricing_db");
+		let mut opts = Options::default();
+		opts.create_if_missing(true);
+		let db = DB::open(&opts, &db_path).unwrap();
+		let pricing_database = DatabaseContext::new(Arc::new(db));
 
-		// todo update once pricing is implemented
-		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 1 };
+		// Store a test price in the database
+		pricing_database.store_latest_price(5).map_err(|e| eyre::eyre!("Database error: {}", e))?;
+
+		let fee_info = calculate_fee_info(&request, &pricing_database).unwrap();
+
+		// Test with the price we stored (5 gwei)
+		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 5 };
 
 		assert_eq!(fee_info.commitment_type, request.commitment_type);
 		assert_eq!(fee_info.fee_payload, fee_payload.abi_encode()?);

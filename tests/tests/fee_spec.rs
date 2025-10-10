@@ -10,14 +10,17 @@ use integration_tests::test_common::test_helpers::create_test_context;
 async fn test_fee_handler_basic() -> eyre::Result<()> {
 	let context = create_test_context().await?;
 
+	// Store a test price in the pricing database
+	context.pricing_database().store_latest_price(5).map_err(|e| eyre::eyre!("Database error: {}", e))?;
+
 	let request = CommitmentRequest {
 		commitment_type: 1,
 		payload: Bytes::from(vec![1, 2, 3, 4, 5]),
 		slasher: "0x1234567890123456789012345678901234567890".parse::<Address>().unwrap(),
 	};
 
-	// todo update once pricing is implemented
-	let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 1 };
+	// Expected fee payload with the price we stored (5 gwei)
+	let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 5 };
 
 	let params_json = json!(request);
 	let params_string = params_json.to_string();

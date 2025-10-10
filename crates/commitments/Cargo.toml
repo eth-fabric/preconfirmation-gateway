@@ -20,3 +20,7 @@ alloy = { workspace = true }
 alloy-primitives = { workspace = true }
 commit-boost = { workspace = true }
 cb-common = { workspace = true }
+
+[dev-dependencies]
+rocksdb = { workspace = true }
+tempfile = { workspace = true }

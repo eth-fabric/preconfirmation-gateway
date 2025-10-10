@@ -352,6 +352,26 @@ impl DatabaseContext {
 		let key = format!("delegation:{}", slot);
 		self.delete(key.as_bytes())
 	}
+
+	/// Store the latest gas price in the database (overwrites previous)
+	pub fn store_latest_price(&self, price_gwei: u64) -> Result<()> {
+		let key = "latest_price_gwei";
+		let value = price_gwei.to_string();
+		self.put(key.as_bytes(), value.as_bytes())
+	}
+
+	/// Retrieve the latest gas price from the database
+	pub fn get_latest_price(&self) -> Result<Option<u64>> {
+		let key = "latest_price_gwei";
+		match self.get(key.as_bytes())? {
+			Some(value) => {
+				let price_str = String::from_utf8(value)?;
+				let price = price_str.parse::<u64>()?;
+				Ok(Some(price))
+			}
+			None => Ok(None),
+		}
+	}
 }
 
 impl std::fmt::Debug for DatabaseContext {

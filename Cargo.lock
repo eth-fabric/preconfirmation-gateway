@@ -2087,8 +2087,10 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "jsonrpsee",
+ "rocksdb",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -5090,7 +5092,13 @@ dependencies = [
 name = "pricer"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "common",
+ "eyre",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -5981,6 +5989,7 @@ dependencies = [
  "constraints",
  "eyre",
  "hex",
+ "pricer",
  "reqwest 0.11.27",
  "rocksdb",
  "serde",

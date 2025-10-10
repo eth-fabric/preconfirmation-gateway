@@ -18,6 +18,11 @@ async fn main() -> anyhow::Result<()> {
 	db::db_healthcheck(&db).await?;
 	let db_context = types::DatabaseContext::new(db);
 
+	// Initialize pricing database
+	let pricing_db = db::create_database(&commit_config, DatabaseType::Pricing)?;
+	db::db_healthcheck(&pricing_db).await?;
+	let pricing_db_context = types::DatabaseContext::new(pricing_db);
+
 	// Get constraints configuration for BLS keys and relay settings
 	let constraints_config = commit_config.extra.constraints();
 	let bls_public_key = bls_pubkey_from_hex(&constraints_config.bls_public_key)
@@ -29,7 +34,15 @@ async fn main() -> anyhow::Result<()> {
 	let slot_timer = SlotTimer::new(commit_config.extra.eth_genesis_timestamp());
 
 	// Create RPC context with database context and commit config
-	let rpc_context = types::RpcContext::new(db_context, commit_config, bls_public_key, relay_url, api_key, slot_timer);
+	let rpc_context = types::RpcContext::new(
+		db_context,
+		pricing_db_context,
+		commit_config,
+		bls_public_key,
+		relay_url,
+		api_key,
+		slot_timer,
+	);
 
 	server::run_server(rpc_context).await?;
 
