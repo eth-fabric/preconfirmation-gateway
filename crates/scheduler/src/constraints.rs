@@ -2,7 +2,7 @@ use eyre::Result;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
-use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
+use commit_boost::prelude::StartCommitModuleConfig;
 use common::config::InclusionPreconfConfig;
 use common::types::DatabaseContext;
 use common::SlotTimer;
@@ -17,7 +17,6 @@ pub struct ConstraintsTask {
 	slot_timer: SlotTimer,
 	database: DatabaseContext,
 	commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionPreconfConfig>>>,
-	bls_public_key: BlsPublicKey,
 	relay_url: String,
 	api_key: Option<String>,
 }
@@ -29,11 +28,10 @@ impl ConstraintsTask {
 		slot_timer: SlotTimer,
 		database: DatabaseContext,
 		commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionPreconfConfig>>>,
-		bls_public_key: BlsPublicKey,
 		relay_url: String,
 		api_key: Option<String>,
 	) -> Self {
-		Self { config, slot_timer, database, commit_config, bls_public_key, relay_url, api_key }
+		Self { config, slot_timer, database, commit_config, relay_url, api_key }
 	}
 
 	/// Run the constraints task continuously
@@ -113,7 +111,7 @@ impl ConstraintsTask {
 		};
 
 		// Extract BLS keys from delegation
-		let bls_public_key = delegation.message.delegate;
+		let gateway_public_key = delegation.message.delegate;
 		let proposer_public_key = delegation.message.proposer;
 
 		// Parse receiver BLS public keys from config
@@ -124,7 +122,7 @@ impl ConstraintsTask {
 		// Call constraints processing function directly
 		let response = process_constraints(
 			slot,
-			bls_public_key, // This is the gateway's BLS public key
+			gateway_public_key,
 			proposer_public_key,
 			receivers, // receivers
 			&self.database,

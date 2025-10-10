@@ -33,10 +33,6 @@ async fn main() -> Result<()> {
 	// Create shared commit config for tasks
 	let shared_commit_config = Arc::new(Mutex::new(commit_config));
 
-	// Parse BLS public key for constraints
-	let bls_public_key = cb_common::utils::bls_pubkey_from_hex(&app_config.constraints_bls_public_key)
-		.map_err(|e| eyre::eyre!("Failed to parse BLS public key: {}", e))?;
-
 	// Create task coordinator
 	let mut coordinator = TaskCoordinator::new();
 
@@ -62,7 +58,6 @@ async fn main() -> Result<()> {
 		slot_timer.clone(),
 		delegations_database.clone(),
 		shared_commit_config.clone(),
-		bls_public_key,
 		app_config.constraints_relay_url.clone(),
 		app_config.constraints_api_key.clone(),
 	);
