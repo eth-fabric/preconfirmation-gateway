@@ -165,29 +165,31 @@ pub fn slots_handler<T>(
 	// Convert Uint<256> to u64
 	let chain_id = chain_id_uint.to::<u64>();
 
-	// Check next 64 slots for delegations
-	let mut slots = Vec::new();
-	for slot in current_slot..current_slot + 64 {
-		match _context.database().is_delegated(slot) {
-			Ok(true) => {
-				info!("Found delegation for slot {}", slot);
-
-				// Create offering with chain ID and commitment type
-				let offering = Offering { chain_id, commitment_types: vec![COMMITMENT_TYPE] };
-
-				// Create slot info
-				let slot_info = SlotInfo { slot, offerings: vec![offering] };
-
-				slots.push(slot_info);
-			}
-			Ok(false) => {
-				// No delegation for this slot, skip
-			}
-			Err(e) => {
-				error!("Failed to check delegation for slot {}: {}", slot, e);
-				// Continue with other slots even if one fails
-			}
+	// Get all delegated slots in range with a single database query
+	let delegated_slots = match _context.database().get_delegated_slots_in_range(current_slot, current_slot + 64) {
+		Ok(slots) => slots,
+		Err(e) => {
+			error!("Failed to get delegated slots: {}", e);
+			return Err(jsonrpsee::types::error::ErrorObject::owned(
+				-32603, // Internal error
+				"Failed to get delegated slots",
+				Some(format!("{}", e)),
+			));
 		}
+	};
+
+	// Build slot info for each delegated slot
+	let mut slots = Vec::new();
+	for slot in delegated_slots {
+		info!("Found delegation for slot {}", slot);
+
+		// Create offering with chain ID and commitment type
+		let offering = Offering { chain_id, commitment_types: vec![COMMITMENT_TYPE] };
+
+		// Create slot info
+		let slot_info = SlotInfo { slot, offerings: vec![offering] };
+
+		slots.push(slot_info);
 	}
 
 	info!("Found {} slots with delegations", slots.len());

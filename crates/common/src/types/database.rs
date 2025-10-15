@@ -346,6 +346,40 @@ impl DatabaseContext {
 		Ok(self.db.get(key.as_bytes())?.is_some())
 	}
 
+	/// Get all delegated slots in a range using prefix iteration (optimized)
+	pub fn get_delegated_slots_in_range(&self, start_slot: u64, end_slot: u64) -> Result<Vec<u64>> {
+		let prefix = "delegation:";
+		let mut delegated_slots = Vec::new();
+
+		// Use prefix iteration starting from the first slot
+		let start_key = Self::format_delegation_key(start_slot);
+		let iter = self.db.iterator(rocksdb::IteratorMode::From(start_key.as_bytes(), rocksdb::Direction::Forward));
+
+		for item in iter {
+			let (key, _value) = item?;
+			let key_str = String::from_utf8(key.to_vec())?;
+
+			// Stop if we're past the delegation prefix
+			if !key_str.starts_with(prefix) {
+				break;
+			}
+
+			// Extract slot from key: "delegation:<slot>"
+			let slot_str = &key_str[prefix.len()..];
+			if let Ok(slot) = slot_str.parse::<u64>() {
+				// Only include slots within our range
+				if slot >= start_slot && slot < end_slot {
+					delegated_slots.push(slot);
+				} else if slot >= end_slot {
+					// We've passed the end of our range, stop iterating
+					break;
+				}
+			}
+		}
+
+		Ok(delegated_slots)
+	}
+
 	/// Delete all delegations for a specific slot
 	pub fn delete_delegations_for_slot(&self, slot: u64) -> Result<()> {
 		let key = Self::format_delegation_key(slot);
@@ -1349,6 +1383,30 @@ mod tests {
 		let slot2_delegation = db.get_delegation_for_slot(slot2).unwrap();
 		assert!(slot1_delegation.is_none());
 		assert!(slot2_delegation.is_some());
+	}
+
+	#[test]
+	fn test_get_delegated_slots_in_range() {
+		let (_temp_dir, db) = create_test_db();
+
+		// Store delegations at various slots
+		let delegation = create_test_delegation();
+		db.store_delegation(100, &delegation).unwrap();
+		db.store_delegation(105, &delegation).unwrap();
+		db.store_delegation(110, &delegation).unwrap();
+		db.store_delegation(200, &delegation).unwrap();
+
+		// Query range 100-164
+		let delegated = db.get_delegated_slots_in_range(100, 164).unwrap();
+		assert_eq!(delegated.len(), 3);
+		assert!(delegated.contains(&100));
+		assert!(delegated.contains(&105));
+		assert!(delegated.contains(&110));
+		assert!(!delegated.contains(&200)); // Outside range
+
+		// Query range with no delegations
+		let empty = db.get_delegated_slots_in_range(300, 364).unwrap();
+		assert_eq!(empty.len(), 0);
 	}
 
 	#[test]
