@@ -17,13 +17,13 @@ pub async fn create_signed_constraints<T>(
 ) -> Result<SignedConstraints> {
 	debug!("Creating signed constraints with proper BLS signing");
 
-	// 1. Get the object root
-	let object_root = message.to_object_root()?;
+	// 1. Get the message hash
+	let message_hash = message.to_message_hash()?;
 
 	// 2. Call the proxy_bls signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
-		signer::call_proxy_bls_signer(&mut *commit_config, object_root, bls_public_key).await?
+		signer::call_proxy_bls_signer(&mut *commit_config, message_hash, bls_public_key).await?
 	};
 	debug!("Received response from proxy_bls: {:?}", response);
 

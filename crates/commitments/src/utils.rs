@@ -278,22 +278,18 @@ pub async fn create_signed_commitment<T>(
 		slasher: request.slasher,
 	};
 
-	// 4. ABI-encode the commitment
-	let encoded_commitment = commitment.abi_encode()?;
-	debug!("ABI-encoded Commitment: {:?}", encoded_commitment);
+	// 4. Get the object root
+	let message_hash = commitment.to_message_hash()?;
+	debug!("Object root: {:?}", message_hash);
 
-	// 5. Keccak256 hash the encoded commitment
-	let commitment_hash = keccak256(&encoded_commitment);
-	debug!("Keccak256 hash: {:?}", commitment_hash);
-
-	// 6. Call the proxy_ecdsa signer
+	// 5. Call the proxy_ecdsa signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
-		signer::call_proxy_ecdsa_signer(&mut *commit_config, commitment_hash, committer_address).await?
+		signer::call_proxy_ecdsa_signer(&mut *commit_config, message_hash, committer_address).await?
 	};
 	debug!("Received response from proxy_ecdsa: {:?}", response);
 
-	// 7. Construct the SignedCommitment
+	// 6. Construct the SignedCommitment
 	let signed_commitment = SignedCommitment {
 		commitment,
 		nonce: response.nonce,
@@ -312,12 +308,7 @@ pub fn verify_commitment_signature(
 	expected_signer: &Address,
 ) -> Result<bool> {
 	debug!("Verifying commitment signature");
-
-	// ABI encode the commitment
-	let encoded_data = commitment.abi_encode()?;
-
-	// Recover the signer from the signature
-	let message_hash = alloy::primitives::keccak256(&encoded_data);
+	let message_hash = commitment.to_message_hash()?;
 	let recovered_address =
 		signature.recover_address_from_prehash(&message_hash).wrap_err("Failed to recover address from signature")?;
 

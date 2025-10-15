@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, B256, Bytes, U256};
+use alloy::primitives::{Address, B256, Bytes};
 use alloy::sol_types::SolValue;
 use alloy_primitives::keccak256;
 use eyre::Result;
@@ -10,23 +10,7 @@ use commit_boost::prelude::{BlsPublicKey, BlsSignature};
 use urc::i_registry::BLS::{G1Point, G2Point};
 use urc::i_registry::ISlasher::Delegation as SolDelegation;
 
-/// Binding of the MessageType enum, defined here:
-/// https://github.com/eth-fabric/urc/blob/304e59f967dd8fdf4342c2f776f789e7c99b8ef9/src/IRegistry.sol#L99
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum MessageType {
-	Reserved = 0,
-	Registration = 1,
-	Delegation = 2,
-	Commitment = 3,
-	Constraints = 4,
-}
-
-impl MessageType {
-	pub fn to_uint256(self) -> U256 {
-		U256::from(self as u64)
-	}
-}
+use super::MessageType;
 
 /// A constraint with its type and payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,7 +30,7 @@ pub struct Delegation {
 
 impl Delegation {
 	/// ABI-encodes the ConstraintsMessage struct
-	pub fn to_object_root(&self) -> Result<B256> {
+	pub fn to_message_hash(&self) -> Result<B256> {
 		// Convert the pubkeys to G1 points
 		let proposer = convert_pubkey_to_g1_point(&self.proposer).map_err(|e| {
 			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.proposer.as_hex_string());
@@ -95,7 +79,7 @@ pub struct ConstraintsMessage {
 
 impl ConstraintsMessage {
 	/// ABI-encodes the ConstraintsMessage struct
-	pub fn to_object_root(&self) -> Result<B256> {
+	pub fn to_message_hash(&self) -> Result<B256> {
 		alloy::sol! {
 			struct SolConstraint {
 				uint64 constraintType;
@@ -227,7 +211,7 @@ pub fn convert_fp_to_uint256_pair(fp: &blst_fp) -> (B256, B256) {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use alloy::primitives::{Bytes, hex};
+	use alloy::primitives::{Bytes, U256, hex};
 
 	// Local implementation to avoid cb-common dependency
 	fn bls_pubkey_from_hex(hex_str: &str) -> BlsPublicKey {
@@ -249,7 +233,7 @@ mod tests {
 	}
 
 	#[test]
-	fn test_delegation_to_object_root() {
+	fn test_delegation_to_message_hash() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
 		);
@@ -265,13 +249,13 @@ mod tests {
 			slot: 5,
 			metadata: Bytes::from("some-metadata-here"),
 		};
-		let object_root = delegation.to_object_root().unwrap();
-		let expected_root = hex!("0xcd9aca062121f6f50df1bfd7e74e2b023a5a0d9e1387447568a2119db5022e1b");
-		assert_eq!(object_root, expected_root);
+		let message_hash = delegation.to_message_hash().unwrap();
+		let expected_hash = hex!("0xcd9aca062121f6f50df1bfd7e74e2b023a5a0d9e1387447568a2119db5022e1b");
+		assert_eq!(message_hash, expected_hash);
 	}
 
 	#[test]
-	fn test_constraints_message_to_object_root() {
+	fn test_constraints_message_to_message_hash() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
 		);
@@ -295,9 +279,9 @@ mod tests {
 			receivers: receivers,
 		};
 
-		let object_root = constraints_message.to_object_root().unwrap();
-		let expected_root = hex!("b27bb26406c8fe6cf9e5bb1723d7dd2b06e4d32efc0cb0419dc57cc6c4b0ca87");
-		assert_eq!(object_root, expected_root);
+		let message_hash = constraints_message.to_message_hash().unwrap();
+		let expected_hash = hex!("b27bb26406c8fe6cf9e5bb1723d7dd2b06e4d32efc0cb0419dc57cc6c4b0ca87");
+		assert_eq!(message_hash, expected_hash);
 	}
 
 	#[test]

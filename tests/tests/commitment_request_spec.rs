@@ -583,12 +583,11 @@ mod test_cases {
 			request_hash: alloy::primitives::keccak256(commitment_request.abi_encode()?),
 			slasher: commitment_request.slasher.clone(),
 		};
-
-		let message_hash = alloy::primitives::keccak256(commitment.abi_encode()?);
+		let message_hash = commitment.to_message_hash()?;
 		assert_eq!(
 			message_hash,
 			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
-				"0xded4394f844c5beaa81ce97f66016bb248871966d82bb8379d95ca78184dd650"
+				"0x310fefd12df340a4d723608aec3e7471ced2abe290a9458a5ba1832b9fc84653"
 			))
 		);
 
@@ -610,7 +609,7 @@ mod test_cases {
 		assert_eq!(
 			object_root,
 			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
-				"0x29021fb11398cbbcb8d3dac39847d8c2213cb7f696b1c0c571e77ce9de2ed0c7"
+				"0xfa3897cac4616ff1f5d3a698ebd827d267e460aaa20b8a6a3c8e46c7c01f455d"
 			))
 		);
 
@@ -618,13 +617,13 @@ mod test_cases {
 		assert_eq!(
 			signing_root,
 			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
-				"0x80575c16b5bcddf841dd3f51b93cc175554e03555479ee4b6e3363a8fff432b9"
+				"0x90447b3fac12f371cbb8aa2e1527f2abda7576cd618244c005cdb3c0d63e8a7b"
 			))
 		);
 
 		let signature = local_signer.sign_hash_sync(&signing_root)?;
 
-		assert_eq!(signature.to_string(), "0x22cd56d133231753fc522d2dbc7bf32357230c07cd791632536945b566dd58e442e73a48e7c7a896229b027d3833e455a20d452bd204ead62a09bfd270cae9ee1c".to_string());
+		assert_eq!(signature.to_string(), "0xf59f6fbee040a98021f55b8aaff8eecd4f1c1c9723ef7b5b9d09a0c0835bf94e20d90fc12a203bb9fcf81f7e838806bd3e67b82802d0bcd842163bd37c2cce581b".to_string());
 
 		Ok(())
 	}

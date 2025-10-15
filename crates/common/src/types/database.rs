@@ -74,7 +74,7 @@ impl DatabaseContext {
 	fn calculate_signed_constraints_id(
 		signed_constraints: &crate::types::constraints::SignedConstraints,
 	) -> Result<B256> {
-		Ok(signed_constraints.message.to_object_root()?)
+		Ok(signed_constraints.message.to_message_hash()?)
 	}
 
 	/// Store a key-value pair in the database

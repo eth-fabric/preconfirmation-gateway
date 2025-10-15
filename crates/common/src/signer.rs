@@ -5,7 +5,7 @@ use commit_boost::prelude::{
 		request::SignProxyRequest,
 		response::{BlsSignResponse, EcdsaSignResponse},
 	},
-	verify_proposer_commitment_signature_ecdsa_for_message,
+	verify_proposer_commitment_signature_bls_for_message, verify_proposer_commitment_signature_ecdsa_for_message,
 };
 use eyre::{Result, WrapErr};
 use tracing::{debug, error, info};
@@ -15,12 +15,12 @@ use crate::constants::SIGNING_ID;
 /// Calls the proxy_ecdsa signer to sign a hash
 pub async fn call_proxy_ecdsa_signer<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
-	commitment_hash: B256,
+	message_hash: B256,
 	committer: Address,
 ) -> Result<EcdsaSignResponse> {
-	debug!("Calling proxy_ecdsa signer for commitment hash: {:?}", commitment_hash);
+	debug!("Calling proxy_ecdsa signer for message hash: {:?}", message_hash);
 
-	let proxy_request_ecdsa = SignProxyRequest::builder(committer).with_root(commitment_hash);
+	let proxy_request_ecdsa = SignProxyRequest::builder(committer).with_root(message_hash);
 
 	// Make the actual API call to the signer service
 	let proxy_response_ecdsa = commit_config
@@ -32,7 +32,7 @@ pub async fn call_proxy_ecdsa_signer<T>(
 	match verify_proposer_commitment_signature_ecdsa_for_message(
 		commit_config.chain,
 		&committer,
-		&commitment_hash,
+		&message_hash,
 		&proxy_response_ecdsa.signature,
 		&SIGNING_ID,
 		proxy_response_ecdsa.nonce,
@@ -47,12 +47,12 @@ pub async fn call_proxy_ecdsa_signer<T>(
 /// Calls the proxy_bls signer to sign a hash
 pub async fn call_proxy_bls_signer<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
-	constraints_hash: B256,
+	message_hash: B256,
 	bls_public_key: BlsPublicKey,
 ) -> Result<BlsSignResponse> {
-	debug!("Calling proxy_bls signer for constraints hash: {:?}", constraints_hash);
+	debug!("Calling proxy_bls signer for message hash: {:?}", message_hash);
 
-	let proxy_request_bls = SignProxyRequest::builder(bls_public_key).with_root(constraints_hash);
+	let proxy_request_bls = SignProxyRequest::builder(bls_public_key.clone()).with_root(message_hash);
 
 	// Make the actual API call to the signer service
 	let proxy_response_bls = commit_config
@@ -61,11 +61,17 @@ pub async fn call_proxy_bls_signer<T>(
 		.await
 		.wrap_err("Failed to request proxy BLS signature from signer service")?;
 
-	// Note: BLS signature verification would be different from ECDSA
-	// For now, we'll log the response without verification
-	// TODO: Add BLS signature verification when available
-	// todo use verify_proposer_commitment_signature_bls_for_data
-	info!("BLS signature received (verification pending)");
+	match verify_proposer_commitment_signature_bls_for_message(
+		commit_config.chain,
+		&bls_public_key,
+		&message_hash,
+		&proxy_response_bls.signature,
+		&SIGNING_ID,
+		proxy_response_bls.nonce,
+	) {
+		true => info!("Signature verified successfully"),
+		false => error!("Signature verification failed"),
+	};
 
 	Ok(proxy_response_bls)
 }

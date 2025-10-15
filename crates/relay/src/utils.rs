@@ -7,9 +7,9 @@ use tracing::{debug, error, info};
 pub fn verify_constraints_signature(signed_constraints: &SignedConstraints, chain: Chain) -> Result<bool> {
 	debug!("Verifying constraints signature");
 
-	// Get the object root for signature verification
-	let object_root = signed_constraints.message.to_object_root()?;
-	debug!("DEBUG: Object root: {:?}", object_root);
+	// Get the message hash for signature verification
+	let message_hash = signed_constraints.message.to_message_hash()?;
+	debug!("DEBUG: Message hash: {:?}", message_hash);
 
 	// Use the delegate public key from the message for verification
 	let delegate_public_key = &signed_constraints.message.delegate;
@@ -19,7 +19,7 @@ pub fn verify_constraints_signature(signed_constraints: &SignedConstraints, chai
 	let is_valid = verify_proposer_commitment_signature_bls_for_message(
 		chain,
 		delegate_public_key,
-		&object_root,
+		&message_hash,
 		&signed_constraints.signature,
 		&signed_constraints.signing_id,
 		signed_constraints.nonce,
@@ -40,8 +40,8 @@ pub fn verify_constraints_signature(signed_constraints: &SignedConstraints, chai
 pub fn verify_delegation_signature(signed_delegation: &SignedDelegation, chain: Chain) -> Result<bool> {
 	debug!("Verifying delegation signature");
 
-	// Get the object root for signature verification
-	let _object_root = signed_delegation.message.to_object_root()?;
+	// Get the message hash for signature verification
+	let message_hash = signed_delegation.message.to_message_hash()?;
 
 	// Use the proposer public key from the message for verification
 	let proposer_public_key = &signed_delegation.message.proposer;
@@ -50,7 +50,7 @@ pub fn verify_delegation_signature(signed_delegation: &SignedDelegation, chain: 
 	let is_valid = verify_proposer_commitment_signature_bls_for_message(
 		chain,
 		proposer_public_key,
-		&signed_delegation.message.to_object_root()?,
+		&message_hash,
 		&signed_delegation.signature,
 		&signed_delegation.signing_id,
 		signed_delegation.nonce,

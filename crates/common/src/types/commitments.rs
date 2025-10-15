@@ -1,7 +1,10 @@
 use alloy::primitives::{Address, B256, Bytes, Signature};
 use alloy::sol_types::SolValue;
+use alloy_primitives::keccak256;
 use eyre::{Result, WrapErr};
 use serde::{Deserialize, Serialize};
+
+use super::MessageType;
 
 /// Payload for commitments/constraints
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,6 +143,29 @@ impl Commitment {
 			request_hash: decoded.request_hash,
 			slasher: decoded.slasher,
 		})
+	}
+
+	pub fn to_message_hash(&self) -> Result<B256> {
+		alloy::sol! {
+			struct SolCommitment {
+				uint64 commitment_type;
+				bytes payload;
+				bytes32 request_hash;
+				address slasher;
+			}
+		}
+
+		let commitment_evm = SolCommitment {
+			commitment_type: self.commitment_type,
+			payload: self.payload.clone(),
+			request_hash: self.request_hash,
+			slasher: self.slasher,
+		};
+
+		let message_type = MessageType::Commitment.to_uint256();
+		let encoded = (message_type, commitment_evm).abi_encode_params(); // Rust equivalent of abi.encode(message_type, commitment) in Solidity
+		let object_root = keccak256(encoded);
+		Ok(object_root)
 	}
 }
 
