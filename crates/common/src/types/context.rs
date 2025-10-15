@@ -1,4 +1,4 @@
-use crate::SlotTimer;
+use crate::slot_timer::SlotTimer;
 use crate::types::database::DatabaseContext;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
 use std::sync::Arc;

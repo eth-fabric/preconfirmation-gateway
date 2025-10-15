@@ -25,6 +25,7 @@ eyre = { workspace = true }
 
 # BLS and crypto
 commit-boost = { workspace = true }
+cb-common = { workspace = true }
 
 # Alloy for primitives
 alloy = { workspace = true }

@@ -124,6 +124,8 @@ impl CommitmentRequestTestHarness {
 
 /// Test cases for different scenarios
 mod test_cases {
+	use commit_boost::prelude::tree_hash::TreeHash;
+
 	use super::*;
 
 	#[tokio::test]
@@ -557,6 +559,73 @@ mod test_cases {
 		}
 
 		println!("Successfully verified {} constraints were saved for slot {}", slot_constraints.len(), slot);
+		Ok(())
+	}
+
+	#[test]
+	/// The expected ecdsa signature for a commitment request
+	fn test_fixed_sign_commitment_request() -> eyre::Result<()> {
+		use alloy::signers::{SignerSync, local::PrivateKeySigner};
+		let local_signer = PrivateKeySigner::from_bytes(&alloy::primitives::B256::from_slice(
+			&alloy::primitives::bytes!("0x0501e85d5bc2e95f70efda47409710a7cf01dd02ff238e3efec679b27331d917"),
+		))
+		.unwrap();
+
+		let commitment_request = CommitmentRequest {
+			commitment_type: 1,
+			payload: alloy_primitives::Bytes::new(),
+			slasher: alloy_primitives::Address::repeat_byte(0x11),
+		};
+
+		let commitment = common::Commitment {
+			commitment_type: 1,
+			payload: commitment_request.payload.clone(),
+			request_hash: alloy::primitives::keccak256(commitment_request.abi_encode()?),
+			slasher: commitment_request.slasher.clone(),
+		};
+
+		let message_hash = alloy::primitives::keccak256(commitment.abi_encode()?);
+		assert_eq!(
+			message_hash,
+			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
+				"0xded4394f844c5beaa81ce97f66016bb248871966d82bb8379d95ca78184dd650"
+			))
+		);
+
+		let module_signing_id = alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
+			"0xcb005700fab121c00ccbc94db58c04675b7847c38f9583815139d1d98bea0cb0"
+		));
+
+		let domain = alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
+			"0x6d6d6f43719103511efa4f1362ff2a50996cccf329cc84cb410c5e5c7d351d03"
+		));
+
+		let object_root = cb_common::types::PropCommitSigningInfo {
+			data: message_hash,
+			module_signing_id: module_signing_id,
+			nonce: u64::MAX - 1,
+			chain_id: cb_common::types::Chain::Hoodi.id(),
+		}
+		.tree_hash_root();
+		assert_eq!(
+			object_root,
+			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
+				"0x29021fb11398cbbcb8d3dac39847d8c2213cb7f696b1c0c571e77ce9de2ed0c7"
+			))
+		);
+
+		let signing_root = cb_common::types::SigningData { object_root, signing_domain: domain }.tree_hash_root();
+		assert_eq!(
+			signing_root,
+			alloy::primitives::B256::from_slice(&alloy::primitives::bytes!(
+				"0x80575c16b5bcddf841dd3f51b93cc175554e03555479ee4b6e3363a8fff432b9"
+			))
+		);
+
+		let signature = local_signer.sign_hash_sync(&signing_root)?;
+
+		assert_eq!(signature.to_string(), "0x22cd56d133231753fc522d2dbc7bf32357230c07cd791632536945b566dd58e442e73a48e7c7a896229b027d3833e455a20d452bd204ead62a09bfd270cae9ee1c".to_string());
+
 		Ok(())
 	}
 }

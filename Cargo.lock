@@ -5522,6 +5522,7 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "axum 0.8.6",
+ "cb-common",
  "chrono",
  "commit-boost",
  "common",

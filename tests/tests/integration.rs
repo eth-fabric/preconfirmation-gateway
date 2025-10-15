@@ -1,5 +1,5 @@
 use alloy::primitives::B256;
-use common::SlotTimer;
+use common::slot_timer::SlotTimer;
 use common::types::{CommitmentRequest, SignedCommitment};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
@@ -104,7 +104,7 @@ impl TestEnvironment {
 		let committer_address = proxy_address.message.proxy;
 
 		// Create test slots relative to current time
-		let slot_timer = common::SlotTimer::new(1606824023);
+		let slot_timer = SlotTimer::new(1606824023);
 		let current_slot = slot_timer.get_current_slot();
 		let test_slots: Vec<u64> = (current_slot..current_slot + 10).collect();
 

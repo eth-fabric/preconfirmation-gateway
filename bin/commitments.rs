@@ -2,7 +2,8 @@ use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::server;
 use common::db::DatabaseType;
-use common::{SlotTimer, config, db, types};
+use common::slot_timer::SlotTimer;
+use common::{config, db, types};
 use eyre;
 
 #[tokio::main]

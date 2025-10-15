@@ -5,8 +5,8 @@ use cb_common::{
 	types::{Jwt, ModuleId},
 };
 use commit_boost::prelude::StartCommitModuleConfig;
-use common::SlotTimer;
 use common::config::InclusionPreconfConfig;
+use common::slot_timer::SlotTimer;
 use common::types::commitments::InclusionPayload;
 use common::types::{Commitment, CommitmentRequest, DatabaseContext, RpcContext, SignedCommitment};
 use eyre::Result;

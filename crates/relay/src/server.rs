@@ -11,12 +11,12 @@ use tower_http::{
 use tracing::info;
 
 use crate::config::RelayConfig;
-use crate::database::RelayDatabase;
 use crate::handlers::{
 	capabilities_handler, get_constraints_for_slot_handler, get_delegations_handler, health_handler,
 	store_constraints_handler, store_delegation_handler, RelayState,
 };
 use common::constants::routes::{constraints, relay};
+use common::types::database::DatabaseContext;
 
 /// Setup logging for the relay server
 pub fn setup_logging(log_level: &str) -> eyre::Result<()> {
@@ -37,8 +37,13 @@ pub fn setup_logging(log_level: &str) -> eyre::Result<()> {
 pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 	info!("Starting relay server on port {}", config.relay.port);
 
-	// Create database
-	let database = Arc::new(RelayDatabase::new(&config.relay.database_path)?);
+	// Create database using common infrastructure with local path
+	let mut opts = rocksdb::Options::default();
+	opts.create_if_missing(true);
+	opts.create_missing_column_families(true);
+
+	let db = Arc::new(rocksdb::DB::open(&opts, &config.relay.database_path)?);
+	let database = Arc::new(DatabaseContext::new(db));
 	info!("Database initialized at {:?}", config.relay.database_path);
 
 	// Create shared state
@@ -81,6 +86,7 @@ mod tests {
 				database_path: temp_dir.path().join("test_db"),
 				log_level: "debug".to_string(),
 				constraint_capabilities: vec![1],
+				chain: commit_boost::prelude::Chain::Hoodi,
 			},
 			storage: crate::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

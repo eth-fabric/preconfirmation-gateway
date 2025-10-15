@@ -4,7 +4,7 @@ pub mod coordinator;
 pub mod delegations;
 pub mod pricer;
 
-pub use common::SlotTimer;
+pub use common::slot_timer::SlotTimer;
 pub use config::SchedulerConfig;
 pub use constraints::ConstraintsTask;
 pub use coordinator::TaskCoordinator;

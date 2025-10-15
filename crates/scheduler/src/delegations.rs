@@ -4,8 +4,8 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use common::config::InclusionPreconfConfig;
+use common::slot_timer::SlotTimer;
 use common::types::DatabaseContext;
-use common::SlotTimer;
 use constraints::{parse_bls_public_key, process_delegations};
 
 /// Configuration for the delegation task

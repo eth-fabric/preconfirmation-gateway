@@ -58,10 +58,23 @@ impl DatabaseContext {
 		format!("constraint_posted:{}", slot)
 	}
 
+	/// Helper function to format signed constraints key
+	fn format_signed_constraints_key(slot: u64, constraint_id: &B256) -> String {
+		format!("signed_constraints:{}:{}", slot, constraint_id)
+	}
+
 	/// Helper function to calculate constraint ID from request hash
 	/// This is used when storing constraints that are derived from commitment requests
 	fn calculate_constraint_id_from_request_hash(request_hash: &B256) -> B256 {
 		*request_hash // For now, we use the request hash as the constraint ID
+	}
+
+	/// Helper function to calculate constraint ID from request hash
+	/// This is used when storing constraints that are derived from commitment requests
+	fn calculate_signed_constraints_id(
+		signed_constraints: &crate::types::constraints::SignedConstraints,
+	) -> Result<B256> {
+		Ok(signed_constraints.message.to_object_root()?)
 	}
 
 	/// Store a key-value pair in the database
@@ -376,6 +389,44 @@ impl DatabaseContext {
 			}
 			None => Ok(None),
 		}
+	}
+
+	/// Store signed constraints in the database
+	pub fn store_signed_constraints(
+		&self,
+		signed_constraints: &crate::types::constraints::SignedConstraints,
+	) -> Result<()> {
+		let constraint_id = Self::calculate_signed_constraints_id(signed_constraints)?;
+		let key = Self::format_signed_constraints_key(signed_constraints.message.slot, &constraint_id);
+		let value = serde_json::to_vec(signed_constraints)?;
+		self.put(key.as_bytes(), &value)
+	}
+
+	/// Get all signed constraints for a specific slot
+	pub fn get_signed_constraints_for_slot(
+		&self,
+		slot: u64,
+	) -> Result<Vec<crate::types::constraints::SignedConstraints>> {
+		let prefix = format!("signed_constraints:{}:", slot);
+		let mut signed_constraints = Vec::new();
+
+		// Use prefix iteration for O(1) performance instead of full table scan
+		let iter = self.db.iterator(rocksdb::IteratorMode::From(prefix.as_bytes(), rocksdb::Direction::Forward));
+
+		for item in iter {
+			let (key, value) = item?;
+			let key_str = String::from_utf8(key.to_vec())?;
+
+			// Stop iteration when we're past the prefix
+			if !key_str.starts_with(&prefix) {
+				break;
+			}
+
+			// Deserialize the signed constraints
+			let signed_constraints_item: crate::types::constraints::SignedConstraints = serde_json::from_slice(&value)?;
+			signed_constraints.push(signed_constraints_item);
+		}
+		Ok(signed_constraints)
 	}
 }
 

@@ -1,4 +1,4 @@
-use common::SlotTimer;
+use common::slot_timer::SlotTimer;
 use eyre::Result;
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};

@@ -1,27 +1,31 @@
-use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey};
+use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey, Chain};
 use common::types::{ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation};
 use eyre::Result;
 use tracing::{debug, error, info};
 
 /// Verify BLS signature on a SignedConstraints message using the delegate public key from the message
-pub fn verify_constraints_signature(signed_constraints: &SignedConstraints) -> Result<bool> {
+pub fn verify_constraints_signature(signed_constraints: &SignedConstraints, chain: Chain) -> Result<bool> {
 	debug!("Verifying constraints signature");
 
 	// Get the object root for signature verification
-	let _object_root = signed_constraints.message.to_object_root()?;
+	let object_root = signed_constraints.message.to_object_root()?;
+	debug!("DEBUG: Object root: {:?}", object_root);
 
 	// Use the delegate public key from the message for verification
 	let delegate_public_key = &signed_constraints.message.delegate;
+	debug!("DEBUG: Delegate public key: {:?}", hex::encode(delegate_public_key.serialize()));
 
 	// Use the existing commit-boost BLS verification function
 	let is_valid = verify_proposer_commitment_signature_bls_for_message(
-		commit_boost::prelude::Chain::Mainnet, // TODO: Make this configurable
+		chain,
 		delegate_public_key,
-		&signed_constraints.message.to_object_root()?,
+		&object_root,
 		&signed_constraints.signature,
 		&signed_constraints.signing_id,
 		signed_constraints.nonce,
 	);
+
+	debug!("DEBUG: Signature verification result: {}", is_valid);
 
 	if is_valid {
 		info!("Constraints signature verification successful");
@@ -33,7 +37,7 @@ pub fn verify_constraints_signature(signed_constraints: &SignedConstraints) -> R
 }
 
 /// Verify BLS signature on a SignedDelegation message using the proposer public key from the message
-pub fn verify_delegation_signature(signed_delegation: &SignedDelegation) -> Result<bool> {
+pub fn verify_delegation_signature(signed_delegation: &SignedDelegation, chain: Chain) -> Result<bool> {
 	debug!("Verifying delegation signature");
 
 	// Get the object root for signature verification
@@ -44,7 +48,7 @@ pub fn verify_delegation_signature(signed_delegation: &SignedDelegation) -> Resu
 
 	// Use the existing commit-boost BLS verification function
 	let is_valid = verify_proposer_commitment_signature_bls_for_message(
-		commit_boost::prelude::Chain::Mainnet, // TODO: Make this configurable
+		chain,
 		proposer_public_key,
 		&signed_delegation.message.to_object_root()?,
 		&signed_delegation.signature,
@@ -74,6 +78,8 @@ pub fn validate_constraints_message(constraints_message: &ConstraintsMessage) ->
 			return Ok(false);
 		}
 	}
+
+	// TODO: Add more validation logic
 
 	Ok(true)
 }

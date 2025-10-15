@@ -4,8 +4,8 @@ use tracing::{error, info, warn};
 
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::config::InclusionPreconfConfig;
+use common::slot_timer::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
 use common::types::DatabaseContext;
-use common::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
 use constraints::process_constraints;
 use std::sync::Arc;
 use tokio::sync::Mutex;

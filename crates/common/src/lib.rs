@@ -8,7 +8,6 @@ pub mod utils;
 
 // Re-export commonly used types and functions for easier access
 pub use db::{DatabaseType, create_database, db_healthcheck};
-pub use slot_timer::{CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS, SlotTimer};
 pub use types::{
 	Commitment, CommitmentRequest, DatabaseContext, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse,
 };

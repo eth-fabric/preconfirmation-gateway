@@ -1,4 +1,5 @@
 use axum::{extract::Path, extract::State, http::HeaderMap, http::StatusCode, response::Json};
+use commit_boost::prelude::verify_proposer_commitment_signature_bls_for_message;
 use common::types::{
 	ConstraintCapabilities, GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse,
 	SignedConstraints, SignedDelegation,
@@ -7,16 +8,19 @@ use hex;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 
-use crate::database::RelayDatabase;
 use crate::utils::{
 	validate_constraints_message, validate_delegation_message, validate_is_proposer, verify_constraints_signature,
 	verify_delegation_signature,
 };
+use common::types::database::DatabaseContext;
 
-/// Extract and parse BLS signature and public key from headers
+/// Extract and parse BLS signature, public key, nonce, and signing_id from headers
 fn extract_bls_auth_headers(
 	headers: &HeaderMap,
-) -> Result<(commit_boost::prelude::BlsPublicKey, commit_boost::prelude::BlsSignature), StatusCode> {
+) -> Result<
+	(commit_boost::prelude::BlsPublicKey, commit_boost::prelude::BlsSignature, u64, alloy::primitives::B256),
+	StatusCode,
+> {
 	// Extract required headers
 	let signature_header = headers.get("X-Receiver-Signature").ok_or_else(|| {
 		error!("Missing X-Receiver-Signature header");
@@ -25,6 +29,16 @@ fn extract_bls_auth_headers(
 
 	let public_key_header = headers.get("X-Receiver-PublicKey").ok_or_else(|| {
 		error!("Missing X-Receiver-PublicKey header");
+		StatusCode::BAD_REQUEST
+	})?;
+
+	let nonce_header = headers.get("X-Receiver-Nonce").ok_or_else(|| {
+		error!("Missing X-Receiver-Nonce header");
+		StatusCode::BAD_REQUEST
+	})?;
+
+	let signing_id_header = headers.get("X-Receiver-SigningId").ok_or_else(|| {
+		error!("Missing X-Receiver-SigningId header");
 		StatusCode::BAD_REQUEST
 	})?;
 
@@ -59,13 +73,44 @@ fn extract_bls_auth_headers(
 		StatusCode::BAD_REQUEST
 	})?;
 
-	Ok((public_key, bls_signature))
+	// Parse nonce
+	let nonce_str = nonce_header.to_str().map_err(|_| {
+		error!("Invalid X-Receiver-Nonce header");
+		StatusCode::BAD_REQUEST
+	})?;
+
+	let nonce = nonce_str.parse::<u64>().map_err(|e| {
+		error!("Invalid nonce format: {}", e);
+		error!("Nonce string: {}", nonce_str);
+		StatusCode::BAD_REQUEST
+	})?;
+
+	// Parse signing_id
+	let signing_id_str = signing_id_header.to_str().map_err(|_| {
+		error!("Invalid X-Receiver-SigningId header");
+		StatusCode::BAD_REQUEST
+	})?;
+
+	let signing_id_hex = signing_id_str.strip_prefix("0x").unwrap_or(signing_id_str);
+	let signing_id_bytes = hex::decode(signing_id_hex).map_err(|e| {
+		error!("Invalid signing_id hex: {}", e);
+		StatusCode::BAD_REQUEST
+	})?;
+
+	if signing_id_bytes.len() != 32 {
+		error!("Invalid signing_id length: expected 32 bytes, got {}", signing_id_bytes.len());
+		return Err(StatusCode::BAD_REQUEST);
+	}
+
+	let signing_id = alloy::primitives::B256::from_slice(&signing_id_bytes);
+
+	Ok((public_key, bls_signature, nonce, signing_id))
 }
 
 /// Shared state for relay handlers
 #[derive(Clone)]
 pub struct RelayState {
-	pub database: Arc<RelayDatabase>,
+	pub database: Arc<DatabaseContext>,
 	pub config: crate::config::RelayConfig,
 }
 
@@ -98,7 +143,7 @@ pub async fn store_delegation_handler(
 	}
 
 	// Verify BLS signature using the proposer public key from the message
-	match verify_delegation_signature(&delegation) {
+	match verify_delegation_signature(&delegation, state.config.relay.chain) {
 		Ok(true) => {
 			info!("Delegation signature verification successful");
 		}
@@ -228,7 +273,7 @@ pub async fn store_constraints_handler(
 	}
 
 	// Verify BLS signature using the delegate public key from the message
-	match verify_constraints_signature(&signed_constraints) {
+	match verify_constraints_signature(&signed_constraints, state.config.relay.chain) {
 		Ok(true) => {
 			info!("Constraints signature verification successful");
 		}
@@ -248,16 +293,21 @@ pub async fn store_constraints_handler(
 		}
 	}
 
-	// Store constraints in database
-	let constraint_id = format!("constraint_{}", chrono::Utc::now().timestamp_millis());
-	match state.database.store_constraint(signed_constraints.message.slot, &constraint_id, &signed_constraints) {
+	// Store signed constraints in database
+	match state.database.store_signed_constraints(&signed_constraints) {
 		Ok(_) => {
-			info!("Constraints stored successfully for slot {}", signed_constraints.message.slot);
-			Ok(Json(PostConstraintsResponse { success: true, message: "Constraints stored successfully".to_string() }))
+			info!("Signed constraints stored successfully for slot {}", signed_constraints.message.slot);
+			Ok(Json(PostConstraintsResponse {
+				success: true,
+				message: "Signed constraints stored successfully".to_string(),
+			}))
 		}
 		Err(e) => {
-			error!("Failed to store constraints: {}", e);
-			Ok(Json(PostConstraintsResponse { success: false, message: format!("Failed to store constraints: {}", e) }))
+			error!("Failed to store signed constraints: {}", e);
+			Ok(Json(PostConstraintsResponse {
+				success: false,
+				message: format!("Failed to store signed constraints: {}", e),
+			}))
 		}
 	}
 }
@@ -272,50 +322,68 @@ pub async fn get_constraints_for_slot_handler(
 	info!("Handler called with slot: {}", slot);
 	info!("Headers count: {}", headers.len());
 
-	// Extract and parse BLS signature and public key from headers
-	let (public_key, bls_signature) = extract_bls_auth_headers(&headers)?;
+	// Extract and parse BLS signature, public key, nonce, and signing_id from headers
+	let (public_key, bls_signature, nonce, signing_id) = extract_bls_auth_headers(&headers)?;
 
-	// For now, we'll use a simplified signature verification approach
-	// In a production system, you would implement proper BLS signature verification
-	// over the slot number as specified in the requirements
+	// Compute slot hash for signature verification
+	let slot_hash = alloy::primitives::keccak256(slot.to_string().as_bytes());
 
-	// Create a simple hash of the slot for verification
-	let slot_str = slot.to_string();
-	let slot_hash = alloy::primitives::keccak256(slot_str.as_bytes());
-
-	// Verify caller's signature against the slot hash
-	let is_valid = bls_signature.verify(&public_key, slot_hash);
+	// Verify caller's signature against the slot hash using standardized commit-boost verification
+	let is_valid = verify_proposer_commitment_signature_bls_for_message(
+		state.config.relay.chain,
+		&public_key,
+		&slot_hash,
+		&bls_signature,
+		&signing_id,
+		nonce,
+	);
 
 	// Debug output
-	info!("Signature verification for slot {}: {}", slot, is_valid);
-	info!("Public key: {:?}", public_key.serialize());
-	info!("Signature: {:?}", bls_signature.serialize());
-	info!("Slot hash: {:?}", slot_hash);
+	println!("DEBUG: Slot: {}", slot);
+	println!("DEBUG: Slot hash: {:?}", slot_hash);
+	println!("DEBUG: Public key: {:?}", public_key.serialize());
+	println!("DEBUG: Signature: {:?}", bls_signature.serialize());
+	println!("DEBUG: Nonce: {}", nonce);
+	println!("DEBUG: Signing ID: {:?}", signing_id);
+	println!("DEBUG: Signature verification result: {}", is_valid);
 
 	if !is_valid {
 		error!("Invalid BLS signature for slot {}", slot);
 		return Err(StatusCode::BAD_REQUEST);
 	}
 
-	// Get constraints from database
-	let constraints = match state.database.get_constraints_for_slot(slot) {
-		Ok(constraints) => constraints,
+	// Get signed constraints from database
+	let signed_constraints = match state.database.get_signed_constraints_for_slot(slot) {
+		Ok(constraints) => {
+			println!("DEBUG: Retrieved {} signed constraints from database for slot {}", constraints.len(), slot);
+			constraints
+		}
 		Err(e) => {
-			error!("Failed to get constraints for slot {}: {}", slot, e);
+			error!("Failed to get signed constraints for slot {}: {}", slot, e);
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 	};
 
 	// Filter constraints where the public key is in the receivers list
+	// If receivers list is empty, allow access to all constraints (public endpoint)
 	let mut authorized_constraints = Vec::new();
-	for constraint in constraints {
-		// Check if the public key is in any of the receivers lists
-		let is_authorized = constraint.message.receivers.iter().any(|receiver| receiver == &public_key);
-
-		if is_authorized {
-			authorized_constraints.push(constraint);
+	for signed_constraints_item in signed_constraints {
+		if signed_constraints_item.message.receivers.is_empty()
+			|| signed_constraints_item.message.receivers.iter().any(|receiver| receiver == &public_key)
+		{
+			authorized_constraints.push(signed_constraints_item);
 		}
 	}
+	// for signed_constraints_item in signed_constraints {
+	// 	let is_authorized = if signed_constraints_item.message.receivers.is_empty() {
+	// 		true
+	// 	} else {
+	// 		signed_constraints_item.message.receivers.iter().any(|receiver| receiver == &public_key)
+	// 	};
+	// 	if is_authorized {
+	// 		authorized_constraints.push(signed_constraints_item);
+	// 	}
+	// }
 
 	info!("Returning {} authorized constraints for slot {}", authorized_constraints.len(), slot);
 	Ok(Json(authorized_constraints))
@@ -333,8 +401,8 @@ pub async fn capabilities_handler(State(state): State<RelayState>) -> Result<Jso
 
 /// GET /health - Health check endpoint
 pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<HealthResponse>, StatusCode> {
-	match state.database.get_health_status() {
-		Ok(_health_status) => {
+	match state.database.db_healthcheck().await {
+		Ok(_) => {
 			Ok(Json(HealthResponse { status: "healthy".to_string(), timestamp: chrono::Utc::now().timestamp() as u64 }))
 		}
 		Err(e) => {
@@ -355,10 +423,13 @@ mod tests {
 	use tempfile::TempDir;
 
 	/// Helper to create a test database
-	fn create_test_database() -> (RelayDatabase, TempDir) {
+	fn create_test_database() -> (DatabaseContext, TempDir) {
 		let temp_dir = TempDir::new().unwrap();
 		let db_path = temp_dir.path().join("test_relay.db");
-		let database = RelayDatabase::new(&db_path).unwrap();
+		let mut opts = rocksdb::Options::default();
+		opts.create_if_missing(true);
+		let db = Arc::new(rocksdb::DB::open(&opts, &db_path).unwrap());
+		let database = DatabaseContext::new(db);
 		(database, temp_dir)
 	}
 
@@ -371,6 +442,7 @@ mod tests {
 	}
 
 	/// Helper to create a test SignedConstraints
+	#[allow(dead_code)]
 	fn create_test_signed_constraints(slot: u64) -> SignedConstraints {
 		use commit_boost::prelude::BlsSignature;
 
@@ -402,18 +474,24 @@ mod tests {
 	}
 
 	#[test]
-	fn test_extract_bls_auth_headers_success() {
+	fn test_extract_bls_auth_headers_with_all_fields() {
 		// Use a valid 48-byte BLS public key
 		let public_key =
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
 		// Use a valid 96-byte BLS signature (this is a real BLS signature from commit-boost test data)
 		let signature = "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-		let headers = create_test_headers(public_key, signature);
+		let mut headers = create_test_headers(public_key, signature);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("42").unwrap());
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0202020202020202020202020202020202020202020202020202020202020202").unwrap(),
+		);
+
 		let result = extract_bls_auth_headers(&headers);
 
 		assert!(result.is_ok());
-		let (parsed_pubkey, parsed_sig) = result.unwrap();
+		let (parsed_pubkey, parsed_sig, nonce, signing_id) = result.unwrap();
 		assert_eq!(
 			parsed_pubkey.serialize().as_slice(),
 			hex::decode(public_key.strip_prefix("0x").unwrap()).unwrap().as_slice()
@@ -422,6 +500,8 @@ mod tests {
 			parsed_sig.serialize().as_slice(),
 			hex::decode(signature.strip_prefix("0x").unwrap()).unwrap().as_slice()
 		);
+		assert_eq!(nonce, 42);
+		assert_eq!(signing_id, alloy::primitives::B256::from_slice(&[0x02; 32]));
 	}
 
 	#[test]
@@ -478,68 +558,16 @@ mod tests {
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
 		let signature = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-		let headers = create_test_headers(public_key, signature);
+		let mut headers = create_test_headers(public_key, signature);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("123").unwrap());
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0303030303030303030303030303030303030303030303030303030303030303").unwrap(),
+		);
+
 		let result = extract_bls_auth_headers(&headers);
 
 		assert!(result.is_ok());
-	}
-
-	#[tokio::test]
-	async fn test_get_constraints_for_slot_handler_success() {
-		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
-
-		let slot = 12345u64;
-		let public_key =
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
-		let signature = "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505";
-
-		let headers = create_test_headers(public_key, signature);
-
-		// Store some test constraints
-		let test_constraints = create_test_signed_constraints(slot);
-		state.database.store_constraint(slot, "test_constraint_1", &test_constraints).unwrap();
-
-		let result = get_constraints_for_slot_handler(State(state), Path(slot), headers).await;
-
-		// Note: This test will fail signature verification in the current implementation
-		// because we're using a default signature. In a real test, you'd need to create
-		// a properly signed constraint with a valid BLS signature.
-		assert!(result.is_err());
-	}
-
-	#[tokio::test]
-	async fn test_get_constraints_for_slot_handler_missing_headers() {
-		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
-
-		let slot = 12345u64;
-		let headers = HeaderMap::new(); // Empty headers
-
-		let result = get_constraints_for_slot_handler(State(state), Path(slot), headers).await;
-
-		assert!(result.is_err());
-		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
-	}
-
-	#[tokio::test]
-	async fn test_get_constraints_for_slot_handler_no_constraints() {
-		let (database, _temp_dir) = create_test_database();
-		let state = RelayState { database: Arc::new(database), config: crate::config::RelayConfig::default() };
-
-		let slot = 12345u64;
-		let public_key =
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
-		let signature = "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505";
-
-		let headers = create_test_headers(public_key, signature);
-
-		// Don't store any constraints
-		let result = get_constraints_for_slot_handler(State(state), Path(slot), headers).await;
-
-		// Should return empty array even if signature verification fails
-		// because there are no constraints to return
-		assert!(result.is_err()); // Will fail due to signature verification
 	}
 
 	#[test]
@@ -548,7 +576,13 @@ mod tests {
 			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
 		let signature = "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-		let headers = create_test_headers(public_key, signature);
+		let mut headers = create_test_headers(public_key, signature);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("456").unwrap());
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0404040404040404040404040404040404040404040404040404040404040404").unwrap(),
+		);
+
 		let result = extract_bls_auth_headers(&headers);
 
 		// Should still work because the helper handles the 0x prefix
@@ -610,5 +644,146 @@ mod tests {
 
 		let capabilities = result.unwrap();
 		assert_eq!(capabilities.constraint_types, vec![1]);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_missing_nonce() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0101010101010101010101010101010101010101010101010101010101010101").unwrap(),
+		);
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_missing_signing_id() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("1337").unwrap());
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_invalid_nonce_format() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("not_a_number").unwrap());
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0101010101010101010101010101010101010101010101010101010101010101").unwrap(),
+		);
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_invalid_signing_id_format() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("1337").unwrap());
+		headers.insert("X-Receiver-SigningId", HeaderValue::from_str("not_hex").unwrap());
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_invalid_signing_id_length() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("1337").unwrap());
+		headers.insert("X-Receiver-SigningId", HeaderValue::from_str("0x0101").unwrap()); // Too short
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[test]
+	fn test_extract_bls_auth_headers_success() {
+		let mut headers = HeaderMap::new();
+		headers.insert(
+			"X-Receiver-PublicKey",
+			HeaderValue::from_str(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		);
+		headers.insert(
+			"X-Receiver-Signature",
+			HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
+		);
+		headers.insert("X-Receiver-Nonce", HeaderValue::from_str("1337").unwrap());
+		headers.insert(
+			"X-Receiver-SigningId",
+			HeaderValue::from_str("0x0101010101010101010101010101010101010101010101010101010101010101").unwrap(),
+		);
+
+		let result = extract_bls_auth_headers(&headers);
+		assert!(result.is_ok());
+		let (_, _, nonce, signing_id) = result.unwrap();
+		assert_eq!(nonce, 1337);
+		assert_eq!(signing_id, alloy::primitives::B256::from_slice(&[0x01; 32]));
 	}
 }

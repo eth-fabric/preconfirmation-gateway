@@ -1,3 +1,4 @@
+use commit_boost::prelude::Chain;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -14,6 +15,7 @@ pub struct RelayServerConfig {
 	pub database_path: PathBuf,
 	pub log_level: String,
 	pub constraint_capabilities: Vec<u64>,
+	pub chain: Chain,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +32,7 @@ impl Default for RelayConfig {
 				database_path: PathBuf::from("data/relay-rocksdb"),
 				log_level: "info".to_string(),
 				constraint_capabilities: vec![1],
+				chain: Chain::Hoodi,
 			},
 			storage: StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}
