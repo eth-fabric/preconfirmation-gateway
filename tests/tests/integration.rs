@@ -20,7 +20,7 @@ async fn test_complete_preconfirmation_workflow() {
 		.unwrap();
 
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// === STEP 1: Post delegation to relay ===
 	println!("Step 1: Posting delegation to relay...");

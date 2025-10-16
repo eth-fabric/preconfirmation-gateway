@@ -111,6 +111,7 @@ fn extract_bls_auth_headers(
 pub struct RelayState {
 	pub database: Arc<DatabaseContext>,
 	pub config: crate::config::RelayConfig,
+	pub slot_timer: common::slot_timer::SlotTimer,
 }
 
 /// POST /delegation - Store a verified delegation
@@ -121,7 +122,7 @@ pub async fn store_delegation_handler(
 	info!("Storing delegation for slot {}", delegation.message.slot);
 
 	// Validate delegation message structure
-	if validate_delegation_message(&delegation.message).is_err() {
+	if validate_delegation_message(&delegation.message, &state.slot_timer).is_err() {
 		error!("Invalid delegation message structure");
 		return StatusCode::BAD_REQUEST;
 	}
@@ -593,7 +594,8 @@ mod tests {
 	async fn test_capabilities_handler() {
 		let (database, _temp_dir) = create_test_database();
 		let config = crate::config::RelayConfig::default();
-		let state = RelayState { database: Arc::new(database), config };
+		let slot_timer = common::slot_timer::SlotTimer::new(config.relay.genesis_timestamp);
+		let state = RelayState { database: Arc::new(database), config, slot_timer };
 
 		let result = capabilities_handler(State(state)).await;
 		assert!(result.is_ok());

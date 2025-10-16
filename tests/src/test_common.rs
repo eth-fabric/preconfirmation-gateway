@@ -374,6 +374,7 @@ impl TestHarnessBuilder {
 				log_level: "info".to_string(),
 				constraint_capabilities: vec![1],
 				chain: commit_boost::prelude::Chain::Hoodi,
+				genesis_timestamp: 1742213400,
 			},
 			storage: relay::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		};
@@ -563,10 +564,9 @@ impl TestHarness {
 
 	/// Create a RelayState for relay testing
 	pub fn create_relay_state(&self) -> relay::handlers::RelayState {
-		relay::handlers::RelayState {
-			database: Arc::new(self.context.database.clone()),
-			config: relay::config::RelayConfig::default(),
-		}
+		let config = relay::config::RelayConfig::default();
+		let slot_timer = common::slot_timer::SlotTimer::new(config.relay.genesis_timestamp);
+		relay::handlers::RelayState { database: Arc::new(self.context.database.clone()), config, slot_timer }
 	}
 
 	/// Create a ClientHarness for making RPC/HTTP calls to running services

@@ -46,8 +46,11 @@ pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 	let database = Arc::new(DatabaseContext::new(db));
 	info!("Database initialized at {:?}", config.relay.database_path);
 
+	// Create slot timer
+	let slot_timer = common::slot_timer::SlotTimer::new(config.relay.genesis_timestamp);
+
 	// Create shared state
-	let state = RelayState { database, config: config.clone() };
+	let state = RelayState { database, config: config.clone(), slot_timer };
 
 	// Build router
 	let app = Router::new()
@@ -87,6 +90,7 @@ mod tests {
 				log_level: "debug".to_string(),
 				constraint_capabilities: vec![1],
 				chain: commit_boost::prelude::Chain::Hoodi,
+				genesis_timestamp: 1742213400,
 			},
 			storage: crate::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

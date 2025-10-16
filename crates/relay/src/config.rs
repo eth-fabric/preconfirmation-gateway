@@ -16,6 +16,7 @@ pub struct RelayServerConfig {
 	pub log_level: String,
 	pub constraint_capabilities: Vec<u64>,
 	pub chain: Chain,
+	pub genesis_timestamp: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ impl Default for RelayConfig {
 				log_level: "info".to_string(),
 				constraint_capabilities: vec![1],
 				chain: Chain::Hoodi,
+				genesis_timestamp: 1742213400, // Hoodi genesis timestamp
 			},
 			storage: StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

@@ -1,6 +1,6 @@
 use alloy::primitives::Address;
 use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey, Chain};
-use common::types::{ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation};
+use common::types::{Delegation, SignedConstraints, SignedDelegation};
 use eyre::Result;
 use tracing::{debug, error, info};
 
@@ -67,16 +67,17 @@ pub fn verify_delegation_signature(signed_delegation: &SignedDelegation, chain: 
 }
 
 /// Validate delegation message structure
-pub fn validate_delegation_message(delegation: &Delegation) -> Result<()> {
+pub fn validate_delegation_message(delegation: &Delegation, slot_timer: &common::slot_timer::SlotTimer) -> Result<()> {
 	// Check that committer address is not zero
 	if delegation.committer == Address::ZERO {
 		error!("Invalid committer address");
 		return Err(eyre::eyre!("Invalid committer address"));
 	}
 
-	if delegation.slot == 0 {
-		error!("Slot cannot be zero");
-		return Err(eyre::eyre!("Slot cannot be zero"));
+	// Check that the delegation slot has not already elapsed
+	if delegation.slot <= slot_timer.get_current_slot() {
+		error!("Delegation slot {} has already elapsed", delegation.slot);
+		return Err(eyre::eyre!("Delegation slot has already elapsed"));
 	}
 
 	Ok(())
@@ -110,6 +111,9 @@ mod tests {
 		)
 		.unwrap();
 
+		// Create slot timer with a genesis timestamp
+		let slot_timer = common::slot_timer::SlotTimer::new(1742213400);
+
 		let delegation = Delegation {
 			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
 			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
@@ -118,6 +122,59 @@ mod tests {
 			metadata: Bytes::from(vec![0x01, 0x02]),
 		};
 
-		assert!(validate_delegation_message(&delegation).is_err());
+		assert!(validate_delegation_message(&delegation, &slot_timer).is_err());
+	}
+
+	#[test]
+	fn test_validate_delegation_message_slot_elapsed() {
+		// Use a valid BLS public key
+		let valid_bls_key = hex::decode(
+			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+
+		// Create slot timer with a genesis timestamp
+		let slot_timer = common::slot_timer::SlotTimer::new(1742213400);
+
+		// Get current slot and try to delegate a slot that has already elapsed
+		let current_slot = slot_timer.get_current_slot();
+
+		let delegation = Delegation {
+			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			committer: "0x1234567890123456789012345678901234567890".parse().unwrap(),
+			slot: current_slot - 1, // Slot in the past
+			metadata: Bytes::from(vec![0x01, 0x02]),
+		};
+
+		let result = validate_delegation_message(&delegation, &slot_timer);
+		assert!(result.is_err());
+		assert!(result.unwrap_err().to_string().contains("already elapsed"));
+	}
+
+	#[test]
+	fn test_validate_delegation_message_future_slot() {
+		// Use a valid BLS public key
+		let valid_bls_key = hex::decode(
+			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+
+		// Create slot timer with a genesis timestamp
+		let slot_timer = common::slot_timer::SlotTimer::new(1742213400);
+
+		// Get current slot and try to delegate a future slot
+		let current_slot = slot_timer.get_current_slot();
+
+		let delegation = Delegation {
+			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			committer: "0x1234567890123456789012345678901234567890".parse().unwrap(),
+			slot: current_slot + 10, // Future slot
+			metadata: Bytes::from(vec![0x01, 0x02]),
+		};
+
+		let result = validate_delegation_message(&delegation, &slot_timer);
+		assert!(result.is_ok());
 	}
 }

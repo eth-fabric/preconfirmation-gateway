@@ -20,7 +20,7 @@ async fn test_post_delegation_success() {
 	let client = harness.create_client_harness();
 
 	// Create delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -33,10 +33,11 @@ async fn test_post_delegation_success() {
 async fn test_post_delegation_multiple() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
+	let current_slot = harness.context.slot_timer.get_current_slot();
 
 	// Post multiple delegations for different slots
 	for i in 0..3 {
-		let slot = 12345 + i;
+		let slot = current_slot + i;
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 		let signed_delegation =
 			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -51,14 +52,14 @@ async fn test_post_delegation_different_delegates() {
 	let client = harness.create_client_harness();
 
 	// Post delegation for gateway_one
-	let slot1 = 12345;
+	let slot1 = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation1 = harness.create_delegation(slot1, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation1 =
 		harness.create_signed_delegation(&delegation1, harness.proposer_bls_public_key.clone()).await.unwrap();
 	client.post_delegation(&signed_delegation1).await.unwrap();
 
 	// Post delegation for gateway_two
-	let slot2 = 12346;
+	let slot2 = slot1 + 1;
 	let delegation2 = harness.create_delegation(slot2, harness.gateway_bls_two.clone(), harness.committer_two);
 	let signed_delegation2 =
 		harness.create_signed_delegation(&delegation2, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -89,7 +90,7 @@ async fn test_post_delegation_invalid_signature() {
 async fn test_post_constraints_success() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Step 1: Post delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -115,7 +116,7 @@ async fn test_post_constraints_success() {
 #[tokio::test]
 async fn test_post_constraints_without_delegation() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
-	let slot = 99999; // No delegation for this slot
+	let slot = harness.context.slot_timer.get_current_slot() + 100000000; // No delegation for this slot
 
 	// Store constraints in local database without posting delegation first
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
@@ -134,7 +135,7 @@ async fn test_post_constraints_without_delegation() {
 async fn test_post_constraints_multiple_same_slot() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Post delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -160,7 +161,7 @@ async fn test_post_constraints_multiple_same_slot() {
 async fn test_get_constraints_success() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Setup: Post delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -193,7 +194,7 @@ async fn test_get_constraints_success() {
 async fn test_get_constraints_multiple() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Setup: Post delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -254,7 +255,7 @@ async fn test_get_constraints_missing_auth_headers() {
 async fn test_full_relay_workflow() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Step 1: Post delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -288,8 +289,9 @@ async fn test_concurrent_constraint_posts() {
 
 	// Post delegations for multiple slots
 	let client = harness.create_client_harness();
+	let current_slot = harness.context.slot_timer.get_current_slot();
 	for i in 0..5 {
-		let slot = 12345 + i;
+		let slot = current_slot + i;
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 		let signed_delegation =
 			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -304,7 +306,7 @@ async fn test_concurrent_constraint_posts() {
 	// Process all constraints concurrently
 	let mut handles = vec![];
 	for i in 0..5 {
-		let slot = 12345 + i;
+		let slot = current_slot + i;
 		let gateway = harness.gateway_bls_one.clone();
 		let proposer = harness.proposer_bls_public_key.clone();
 		let database = harness.context.database.clone();
@@ -342,17 +344,17 @@ async fn test_relay_server_handles_errors_gracefully() {
 	// Test various error conditions
 
 	// 1. Process constraints without delegation
-	let slot = 99999;
+	let invalid_slot = harness.context.slot_timer.get_current_slot() + 100000000;
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraint_id = B256::random();
-	harness.context.database.store_constraint(slot, &constraint_id, &constraint).unwrap();
+	harness.context.database.store_constraint(invalid_slot, &constraint_id, &constraint).unwrap();
 
-	let result1 = harness.process_constraints(slot, vec![]).await.unwrap();
+	let result1 = harness.process_constraints(invalid_slot, vec![]).await.unwrap();
 	assert!(!result1.success); // Should fail due to missing delegation
 
 	// 2. Get constraints for nonexistent slot
-	let headers = harness.create_headers_with_valid_signature(88888, harness.gateway_bls_one.clone()).await;
-	let result2 = client.get_constraints(88888, headers).await;
+	let headers = harness.create_headers_with_valid_signature(invalid_slot, harness.gateway_bls_one.clone()).await;
+	let result2 = client.get_constraints(invalid_slot, headers).await;
 	// Either empty or error is acceptable
 	match result2 {
 		Ok(constraints) => assert!(constraints.is_empty()),
@@ -361,7 +363,7 @@ async fn test_relay_server_handles_errors_gracefully() {
 
 	// Server should still be responsive after errors
 	// Post a valid delegation
-	let valid_slot = 12345;
+	let valid_slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(valid_slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
