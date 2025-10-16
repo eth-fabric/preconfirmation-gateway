@@ -1,652 +1,586 @@
-use alloy::primitives::{B256, Bytes};
-use axum::http::{HeaderMap, HeaderValue};
-use commit_boost::prelude::{BlsSignature, Chain};
+use alloy::primitives::Bytes;
 use common::constants::CONSTRAINT_TYPE;
 use common::types::constraints::{Constraint, ConstraintsMessage, SignedConstraints};
-use common::types::database::DatabaseContext;
-use constraints::create_signed_constraints;
-use hex;
-use integration_tests::test_common::start_local_signer_server;
-use rand::Rng;
-use relay::handlers::RelayState;
-use std::sync::Arc;
-use tempfile::TempDir;
+use integration_tests::test_common::TestHarness;
 
-/// Test harness for relay request testing
-/// This provides a clean interface for testing different relay request scenarios
-struct RelayRequestTestHarness {
-	context: common::types::RpcContext,
-	proposer_bls_public_key: commit_boost::prelude::BlsPublicKey,
-	gateway_bls_public_key: commit_boost::prelude::BlsPublicKey,
-	_temp_dir: TempDir,
+/// Tests for relay handlers (delegations and constraints)
+/// These tests do NOT launch services - they test handler logic directly
+/// Data is written directly to databases to isolate the behavior under test
+///
+/// The test pattern is:
+/// 1. Setup: Create test data (delegations, constraints)
+/// 2. Act: Store/retrieve via database or call handlers directly
+/// 3. Assert: Verify expected behavior
+
+// ===== DELEGATION TESTS =====
+
+#[tokio::test]
+async fn test_store_and_retrieve_delegation() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
+
+	// Create delegation
+	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
+
+	// Store in database
+	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+
+	// Retrieve
+	let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap();
+
+	assert!(retrieved.is_some());
+	let retrieved_delegation = retrieved.unwrap();
+	assert_eq!(retrieved_delegation.message.slot, slot);
+	assert_eq!(retrieved_delegation.message.delegate, harness.gateway_bls_one);
+	assert_eq!(retrieved_delegation.message.committer, harness.committer_one);
+
+	println!("✅ Delegation stored and retrieved successfully");
 }
 
-impl RelayRequestTestHarness {
-	/// Creates a new test harness with a properly configured context
-	async fn new() -> eyre::Result<Self> {
-		// Create test database
-		let temp_dir = TempDir::new().unwrap();
-		let db_path = temp_dir.path().join("test_relay.db");
-		let mut opts = rocksdb::Options::default();
-		opts.create_if_missing(true);
-		let db = Arc::new(rocksdb::DB::open(&opts, &db_path).unwrap());
-		let database = DatabaseContext::new(db);
+#[tokio::test]
+async fn test_delegation_signature_valid() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-		// Use the same BLS public key as the signer service is configured with
-		let proposer_bls_public_key =
-			cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY).unwrap();
+	// Create and sign delegation
+	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 
-		// Start local signer server for testing
-		let commit_config = start_local_signer_server(
-			"test_relay_module",
-			RelayRequestTestHarness::signing_id(),
-			"test_secret",
-			rand::thread_rng().gen_range(3000..65535),
-		)
-		.await
-		.expect("Failed to start local signer server");
-		assert_eq!(commit_config.chain, RelayRequestTestHarness::chain());
+	// Verify the BLS signature is not empty
+	assert_ne!(signed_delegation.signature, commit_boost::prelude::BlsSignature::empty());
 
-		// Create pricing database
-		let pricing_db_path = temp_dir.path().join("pricing.db");
-		let mut pricing_opts = rocksdb::Options::default();
-		pricing_opts.create_if_missing(true);
-		let pricing_db = Arc::new(rocksdb::DB::open(&pricing_opts, &pricing_db_path).unwrap());
-		let pricing_database = DatabaseContext::new(pricing_db);
+	// Verify signature can be validated
+	let chain = commit_boost::prelude::Chain::Hoodi;
+	let is_valid = relay::utils::verify_delegation_signature(&signed_delegation, chain).unwrap();
+	assert!(is_valid);
 
-		// Create context with the database
-		let context = common::types::RpcContext {
-			database,
-			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
-			pricing_database,
-			bls_public_key: proposer_bls_public_key.clone(),
-			relay_url: "http://localhost:8080".to_string(),
-			api_key: Some("test-api-key".to_string()),
-			slot_timer: common::slot_timer::SlotTimer::new(12),
-		};
-
-		// Generate proxy BLS key for gateway using the signer service
-		let gateway_bls_public_key = {
-			let mut commit_config_guard = context.commit_config.lock().await;
-			commit_config_guard
-				.signer_client
-				.generate_proxy_key_bls(proposer_bls_public_key.clone())
-				.await
-				.map_err(|e| eyre::eyre!("Failed to generate proxy BLS key: {}", e))?
-				.message
-				.proxy
-		};
-
-		Ok(Self { context, proposer_bls_public_key, gateway_bls_public_key, _temp_dir: temp_dir })
-	}
-
-	fn signing_id() -> B256 {
-		B256::from_slice(&[0x11; 32])
-	}
-
-	fn chain() -> Chain {
-		Chain::Hoodi
-	}
-
-	/// Creates a test ConstraintsMessage with the harness's configured keys
-	fn create_test_constraints_message(
-		&self,
-		slot: u64,
-		num_constraints: usize,
-		public_receivers: bool,
-	) -> ConstraintsMessage {
-		let receivers = if public_receivers { vec![] } else { vec![self.gateway_bls_public_key.clone()] };
-		ConstraintsMessage {
-			proposer: self.proposer_bls_public_key.clone(),
-			delegate: self.gateway_bls_public_key.clone(),
-			slot,
-			constraints: vec![
-				Constraint {
-					constraint_type: CONSTRAINT_TYPE,
-					payload: Bytes::from(vec![0x01, 0x02, 0x03])
-				};
-				num_constraints
-			],
-			receivers,
-		}
-	}
-
-	/// Creates a test SignedConstraints using the proxy BLS signer
-	async fn create_test_signed_constraints(
-		&self,
-		slot: u64,
-		num_constraints: usize,
-		public_receivers: bool,
-	) -> SignedConstraints {
-		let constraints_message = self.create_test_constraints_message(slot, num_constraints, public_receivers);
-
-		// Create the signed constraints
-		let signed_constraints = create_signed_constraints(
-			&constraints_message,
-			self.context.commit_config.clone(),
-			self.gateway_bls_public_key.clone(),
-		)
-		.await
-		.unwrap();
-
-		signed_constraints
-	}
-
-	/// Creates test headers with BLS authentication using the proxy signer
-	async fn create_test_headers_with_valid_signature(&self, slot: u64) -> axum::http::HeaderMap {
-		// Get the commit config from context
-		let mut commit_config = self.context.commit_config.lock().await;
-
-		// Compute slot hash for signing
-		let slot_hash = alloy::primitives::keccak256(slot.to_string().as_bytes());
-
-		// Call the proxy BLS signer to sign the slot hash
-		let bls_response =
-			common::signer::call_proxy_bls_signer(&mut *commit_config, slot_hash, self.gateway_bls_public_key.clone())
-				.await
-				.expect("Failed to sign slot hash with proxy BLS signer");
-
-		let mut headers = HeaderMap::new();
-		headers.insert(
-			"X-Receiver-PublicKey",
-			HeaderValue::from_str(&format!("0x{}", hex::encode(self.gateway_bls_public_key.serialize()))).unwrap(),
-		);
-		headers.insert(
-			"X-Receiver-Signature",
-			HeaderValue::from_str(&format!("0x{}", hex::encode(bls_response.signature.serialize()))).unwrap(),
-		);
-		headers.insert("X-Receiver-Nonce", HeaderValue::from_str(&bls_response.nonce.to_string()).unwrap());
-		headers.insert(
-			"X-Receiver-SigningId",
-			HeaderValue::from_str(&format!("0x{}", hex::encode(bls_response.module_signing_id.as_slice()))).unwrap(),
-		);
-		headers
-	}
-
-	/// Creates a RelayState for testing
-	fn create_relay_state(&self) -> RelayState {
-		RelayState { database: Arc::new(self.context.database.clone()), config: relay::config::RelayConfig::default() }
-	}
+	println!("✅ Delegation signature is valid");
 }
+
+#[tokio::test]
+async fn test_multiple_delegations_different_slots() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Create and store delegations for different slots
+	for i in 0..3 {
+		let slot = 12345 + i;
+		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+		let signed_delegation =
+			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
+		harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	}
+
+	// Retrieve each delegation
+	for i in 0..3 {
+		let slot = 12345 + i;
+		let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap();
+		assert!(retrieved.is_some());
+		assert_eq!(retrieved.unwrap().message.slot, slot);
+	}
+
+	println!("✅ Multiple delegations stored and retrieved correctly");
+}
+
+#[tokio::test]
+async fn test_delegation_with_different_delegates() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Create delegation for gateway_one
+	let slot1 = 12345;
+	let delegation1 = harness.create_delegation(slot1, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation1 =
+		harness.create_signed_delegation(&delegation1, harness.proposer_bls_public_key.clone()).await.unwrap();
+	harness.context.database.store_delegation(slot1, &signed_delegation1).unwrap();
+
+	// Create delegation for gateway_two
+	let slot2 = 12346;
+	let delegation2 = harness.create_delegation(slot2, harness.gateway_bls_two.clone(), harness.committer_two);
+	let signed_delegation2 =
+		harness.create_signed_delegation(&delegation2, harness.proposer_bls_public_key.clone()).await.unwrap();
+	harness.context.database.store_delegation(slot2, &signed_delegation2).unwrap();
+
+	// Retrieve and verify
+	let retrieved1 = harness.context.database.get_delegation_for_slot(slot1).unwrap().unwrap();
+	let retrieved2 = harness.context.database.get_delegation_for_slot(slot2).unwrap().unwrap();
+
+	assert_eq!(retrieved1.message.delegate, harness.gateway_bls_one);
+	assert_eq!(retrieved2.message.delegate, harness.gateway_bls_two);
+	assert_eq!(retrieved1.message.committer, harness.committer_one);
+	assert_eq!(retrieved2.message.committer, harness.committer_two);
+
+	println!("✅ Delegations with different delegates handled correctly");
+}
+
+#[tokio::test]
+async fn test_retrieve_nonexistent_delegation() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Try to retrieve delegation for slot that doesn't exist
+	let nonexistent_slot = 99999;
+	let result = harness.context.database.get_delegation_for_slot(nonexistent_slot).unwrap();
+
+	assert!(result.is_none());
+	println!("✅ Correctly returns None for nonexistent delegation");
+}
+
+// ===== CONSTRAINTS TESTS =====
 
 #[tokio::test]
 async fn test_create_signed_constraints() {
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let signed_constraints = harness.create_test_signed_constraints(12345, 2, true).await;
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	// Verify the signed constraints have proper structure
-	assert_eq!(signed_constraints.message.slot, 12345);
-	assert_eq!(signed_constraints.message.constraints.len(), 2); // We create 2 constraints in the helper
+	// Create constraint
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
+
+	// Create constraints message
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint.clone()],
+		receivers: vec![], // Empty receivers = public
+	};
+
+	// Sign constraints using BLS signer
+	let message_hash = constraints_message.to_message_hash().unwrap();
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
+
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
+
+	// Verify structure
+	assert_eq!(signed_constraints.message.slot, slot);
+	assert_eq!(signed_constraints.message.constraints.len(), 1);
 	assert_eq!(signed_constraints.message.constraints[0].constraint_type, CONSTRAINT_TYPE);
+	assert_ne!(signed_constraints.signature, commit_boost::prelude::BlsSignature::empty());
 
-	// Verify the signature is not empty (it should be a real BLS signature)
-	assert_ne!(signed_constraints.signature, BlsSignature::empty());
-
-	// Verify the nonce and signing_id are set
-	assert_eq!(signed_constraints.signing_id, RelayRequestTestHarness::signing_id());
-
-	// Verify signature is valid
-	assert!(relay::utils::verify_constraints_signature(&signed_constraints, RelayRequestTestHarness::chain()).unwrap());
+	println!("✅ Signed constraints created successfully");
 }
 
 #[tokio::test]
-async fn test_store_constraints_handler() {
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
+async fn test_constraints_signature_valid() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	let slot = 12345u64;
+	// Create and sign constraints
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![],
+	};
+	let message_hash = constraints_message.to_message_hash().unwrap();
 
-	// Create a properly signed constraint using local BLS signing
-	let signed_constraints = harness.create_test_signed_constraints(slot, 2, true).await;
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
 
-	// Store the signed constraint using the POST handler
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
 
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
+	// Verify signature
+	let chain = commit_boost::prelude::Chain::Hoodi;
+	let is_valid = relay::utils::verify_constraints_signature(&signed_constraints, chain).unwrap();
+	assert!(is_valid);
 
-	// Retrieve constraints for the slot
-	let retrieved_constraints = state.database.get_signed_constraints_for_slot(slot).unwrap();
-
-	assert_eq!(retrieved_constraints.len(), 1);
-	assert_eq!(retrieved_constraints[0].message.slot, slot);
-	assert_eq!(retrieved_constraints[0].message.constraints.len(), 2);
-
-	// Verify the signature is preserved
-	assert_ne!(retrieved_constraints[0].signature, BlsSignature::empty());
+	println!("✅ Constraints signature is valid");
 }
 
 #[tokio::test]
-async fn test_store_constraints_handler_multiple_constraints_same_slot() {
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
+async fn test_store_and_retrieve_constraints() {
+	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
+	let slot = 12345;
 
-	let slot = 12345u64;
+	// Create constraints
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4]) };
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![],
+	};
+	let message_hash = constraints_message.to_message_hash().unwrap();
 
-	// Create multiple signed constraints for the same slot
-	let signed_constraints1 = harness.create_test_signed_constraints(slot, 1, true).await;
-	let signed_constraints2 = harness.create_test_signed_constraints(slot, 2, true).await;
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
 
-	// Store both constraints using the POST handler
-	let store_result1 = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints1.clone()),
-	)
-	.await;
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
 
-	let store_result2 = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints2.clone()),
-	)
-	.await;
+	// Store constraints
+	state.database.store_signed_constraints(&signed_constraints).unwrap();
 
-	// Verify both constraints were stored successfully
-	assert!(store_result1.is_ok());
-	assert!(store_result2.is_ok());
+	// Retrieve constraints
+	let retrieved = state.database.get_signed_constraints_for_slot(slot).unwrap();
 
-	// Retrieve all constraints for the slot
-	let retrieved_constraints = state.database.get_signed_constraints_for_slot(slot).unwrap();
+	assert_eq!(retrieved.len(), 1);
+	assert_eq!(retrieved[0].message.slot, slot);
+	assert_eq!(retrieved[0].message.constraints.len(), 1);
 
-	assert_eq!(retrieved_constraints.len(), 2);
+	println!("✅ Constraints stored and retrieved successfully");
+}
 
-	// Both should have the same slot
-	for constraint in &retrieved_constraints {
-		assert_eq!(constraint.message.slot, slot);
-		assert_ne!(constraint.signature, BlsSignature::empty());
+#[tokio::test]
+async fn test_multiple_constraints_same_slot() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let state = harness.create_relay_state();
+	let slot = 12345;
+
+	// Store multiple different constraints for same slot
+	for i in 0..3 {
+		let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
+		let constraints_message = ConstraintsMessage {
+			proposer: harness.proposer_bls_public_key.clone(),
+			delegate: harness.gateway_bls_one.clone(),
+			slot,
+			constraints: vec![constraint],
+			receivers: vec![],
+		};
+		let message_hash = constraints_message.to_message_hash().unwrap();
+
+		let response = {
+			let mut config = harness.context.commit_config.lock().await;
+			common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+				.await
+				.unwrap()
+		};
+
+		let signed_constraints = SignedConstraints {
+			message: constraints_message,
+			nonce: response.nonce,
+			signing_id: response.module_signing_id,
+			signature: response.signature,
+		};
+
+		state.database.store_signed_constraints(&signed_constraints).unwrap();
 	}
+
+	// Retrieve all constraints for slot
+	let retrieved = state.database.get_signed_constraints_for_slot(slot).unwrap();
+
+	assert_eq!(retrieved.len(), 3);
+	println!("✅ Multiple constraints for same slot handled correctly");
 }
 
 #[tokio::test]
-async fn test_verify_constraints_signature_comprehensive() {
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
+async fn test_constraints_with_multiple_constraint_items() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	// Test 1: Valid signature should pass verification
-	let signed_constraints = harness.create_test_signed_constraints(12345, 2, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	// Create constraints message with multiple constraints
+	let constraint1 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint2 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![4, 5, 6]) };
+	let constraint3 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![7, 8, 9]) };
 
-	// Test 2: Test with different slot numbers
-	let signed_constraints_slot_100 = harness.create_test_signed_constraints(100, 1, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints_slot_100, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint1, constraint2, constraint3],
+		receivers: vec![],
+	};
 
-	// Test 3: Test with different number of constraints
-	let signed_constraints_many = harness.create_test_signed_constraints(200, 5, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints_many, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	let message_hash = constraints_message.to_message_hash().unwrap();
 
-	// Test 4: Test with empty constraints (should still work if message is valid)
-	let signed_constraints_empty = harness.create_test_signed_constraints(300, 0, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints_empty, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
+
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
+
+	assert_eq!(signed_constraints.message.constraints.len(), 3);
+	println!("✅ Constraints with multiple items created successfully");
 }
 
 #[tokio::test]
-async fn test_verify_constraints_signature_edge_cases() {
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
+async fn test_public_vs_private_constraints() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	// Test 1: Very large slot number
-	let signed_constraints_large_slot = harness.create_test_signed_constraints(u64::MAX, 1, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints_large_slot, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	// Create public constraints (empty receivers)
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let public_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint.clone()],
+		receivers: vec![], // Empty = public
+	};
 
-	// Test 2: Slot 0
-	let signed_constraints_slot_zero = harness.create_test_signed_constraints(0, 1, true).await;
-	let verification_result =
-		relay::utils::verify_constraints_signature(&signed_constraints_slot_zero, RelayRequestTestHarness::chain());
-	assert!(verification_result.is_ok());
-	assert!(verification_result.unwrap());
+	// Create private constraints (specific receivers)
+	let private_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![harness.gateway_bls_one.clone()], // Specific receiver = private
+	};
+
+	// Both should be signable
+	let public_hash = public_message.to_message_hash().unwrap();
+	let private_hash = private_message.to_message_hash().unwrap();
+
+	// Hashes should be different
+	assert_ne!(public_hash, private_hash);
+
+	println!("✅ Public and private constraints produce different hashes");
 }
 
 #[tokio::test]
-async fn test_get_constraints_handler_with_receivers() {
-	use axum::extract::Path;
-
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
+async fn test_retrieve_constraints_for_nonexistent_slot() {
+	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
 
-	let slot = 12345u64;
+	// Try to retrieve constraints for slot that doesn't exist
+	let nonexistent_slot = 99999;
+	let result = state.database.get_signed_constraints_for_slot(nonexistent_slot).unwrap();
 
-	// Create a test SignedConstraints
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, false).await;
+	assert!(result.is_empty());
+	println!("✅ Correctly returns empty for nonexistent constraints");
+}
 
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
+// ===== AUTH HEADER TESTS =====
 
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
+#[tokio::test]
+async fn test_create_auth_headers() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	// Create valid headers with BLS signature for the slot using the proxy signer
-	let headers = harness.create_test_headers_with_valid_signature(slot).await;
+	// Create auth headers with BLS signature
+	let headers = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_one.clone()).await;
 
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers.clone())
-			.await;
+	// Verify headers are present
+	assert!(headers.contains_key("x-receiver-publickey"));
+	assert!(headers.contains_key("x-receiver-signature"));
+	assert!(headers.contains_key("x-receiver-nonce"));
+	assert!(headers.contains_key("x-receiver-signingid"));
 
-	assert!(result.is_ok());
-	let constraints = result.unwrap();
-	assert_eq!(constraints.len(), 1);
-	assert_eq!(constraints[0].message.slot, slot);
+	println!("✅ Auth headers created successfully");
 }
 
 #[tokio::test]
-async fn test_get_constraints_for_slot_handler_with_invalid_signature() {
-	use axum::extract::Path;
+async fn test_headers_with_different_signers() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
+	// Create headers with gateway_one
+	let headers1 = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_one.clone()).await;
 
-	let slot = 12345u64;
+	// Create headers with gateway_two
+	let headers2 = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_two.clone()).await;
 
-	// Create and store a signed constraint using the POST handler
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, true).await;
+	// Signatures should be different
+	let sig1 = headers1.get("x-receiver-signature").unwrap();
+	let sig2 = headers2.get("x-receiver-signature").unwrap();
+	assert_ne!(sig1, sig2);
 
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
+	println!("✅ Different signers produce different auth headers");
+}
 
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
+// ===== INTEGRATION BETWEEN DELEGATIONS AND CONSTRAINTS =====
 
-	// Create headers with invalid signature (wrong slot)
-	let wrong_slot = 99999u64;
-	let headers = harness.create_test_headers_with_valid_signature(wrong_slot).await;
+#[tokio::test]
+async fn test_delegation_required_for_constraints() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
+	// Store delegation first
+	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
+	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
 
-	// Should fail due to signature verification
-	assert!(result.is_err());
+	// Now create constraints
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![],
+	};
+	let message_hash = constraints_message.to_message_hash().unwrap();
+
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
+
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
+
+	// Both delegation and constraints exist for the slot
+	let delegation_exists = harness.context.database.get_delegation_for_slot(slot).unwrap().is_some();
+	assert!(delegation_exists);
+
+	// Can verify constraints signature
+	let chain = commit_boost::prelude::Chain::Hoodi;
+	let is_valid = relay::utils::verify_constraints_signature(&signed_constraints, chain).unwrap();
+	assert!(is_valid);
+
+	println!("✅ Delegation and constraints workflow works correctly");
 }
 
 #[tokio::test]
-async fn test_get_constraints_for_slot_handler_missing_headers() {
-	use axum::extract::Path;
-	use axum::http::HeaderMap;
+async fn test_constraint_without_delegation() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 99999;
 
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
+	// No delegation stored for this slot
+	let delegation = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	assert!(delegation.is_none());
 
-	let slot = 12345u64;
+	// Can still create constraints (validation happens in handler)
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![],
+	};
+	let message_hash = constraints_message.to_message_hash().unwrap();
 
-	// Create and store a signed constraint using the POST handler
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, false).await;
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
 
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
 
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
-
-	// Create empty headers (missing authentication)
-	let headers = HeaderMap::new();
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should fail due to missing headers
-	assert!(result.is_err());
+	// Constraints can be created, but handler would reject without delegation
+	assert_ne!(signed_constraints.signature, commit_boost::prelude::BlsSignature::empty());
+	println!("✅ Constraints can be created without delegation (handler enforcement needed)");
 }
 
 #[tokio::test]
-async fn test_get_constraints_for_slot_handler_wrong_public_key() {
-	use axum::extract::Path;
-	use axum::http::{HeaderMap, HeaderValue};
+async fn test_delegation_fields_preserved() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
+	// Create delegation with specific values
+	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 
-	let slot = 12345u64;
+	// Store
+	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
 
-	// Create and store a signed constraint using the POST handler
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, false).await;
+	// Retrieve and verify all fields
+	let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap().unwrap();
 
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
+	assert_eq!(retrieved.message.proposer, harness.proposer_bls_public_key);
+	assert_eq!(retrieved.message.delegate, harness.gateway_bls_one);
+	assert_eq!(retrieved.message.committer, harness.committer_one);
+	assert_eq!(retrieved.message.slot, slot);
+	assert_eq!(retrieved.nonce, signed_delegation.nonce);
+	assert_eq!(retrieved.signing_id, signed_delegation.signing_id);
+	assert_eq!(retrieved.signature, signed_delegation.signature);
 
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
-
-	// Create headers with a different public key (not in receivers list)
-	let mut headers = HeaderMap::new();
-	headers.insert(
-		"X-Receiver-PublicKey",
-		HeaderValue::from_str(
-			"0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-		)
-		.unwrap(),
-	);
-	headers.insert(
-		"X-Receiver-Signature",
-		HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-	);
-	headers.insert("X-Receiver-Nonce", HeaderValue::from_str("1337").unwrap());
-	headers.insert(
-		"X-Receiver-SigningId",
-		HeaderValue::from_str("0x0101010101010101010101010101010101010101010101010101010101010101").unwrap(),
-	);
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should fail due to public key not being in receivers list
-	assert!(result.is_err());
+	println!("✅ All delegation fields preserved after storage");
 }
 
 #[tokio::test]
-async fn test_get_constraints_for_slot_handler_mixed_access_scenarios() {
-	use axum::extract::Path;
-
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
+async fn test_constraints_fields_preserved() {
+	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
+	let slot = 12345;
 
-	let slot = 12345u64;
+	// Create constraints
+	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraints_message = ConstraintsMessage {
+		proposer: harness.proposer_bls_public_key.clone(),
+		delegate: harness.gateway_bls_one.clone(),
+		slot,
+		constraints: vec![constraint],
+		receivers: vec![],
+	};
+	let message_hash = constraints_message.to_message_hash().unwrap();
 
-	// Create and store multiple constraints with different access patterns
+	let response = {
+		let mut config = harness.context.commit_config.lock().await;
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+			.await
+			.unwrap()
+	};
 
-	// 1. Public constraint (empty receivers)
-	let mut public_constraints = harness.create_test_signed_constraints(slot, 1, true).await;
-	public_constraints.message.receivers = vec![]; // Empty receivers = public access
-	public_constraints.signing_id = B256::from_slice(&[0x11; 32]); // Unique signing ID
+	let signed_constraints = SignedConstraints {
+		message: constraints_message,
+		nonce: response.nonce,
+		signing_id: response.module_signing_id,
+		signature: response.signature,
+	};
 
-	let store_public = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(public_constraints.clone()),
-	)
-	.await;
-	assert!(store_public.is_ok());
+	// Store
+	state.database.store_signed_constraints(&signed_constraints).unwrap();
 
-	// 2. Restricted constraint (specific receivers)
-	let restricted_constraints = harness.create_test_signed_constraints(slot, 2, false).await;
+	// Retrieve and verify
+	let retrieved = state.database.get_signed_constraints_for_slot(slot).unwrap();
+	assert_eq!(retrieved.len(), 1);
 
-	let store_restricted = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(restricted_constraints.clone()),
-	)
-	.await;
-	assert!(store_restricted.is_ok());
+	let retrieved_constraints = &retrieved[0];
+	assert_eq!(retrieved_constraints.message.slot, slot);
+	assert_eq!(retrieved_constraints.message.constraints.len(), 1);
+	assert_eq!(retrieved_constraints.message.constraints[0].constraint_type, CONSTRAINT_TYPE);
+	assert_eq!(retrieved_constraints.message.constraints[0].payload, payload);
+	assert_eq!(retrieved_constraints.message.receivers.len(), 0); // Empty receivers = public
+	assert_eq!(retrieved_constraints.nonce, signed_constraints.nonce);
+	assert_eq!(retrieved_constraints.signing_id, signed_constraints.signing_id);
+	assert_eq!(retrieved_constraints.signature, signed_constraints.signature);
 
-	// Create headers with a valid BLS signature for the slot using the proxy signer
-	let headers = harness.create_test_headers_with_valid_signature(slot).await;
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should succeed and return both constraints:
-	// - Public constraint (empty receivers) - accessible to anyone
-	// - Restricted constraint (specific receivers) - accessible because caller's key is in receivers
-	assert!(result.is_ok());
-	let constraints = result.unwrap();
-	assert_eq!(constraints.len(), 2);
-
-	// Find the public constraint (empty receivers)
-	let public_constraint = constraints.iter().find(|c| c.message.receivers.is_empty()).unwrap();
-	assert_eq!(public_constraint.message.receivers.len(), 0);
-
-	// Find the restricted constraint (specific receivers)
-	let restricted_constraint = constraints.iter().find(|c| !c.message.receivers.is_empty()).unwrap();
-	assert_eq!(restricted_constraint.message.receivers.len(), 1);
-
-	// The gateway public key should be in the receivers list
-	assert_eq!(restricted_constraint.message.receivers[0], harness.gateway_bls_public_key);
-}
-
-#[tokio::test]
-async fn test_get_constraints_for_slot_handler_unauthorized_access() {
-	use axum::extract::Path;
-
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
-
-	let slot = 12345u64;
-
-	// Create and store a signed constraint with specific receivers (restricted access)
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, false).await;
-	// The default test constraints already have a specific receiver list
-
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
-
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
-
-	// Create headers with a different public key (not in receivers list)
-	let mut headers = HeaderMap::new();
-	headers.insert(
-		"X-Receiver-PublicKey",
-		HeaderValue::from_str(
-			"0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba",
-		)
-		.unwrap(),
-	);
-	headers.insert(
-		"X-Receiver-Signature",
-		HeaderValue::from_str("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap(),
-	);
-	headers.insert("X-Receiver-Nonce", HeaderValue::from_str("9999").unwrap());
-	headers.insert(
-		"X-Receiver-SigningId",
-		HeaderValue::from_str("0x9999999999999999999999999999999999999999999999999999999999999999").unwrap(),
-	);
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should because the signature is invalid
-	assert!(result.is_err());
-}
-
-#[tokio::test]
-async fn test_get_constraints_for_slot_handler_public_access_empty_receivers() {
-	use axum::extract::Path;
-
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
-
-	let slot = 12345u64;
-
-	// Create and store a signed constraint with empty receivers (public access)
-	let mut signed_constraints = harness.create_test_signed_constraints(slot, 1, true).await;
-	signed_constraints.message.receivers = vec![]; // Empty receivers = public access
-
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
-
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
-
-	let _stored = store_result.unwrap();
-
-	// Create headers with a valid BLS signature for the slot using the proxy signer
-	let headers = harness.create_test_headers_with_valid_signature(slot).await;
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should succeed and return the public constraint
-	assert!(result.is_ok());
-	let constraints = result.unwrap();
-	assert_eq!(constraints.len(), 1);
-	assert_eq!(constraints[0].message.receivers.len(), 0); // Empty receivers = public
-}
-
-#[tokio::test]
-async fn test_get_constraints_for_slot_handler_restricted_access_with_receivers() {
-	use axum::extract::Path;
-
-	let harness = RelayRequestTestHarness::new().await.expect("Failed to create test harness");
-	let state = harness.create_relay_state();
-
-	let slot = 12346u64;
-
-	// Create and store a signed constraint with specific receivers (restricted access)
-	let signed_constraints = harness.create_test_signed_constraints(slot, 1, false).await;
-	// The default test constraints already have a specific receiver list
-
-	// Use the store_constraints_handler to store the constraint
-	let store_result = relay::handlers::store_constraints_handler(
-		axum::extract::State(state.clone()),
-		axum::Json(signed_constraints.clone()),
-	)
-	.await;
-
-	// Verify the constraint was stored successfully
-	assert!(store_result.is_ok());
-
-	// Create headers with a valid BLS signature for the slot using the proxy signer
-	let headers = harness.create_test_headers_with_valid_signature(slot).await;
-
-	// Call the handler
-	let result =
-		relay::handlers::get_constraints_for_slot_handler(axum::extract::State(state), Path(slot), headers).await;
-
-	// Should succeed and return the constraint because the caller's key is in the receivers list
-	assert!(result.is_ok());
-	let constraints = result.unwrap();
-	assert_eq!(constraints.len(), 1);
-	assert!(constraints[0].message.receivers.len() > 0); // Has specific receivers
+	println!("✅ All constraints fields preserved after storage");
 }

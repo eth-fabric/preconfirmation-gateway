@@ -1,3 +1,4 @@
+use alloy::primitives::Address;
 use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey, Chain};
 use common::types::{ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation};
 use eyre::Result;
@@ -65,44 +66,20 @@ pub fn verify_delegation_signature(signed_delegation: &SignedDelegation, chain: 
 	Ok(is_valid)
 }
 
-/// Validate constraints message structure
-pub fn validate_constraints_message(constraints_message: &ConstraintsMessage) -> Result<bool> {
-	// Check that constraints list is not empty
-	if constraints_message.constraints.is_empty() {
-		return Ok(false);
-	}
-
-	// Check that all constraints have valid structure
-	for constraint in &constraints_message.constraints {
-		if constraint.payload.is_empty() {
-			return Ok(false);
-		}
-	}
-
-	// TODO: Add more validation logic
-
-	Ok(true)
-}
-
 /// Validate delegation message structure
-pub fn validate_delegation_message(delegation: &Delegation) -> Result<bool> {
+pub fn validate_delegation_message(delegation: &Delegation) -> Result<()> {
 	// Check that committer address is not zero
-	if delegation.committer
-		== "0x0000000000000000000000000000000000000000".parse::<alloy::primitives::Address>().unwrap()
-	{
-		return Ok(false);
+	if delegation.committer == Address::ZERO {
+		error!("Invalid committer address");
+		return Err(eyre::eyre!("Invalid committer address"));
 	}
 
-	// Check that BLS public keys are not zero
-	let zero_key = BlsPublicKey::deserialize(&[0u8; 48]).unwrap_or_else(|_| {
-		// Create a zero key for comparison
-		BlsPublicKey::deserialize(&[0u8; 48]).unwrap()
-	});
-	if delegation.proposer == zero_key || delegation.delegate == zero_key {
-		return Ok(false);
+	if delegation.slot == 0 {
+		error!("Slot cannot be zero");
+		return Err(eyre::eyre!("Slot cannot be zero"));
 	}
 
-	Ok(true)
+	Ok(())
 }
 
 /// Validate that the given public key is the scheduled proposer for the given slot
@@ -126,26 +103,6 @@ mod tests {
 	use hex;
 
 	#[test]
-	fn test_validate_constraints_message_empty() {
-		// Use a valid BLS public key
-		let valid_bls_key = hex::decode(
-			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.unwrap();
-
-		let constraints_message = ConstraintsMessage {
-			constraints: vec![],
-			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
-			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
-			slot: 12345,
-			receivers: vec![],
-		};
-
-		let result = validate_constraints_message(&constraints_message);
-		assert_eq!(result.unwrap(), false);
-	}
-
-	#[test]
 	fn test_validate_delegation_message_zero_committer() {
 		// Use a valid BLS public key
 		let valid_bls_key = hex::decode(
@@ -156,12 +113,11 @@ mod tests {
 		let delegation = Delegation {
 			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
 			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
-			committer: "0x0000000000000000000000000000000000000000".parse::<alloy::primitives::Address>().unwrap(),
+			committer: Address::ZERO,
 			slot: 12345,
 			metadata: Bytes::from(vec![0x01, 0x02]),
 		};
 
-		let result = validate_delegation_message(&delegation);
-		assert_eq!(result.unwrap(), false);
+		assert!(validate_delegation_message(&delegation).is_err());
 	}
 }

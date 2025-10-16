@@ -36,7 +36,7 @@ impl ConstraintsClient {
 	}
 
 	/// POST signed constraints to relay
-	pub async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<PostConstraintsResponse> {
+	pub async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<()> {
 		let url = format!("{}{}", self.base_url, routes::relay::CONSTRAINTS);
 
 		debug!("Posting constraints to: {}", url);
@@ -51,14 +51,13 @@ impl ConstraintsClient {
 		let response = request.send().await?;
 
 		if response.status().is_success() {
-			let result: PostConstraintsResponse = response.json().await?;
-			info!("Successfully posted constraints: {}", result.message);
-			Ok(result)
+			info!("Successfully posted constraints (status: {})", response.status());
+			Ok(())
 		} else {
 			let status = response.status();
 			let error_text = response.text().await.unwrap_or_default();
 			error!("Failed to post constraints: {} - {}", status, error_text);
-			Err(eyre::eyre!("Failed to post constraints: {} - {}", status, error_text))
+			Err(eyre::eyre!("Failed to post constraints (status {}): {}", status, error_text))
 		}
 	}
 

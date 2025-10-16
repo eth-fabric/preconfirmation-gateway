@@ -37,22 +37,8 @@ pub struct HealthResponse {
 	pub timestamp: u64,
 }
 
-/// Response for posting a delegation
-#[derive(Debug, Serialize)]
-pub struct PostDelegationResponse {
-	pub success: bool,
-	pub message: String,
-}
-
 /// Response for getting delegations
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GetDelegationsResponse {
 	pub delegations: Vec<SignedDelegation>,
-}
-
-/// Response for posting constraints
-#[derive(Debug, Serialize)]
-pub struct PostConstraintsResponse {
-	pub success: bool,
-	pub message: String,
 }

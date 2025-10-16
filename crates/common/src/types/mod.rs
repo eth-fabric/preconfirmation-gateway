@@ -14,8 +14,7 @@ pub use context::RpcContext;
 pub use database::DatabaseContext;
 pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};
 pub use responses::{
-	GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse,
-	ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse,
+	GetDelegationsResponse, HealthResponse, ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse,
 };
 
 /// Binding of the MessageType enum, defined here:

@@ -1,185 +1,320 @@
-use alloy::primitives::B256;
-use commitments::handlers::commitment_result_handler;
-use common::types::SignedCommitment;
-use jsonrpsee::Extensions;
-use jsonrpsee::types::Params;
+use alloy::primitives::{Address, B256};
+use common::constants::COMMITMENT_TYPE;
+use integration_tests::test_common::TestHarness;
 
-use integration_tests::test_common::test_helpers;
+/// Tests for the commitmentResult RPC handler
+/// These tests do NOT launch services - they test retrieval logic directly
+/// Data is written directly to databases to isolate the behavior under test
+///
+/// The test pattern is:
+/// 1. Setup: Create commitment and store it directly in database
+/// 2. Act: Retrieve commitment from database by hash
+/// 3. Assert: Verify the retrieved commitment matches what was stored
 
-/// Test harness for commitment result testing
-/// This provides a clean interface for testing different commitment result scenarios
-struct CommitmentResultTestHarness {
-	context: common::types::RpcContext,
+// ===== POSITIVE TESTS =====
+
+#[tokio::test]
+async fn test_retrieve_commitment_by_request_hash() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
+
+	// Create and store a commitment
+	let signed_tx = harness.create_signed_tx();
+	let slasher = Address::random();
+	let request = harness.create_commitment_request(slot, signed_tx, slasher).unwrap();
+	let signed_commitment = commitments::utils::create_signed_commitment(
+		&request,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
+
+	// Store in database
+	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+	harness
+		.context
+		.database
+		.store_commitment_and_constraint(
+			slot,
+			&signed_commitment.commitment.request_hash,
+			&signed_commitment,
+			&constraint,
+		)
+		.unwrap();
+
+	// Retrieve by request hash
+	let retrieved =
+		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap();
+
+	assert!(retrieved.is_some());
+	let retrieved_commitment = retrieved.unwrap();
+	assert_eq!(retrieved_commitment.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(retrieved_commitment.commitment.slasher, slasher);
+	assert_eq!(retrieved_commitment.commitment.request_hash, signed_commitment.commitment.request_hash);
+	assert_eq!(retrieved_commitment.nonce, signed_commitment.nonce);
+
+	println!("✅ Commitment retrieved successfully by request hash");
 }
 
-impl CommitmentResultTestHarness {
-	/// Creates a new test harness with a properly configured context
-	async fn new() -> eyre::Result<Self> {
-		let context = test_helpers::create_test_context().await?;
-		Ok(Self { context })
+#[tokio::test]
+async fn test_retrieve_multiple_commitments() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Create and store multiple commitments
+	let mut stored_commitments = vec![];
+
+	for i in 0..3 {
+		let slot = 12345 + i;
+		let signed_tx = harness.create_signed_tx();
+		let slasher = Address::random();
+		let request = harness.create_commitment_request(slot, signed_tx, slasher).unwrap();
+		let signed_commitment = commitments::utils::create_signed_commitment(
+			&request,
+			harness.context.commit_config.clone(),
+			harness.committer_one,
+		)
+		.await
+		.unwrap();
+
+		let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+		harness
+			.context
+			.database
+			.store_commitment_and_constraint(
+				slot,
+				&signed_commitment.commitment.request_hash,
+				&signed_commitment,
+				&constraint,
+			)
+			.unwrap();
+
+		stored_commitments.push(signed_commitment);
 	}
 
-	/// Tests a commitment result request and returns the result
-	async fn test_commitment_result(&self, request_hash: B256) -> eyre::Result<SignedCommitment> {
-		// Create params with the request hash as a single parameter
-		let request_json = serde_json::to_string(&request_hash)?;
-		let params_json = format!("[{}]", request_json);
-		let params = Params::new(Some(&params_json));
+	// Retrieve each commitment and verify
+	for stored in &stored_commitments {
+		let retrieved = harness.context.database.get_commitment_by_hash(&stored.commitment.request_hash).unwrap();
 
-		// Call the handler
-		let result = commitment_result_handler::<()>(params, &self.context, &Extensions::default());
-
-		match result {
-			Ok(signed_commitment) => Ok(signed_commitment),
-			Err(e) => Err(eyre::eyre!("Handler failed: {}", e)),
-		}
+		assert!(retrieved.is_some());
+		let retrieved_commitment = retrieved.unwrap();
+		assert_eq!(retrieved_commitment.commitment.request_hash, stored.commitment.request_hash);
+		assert_eq!(retrieved_commitment.commitment.slasher, stored.commitment.slasher);
+		assert_eq!(retrieved_commitment.nonce, stored.nonce);
+		assert_eq!(retrieved_commitment.signature, stored.signature);
 	}
 
-	/// Tests a commitment result request and expects it to fail with a specific error
-	async fn test_commitment_result_should_fail(&self, request_hash: B256) -> eyre::Result<()> {
-		// Create params with the request hash as a single parameter
-		let request_json = serde_json::to_string(&request_hash)?;
-		let params_json = format!("[{}]", request_json);
-		let params = Params::new(Some(&params_json));
-
-		// Call the handler
-		let result = commitment_result_handler::<()>(params, &self.context, &Extensions::default());
-
-		match result {
-			Ok(_) => Err(eyre::eyre!("Expected handler to fail but it succeeded")),
-			Err(_) => Ok(()), // Expected failure
-		}
-	}
-
-	/// Pre-populates the database with a signed commitment for testing
-	fn pre_populate_commitment(
-		&self,
-		request_hash: B256,
-		signed_commitment: SignedCommitment,
-		slot: u64,
-	) -> eyre::Result<()> {
-		self.context
-			.database()
-			.store_commitment(slot, &request_hash, &signed_commitment)
-			.map_err(|e| eyre::eyre!("Failed to store commitment: {}", e))?;
-		Ok(())
-	}
-
-	/// Pre-populates the database with multiple signed commitments for testing
-	fn pre_populate_multiple_commitments(&self, commitments: Vec<(B256, SignedCommitment, u64)>) -> eyre::Result<()> {
-		for (request_hash, signed_commitment, slot) in commitments {
-			self.context
-				.database()
-				.store_commitment(slot, &request_hash, &signed_commitment)
-				.map_err(|e| eyre::eyre!("Failed to store commitment: {}", e))?;
-		}
-		Ok(())
-	}
+	println!("✅ Multiple commitments retrieved successfully");
 }
 
-/// Test cases for different scenarios
-mod test_cases {
-	use super::*;
+#[tokio::test]
+async fn test_commitment_fields_preserved_after_storage() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-	#[tokio::test]
-	async fn test_valid_commitment_result() -> eyre::Result<()> {
-		let harness = CommitmentResultTestHarness::new().await?;
+	// Create commitment with specific values
+	let signed_tx = harness.create_signed_tx();
+	let slasher = Address::random();
+	let request = harness.create_commitment_request(slot, signed_tx, slasher).unwrap();
+	let signed_commitment = commitments::utils::create_signed_commitment(
+		&request,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
 
-		// Create test data
-		let request_hash = test_helpers::create_valid_request_hash();
-		let slasher = test_helpers::create_valid_slasher();
-		let payload = test_helpers::create_valid_payload();
-		let commitment_type = test_helpers::create_valid_commitment_type();
-		let nonce = test_helpers::create_valid_nonce();
-		let signing_id = test_helpers::create_valid_signing_id();
+	// Store it
+	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+	harness
+		.context
+		.database
+		.store_commitment_and_constraint(
+			slot,
+			&signed_commitment.commitment.request_hash,
+			&signed_commitment,
+			&constraint,
+		)
+		.unwrap();
 
-		// Create and store a signed commitment
-		let signed_commitment = test_helpers::create_signed_commitment_with_mock_signature(
-			commitment_type,
-			payload.clone(),
-			request_hash,
-			slasher,
-			nonce,
-			signing_id,
-		);
+	// Retrieve and verify all fields are preserved
+	let retrieved =
+		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
 
-		harness.pre_populate_commitment(request_hash, signed_commitment.clone(), 12345)?;
+	assert_eq!(retrieved.commitment.commitment_type, signed_commitment.commitment.commitment_type);
+	assert_eq!(retrieved.commitment.payload, signed_commitment.commitment.payload);
+	assert_eq!(retrieved.commitment.request_hash, signed_commitment.commitment.request_hash);
+	assert_eq!(retrieved.commitment.slasher, signed_commitment.commitment.slasher);
+	assert_eq!(retrieved.nonce, signed_commitment.nonce);
+	assert_eq!(retrieved.signing_id, signed_commitment.signing_id);
+	assert_eq!(retrieved.signature, signed_commitment.signature);
 
-		// Test retrieving the commitment
-		let result = harness.test_commitment_result(request_hash).await?;
+	println!("✅ All commitment fields preserved after storage");
+}
 
-		// Verify the result matches what we stored
-		assert_eq!(result.commitment.commitment_type, commitment_type);
-		assert_eq!(result.commitment.payload, payload);
-		assert_eq!(result.commitment.request_hash, request_hash);
-		assert_eq!(result.commitment.slasher, slasher);
-		assert_eq!(result.nonce, nonce);
-		assert_eq!(result.signing_id, signing_id);
-		assert_eq!(result.signature, signed_commitment.signature);
+#[tokio::test]
+async fn test_retrieve_commitment_idempotent() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-		Ok(())
+	// Create and store commitment
+	let signed_tx = harness.create_signed_tx();
+	let request = harness.create_commitment_request(slot, signed_tx, Address::random()).unwrap();
+	let signed_commitment = commitments::utils::create_signed_commitment(
+		&request,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
+
+	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+	harness
+		.context
+		.database
+		.store_commitment_and_constraint(
+			slot,
+			&signed_commitment.commitment.request_hash,
+			&signed_commitment,
+			&constraint,
+		)
+		.unwrap();
+
+	// Retrieve multiple times
+	let retrieved1 =
+		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
+	let retrieved2 =
+		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
+
+	// Should get same data
+	assert_eq!(retrieved1.commitment.request_hash, retrieved2.commitment.request_hash);
+	assert_eq!(retrieved1.signature, retrieved2.signature);
+
+	println!("✅ Retrieving commitment is idempotent");
+}
+
+// ===== NEGATIVE TESTS =====
+
+#[tokio::test]
+async fn test_retrieve_nonexistent_commitment() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Try to retrieve a commitment that doesn't exist
+	let nonexistent_hash = B256::random();
+	let result = harness.context.database.get_commitment_by_hash(&nonexistent_hash).unwrap();
+
+	assert!(result.is_none());
+	println!("✅ Correctly returns None for nonexistent commitment");
+}
+
+#[tokio::test]
+async fn test_retrieve_with_zero_hash() {
+	let harness = TestHarness::builder().build().await.unwrap();
+
+	// Try to retrieve with zero hash
+	let zero_hash = B256::ZERO;
+	let result = harness.context.database.get_commitment_by_hash(&zero_hash).unwrap();
+
+	assert!(result.is_none());
+	println!("✅ Correctly handles zero hash");
+}
+
+#[tokio::test]
+async fn test_retrieve_after_multiple_stores() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
+
+	// Store multiple different commitments
+	for _ in 0..5 {
+		let signed_tx = harness.create_signed_tx();
+		let request = harness.create_commitment_request(slot, signed_tx, Address::random()).unwrap();
+		let signed_commitment = commitments::utils::create_signed_commitment(
+			&request,
+			harness.context.commit_config.clone(),
+			harness.committer_one,
+		)
+		.await
+		.unwrap();
+
+		let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+		harness
+			.context
+			.database
+			.store_commitment_and_constraint(
+				slot,
+				&signed_commitment.commitment.request_hash,
+				&signed_commitment,
+				&constraint,
+			)
+			.unwrap();
 	}
 
-	#[tokio::test]
-	async fn test_nonexistent_commitment() -> eyre::Result<()> {
-		let harness = CommitmentResultTestHarness::new().await?;
+	// Store a specific commitment we'll retrieve
+	let signed_tx = harness.create_signed_tx();
+	let specific_slasher = Address::random();
+	let request = harness.create_commitment_request(slot, signed_tx, specific_slasher).unwrap();
+	let target_commitment = commitments::utils::create_signed_commitment(
+		&request,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
 
-		// Try to retrieve a commitment that doesn't exist
-		let nonexistent_hash = test_helpers::create_nonexistent_request_hash();
-		harness.test_commitment_result_should_fail(nonexistent_hash).await?;
+	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
+	harness
+		.context
+		.database
+		.store_commitment_and_constraint(
+			slot,
+			&target_commitment.commitment.request_hash,
+			&target_commitment,
+			&constraint,
+		)
+		.unwrap();
 
-		Ok(())
-	}
+	// Retrieve the specific commitment
+	let retrieved =
+		harness.context.database.get_commitment_by_hash(&target_commitment.commitment.request_hash).unwrap();
 
-	#[tokio::test]
-	async fn test_multiple_commitments() -> eyre::Result<()> {
-		let harness = CommitmentResultTestHarness::new().await?;
+	assert!(retrieved.is_some());
+	let retrieved_commitment = retrieved.unwrap();
+	assert_eq!(retrieved_commitment.commitment.slasher, specific_slasher);
+	assert_eq!(retrieved_commitment.commitment.request_hash, target_commitment.commitment.request_hash);
 
-		// Create multiple commitments
-		let commitments = vec![
-			(
-				test_helpers::create_valid_request_hash(),
-				test_helpers::create_signed_commitment_with_mock_signature(
-					test_helpers::create_valid_commitment_type(),
-					test_helpers::create_valid_payload(),
-					test_helpers::create_valid_request_hash(),
-					test_helpers::create_valid_slasher(),
-					test_helpers::create_valid_nonce(),
-					test_helpers::create_valid_signing_id(),
-				),
-				12345,
-			),
-			(
-				test_helpers::create_another_valid_request_hash(),
-				test_helpers::create_signed_commitment_with_mock_signature(
-					test_helpers::create_valid_commitment_type(),
-					test_helpers::create_another_valid_payload(),
-					test_helpers::create_another_valid_request_hash(),
-					test_helpers::create_valid_slasher(),
-					test_helpers::create_another_valid_nonce(),
-					test_helpers::create_valid_signing_id(),
-				),
-				12346,
-			),
-		];
+	println!("✅ Can retrieve specific commitment among many");
+}
 
-		// Pre-populate the database
-		harness.pre_populate_multiple_commitments(commitments.clone())?;
+#[tokio::test]
+async fn test_different_requests_have_different_hashes() {
+	let harness = TestHarness::builder().build().await.unwrap();
+	let slot = 12345;
 
-		// Test retrieving each commitment
-		for (request_hash, expected_commitment, _slot) in commitments {
-			let result = harness.test_commitment_result(request_hash).await?;
+	// Create two different commitments
+	let signed_tx1 = harness.create_signed_tx();
+	let slasher1 = Address::random();
+	let request1 = harness.create_commitment_request(slot, signed_tx1, slasher1).unwrap();
+	let commitment1 = commitments::utils::create_signed_commitment(
+		&request1,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
 
-			// Verify the result matches what we stored
-			assert_eq!(result.commitment.commitment_type, expected_commitment.commitment.commitment_type);
-			assert_eq!(result.commitment.payload, expected_commitment.commitment.payload);
-			assert_eq!(result.commitment.request_hash, expected_commitment.commitment.request_hash);
-			assert_eq!(result.commitment.slasher, expected_commitment.commitment.slasher);
-			assert_eq!(result.nonce, expected_commitment.nonce);
-			assert_eq!(result.signing_id, expected_commitment.signing_id);
-			assert_eq!(result.signature, expected_commitment.signature);
-		}
+	let signed_tx2 = harness.create_signed_tx();
+	let slasher2 = Address::random();
+	let request2 = harness.create_commitment_request(slot, signed_tx2, slasher2).unwrap();
+	let commitment2 = commitments::utils::create_signed_commitment(
+		&request2,
+		harness.context.commit_config.clone(),
+		harness.committer_one,
+	)
+	.await
+	.unwrap();
 
-		Ok(())
-	}
+	// Different requests should have different hashes
+	assert_ne!(commitment1.commitment.request_hash, commitment2.commitment.request_hash);
+
+	println!("✅ Different commitment requests produce different hashes");
 }

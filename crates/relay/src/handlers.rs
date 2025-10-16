@@ -1,18 +1,17 @@
 use axum::{extract::Path, extract::State, http::HeaderMap, http::StatusCode, response::Json};
 use commit_boost::prelude::verify_proposer_commitment_signature_bls_for_message;
 use common::types::{
-	ConstraintCapabilities, GetDelegationsResponse, HealthResponse, PostConstraintsResponse, PostDelegationResponse,
-	SignedConstraints, SignedDelegation,
+	ConstraintCapabilities, GetDelegationsResponse, HealthResponse, SignedConstraints, SignedDelegation,
 };
 use hex;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 
 use crate::utils::{
-	validate_constraints_message, validate_delegation_message, validate_is_proposer, verify_constraints_signature,
-	verify_delegation_signature,
+	validate_delegation_message, validate_is_proposer, verify_constraints_signature, verify_delegation_signature,
 };
 use common::types::database::DatabaseContext;
+use constraints::utils::validate_constraints_message;
 
 /// Extract and parse BLS signature, public key, nonce, and signing_id from headers
 fn extract_bls_auth_headers(
@@ -118,29 +117,16 @@ pub struct RelayState {
 pub async fn store_delegation_handler(
 	State(state): State<RelayState>,
 	Json(delegation): Json<SignedDelegation>,
-) -> Result<Json<PostDelegationResponse>, StatusCode> {
+) -> StatusCode {
 	info!("Storing delegation for slot {}", delegation.message.slot);
 
 	// Validate delegation message structure
-	match validate_delegation_message(&delegation.message) {
-		Ok(false) => {
-			error!("Invalid delegation message structure");
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: "Invalid delegation message structure".to_string(),
-			}));
-		}
-		Err(e) => {
-			error!("Error validating delegation message: {}", e);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: format!("Error validating delegation message: {}", e),
-			}));
-		}
-		Ok(true) => {
-			debug!("Delegation message structure is valid");
-		}
+	if validate_delegation_message(&delegation.message).is_err() {
+		error!("Invalid delegation message structure");
+		return StatusCode::BAD_REQUEST;
 	}
+
+	info!("Delegation message validated");
 
 	// Verify BLS signature using the proposer public key from the message
 	match verify_delegation_signature(&delegation, state.config.relay.chain) {
@@ -149,19 +135,15 @@ pub async fn store_delegation_handler(
 		}
 		Ok(false) => {
 			error!("Delegation signature verification failed");
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: "Delegation signature verification failed".to_string(),
-			}));
+			return StatusCode::UNAUTHORIZED;
 		}
 		Err(e) => {
 			error!("Error verifying delegation signature: {}", e);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: format!("Error verifying delegation signature: {}", e),
-			}));
+			return StatusCode::BAD_REQUEST;
 		}
 	}
+
+	info!("Delegation signature verified");
 
 	// Validate that the proposer is scheduled for this slot
 	match validate_is_proposer(&delegation.message.proposer, delegation.message.slot) {
@@ -170,19 +152,15 @@ pub async fn store_delegation_handler(
 		}
 		Ok(false) => {
 			error!("Proposer public key is not scheduled for slot {}", delegation.message.slot);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: "Proposer public key is not scheduled for this slot".to_string(),
-			}));
+			return StatusCode::FORBIDDEN;
 		}
 		Err(e) => {
 			error!("Error validating proposer for slot {}: {}", delegation.message.slot, e);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: format!("Error validating proposer: {}", e),
-			}));
+			return StatusCode::INTERNAL_SERVER_ERROR;
 		}
 	}
+
+	info!("Proposer is scheduled for this slot");
 
 	// Check for existing delegation to prevent equivocation
 	match state.database.get_delegation_for_slot(delegation.message.slot) {
@@ -191,32 +169,28 @@ pub async fn store_delegation_handler(
 				"Delegation already exists for slot {} - rejecting to prevent equivocation",
 				delegation.message.slot
 			);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: "Delegation already exists for this slot. Cannot accept another delegation (equivocation protection)".to_string(),
-			}));
+			return StatusCode::CONFLICT;
 		}
 		Ok(None) => {
 			debug!("No existing delegation found for slot {}", delegation.message.slot);
 		}
 		Err(e) => {
 			error!("Error checking for existing delegation for slot {}: {}", delegation.message.slot, e);
-			return Ok(Json(PostDelegationResponse {
-				success: false,
-				message: format!("Error checking for existing delegation: {}", e),
-			}));
+			return StatusCode::INTERNAL_SERVER_ERROR;
 		}
 	}
+
+	info!("No existing delegation found for this slot");
 
 	// Store delegation in database
 	match state.database.store_delegation(delegation.message.slot, &delegation) {
 		Ok(_) => {
 			info!("Delegation stored successfully for slot {}", delegation.message.slot);
-			Ok(Json(PostDelegationResponse { success: true, message: "Delegation stored successfully".to_string() }))
+			StatusCode::OK
 		}
 		Err(e) => {
 			error!("Failed to store delegation: {}", e);
-			Ok(Json(PostDelegationResponse { success: false, message: format!("Failed to store delegation: {}", e) }))
+			StatusCode::INTERNAL_SERVER_ERROR
 		}
 	}
 }
@@ -248,28 +222,13 @@ pub async fn get_delegations_handler(
 pub async fn store_constraints_handler(
 	State(state): State<RelayState>,
 	Json(signed_constraints): Json<SignedConstraints>,
-) -> Result<Json<PostConstraintsResponse>, StatusCode> {
+) -> StatusCode {
 	info!("Storing constraints for slot {}", signed_constraints.message.slot);
 
 	// Validate constraints message structure
-	match validate_constraints_message(&signed_constraints.message) {
-		Ok(false) => {
-			error!("Invalid constraints message structure");
-			return Ok(Json(PostConstraintsResponse {
-				success: false,
-				message: "Invalid constraints message structure".to_string(),
-			}));
-		}
-		Err(e) => {
-			error!("Error validating constraints message: {}", e);
-			return Ok(Json(PostConstraintsResponse {
-				success: false,
-				message: format!("Error validating constraints message: {}", e),
-			}));
-		}
-		Ok(true) => {
-			debug!("Constraints message structure is valid");
-		}
+	if validate_constraints_message(&signed_constraints.message).is_err() {
+		error!("Invalid constraints message structure");
+		return StatusCode::BAD_REQUEST;
 	}
 
 	// Verify BLS signature using the delegate public key from the message
@@ -279,17 +238,30 @@ pub async fn store_constraints_handler(
 		}
 		Ok(false) => {
 			error!("Constraints signature verification failed");
-			return Ok(Json(PostConstraintsResponse {
-				success: false,
-				message: "Constraints signature verification failed".to_string(),
-			}));
+			return StatusCode::UNAUTHORIZED;
 		}
 		Err(e) => {
 			error!("Error verifying constraints signature: {}", e);
-			return Ok(Json(PostConstraintsResponse {
-				success: false,
-				message: format!("Error verifying constraints signature: {}", e),
-			}));
+			return StatusCode::BAD_REQUEST;
+		}
+	}
+
+	// Verify a delegation exists and is for the correct gateway
+	match state.database.get_delegation_for_slot(signed_constraints.message.slot) {
+		Ok(Some(delegation)) => {
+			if delegation.message.delegate != signed_constraints.message.delegate {
+				error!("Delegation for slot {} is not for the correct gateway", signed_constraints.message.slot);
+				return StatusCode::FORBIDDEN;
+			}
+			info!("Delegation exists for slot {}", signed_constraints.message.slot);
+		}
+		Ok(None) => {
+			error!("No delegation found for slot {}", signed_constraints.message.slot);
+			return StatusCode::NOT_FOUND;
+		}
+		Err(e) => {
+			error!("Error checking for delegation for slot {}: {}", signed_constraints.message.slot, e);
+			return StatusCode::INTERNAL_SERVER_ERROR;
 		}
 	}
 
@@ -297,17 +269,11 @@ pub async fn store_constraints_handler(
 	match state.database.store_signed_constraints(&signed_constraints) {
 		Ok(_) => {
 			info!("Signed constraints stored successfully for slot {}", signed_constraints.message.slot);
-			Ok(Json(PostConstraintsResponse {
-				success: true,
-				message: "Signed constraints stored successfully".to_string(),
-			}))
+			StatusCode::OK
 		}
 		Err(e) => {
 			error!("Failed to store signed constraints: {}", e);
-			Ok(Json(PostConstraintsResponse {
-				success: false,
-				message: format!("Failed to store signed constraints: {}", e),
-			}))
+			StatusCode::INTERNAL_SERVER_ERROR
 		}
 	}
 }
@@ -374,16 +340,6 @@ pub async fn get_constraints_for_slot_handler(
 			authorized_constraints.push(signed_constraints_item);
 		}
 	}
-	// for signed_constraints_item in signed_constraints {
-	// 	let is_authorized = if signed_constraints_item.message.receivers.is_empty() {
-	// 		true
-	// 	} else {
-	// 		signed_constraints_item.message.receivers.iter().any(|receiver| receiver == &public_key)
-	// 	};
-	// 	if is_authorized {
-	// 		authorized_constraints.push(signed_constraints_item);
-	// 	}
-	// }
 
 	info!("Returning {} authorized constraints for slot {}", authorized_constraints.len(), slot);
 	Ok(Json(authorized_constraints))

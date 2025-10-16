@@ -70,7 +70,13 @@ pub async fn process_constraints(
 		}
 		Err(e) => {
 			error!("Failed to send constraints for slot {} to relay: {}", slot, e);
-			Err(eyre::eyre!("Failed to send constraints to relay: {}", e))
+			return Ok(ProcessConstraintsResponse {
+				success: false,
+				slot,
+				processed_count: 0,
+				signed_constraints: None,
+				message: format!("Failed to send constraints for slot {} to relay: {}", slot, e),
+			});
 		}
 	}
 }

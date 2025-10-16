@@ -206,7 +206,7 @@ pub fn fee_handler<T>(
 	_extensions: &Extensions,
 ) -> RpcResult<FeeInfo> {
 	info!("Processing fee request");
-	let request: CommitmentRequest = params.parse()?;
+	let request: CommitmentRequest = params.one()?;
 
 	// Use helper function to calculate fee
 	let fee_info = match utils::calculate_fee_info(&request, _context.pricing_database()) {

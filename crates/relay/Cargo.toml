@@ -33,6 +33,9 @@ alloy = { workspace = true }
 # Common types (reuse from our common crate)
 common = { path = "../common" }
 
+# Constraints
+constraints = { path = "../constraints" }
+
 # Configuration
 toml = { workspace = true }
 
