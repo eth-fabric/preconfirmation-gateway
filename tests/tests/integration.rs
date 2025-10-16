@@ -1,434 +1,127 @@
-use alloy::primitives::B256;
-use common::slot_timer::SlotTimer;
-use common::types::{CommitmentRequest, SignedCommitment};
-use jsonrpsee::core::client::ClientT;
-use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
-use rand::Rng;
-use std::time::Duration;
-use tempfile::TempDir;
-use tokio::time::sleep;
+use alloy::primitives::Address;
+use common::constants::{COMMITMENT_TYPE, CONSTRAINT_TYPE};
+use integration_tests::test_common::TestHarness;
 
-use integration_tests::test_common::{MODULE_ID, SIGNING_ID, test_helpers};
+/// End-to-end integration tests with both commitments and relay services running
+///
+/// These tests verify the complete workflow and interaction between services
+/// in realistic production scenarios.
 
-/// Integration test for the full RPC server flow
-/// This test instantiates the RPC server, starts a local signer, and tests the complete flow
-/// of commitmentRequest -> commitmentResult RPC calls
+// ===== FULL WORKFLOW TESTS =====
+
 #[tokio::test]
-async fn test_full_rpc_server_flow() -> eyre::Result<()> {
-	// Setup test environment
-	let test_env = TestEnvironment::setup().await?;
-
-	// Test the complete flow
-	test_commitment_request_flow(&test_env).await?;
-	test_commitment_result_flow(&test_env).await?;
-	test_end_to_end_flow(&test_env).await?;
-
-	Ok(())
-}
-
-/// Test environment that sets up the RPC server with local signer
-struct TestEnvironment {
-	client: HttpClient,
-	server_handle: tokio::task::JoinHandle<()>,
-	temp_dir: TempDir,
-	test_slots: Vec<u64>,
-}
-
-impl TestEnvironment {
-	/// Sets up the complete test environment including RPC server and local signer
-	async fn setup() -> eyre::Result<Self> {
-		// Create temporary directory for database
-		let temp_dir = TempDir::new()?;
-		let db_path = temp_dir.path().join("test_db");
-
-		// Generate random ports for signer server and RPC server
-		let mut rng = rand::thread_rng();
-		let signer_port = rng.gen_range(20000..29999);
-		let rpc_port = rng.gen_range(30000..39999);
-
-		// Create test configuration
-		let app_config = common::config::InclusionPreconfConfig {
-			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: rpc_port,
-			commitments_database_url: db_path.to_string_lossy().to_string(),
-			constraints_database_url: format!("{}_constraints", db_path.to_string_lossy()),
-			delegations_database_url: format!("{}_delegations", db_path.to_string_lossy()),
-			pricing_database_url: format!("{}_pricing", db_path.to_string_lossy()),
-			log_level: "debug".to_string(),
-			enable_method_tracing: true,
-			traced_methods: vec![
-				"commitmentRequest".to_string(),
-				"commitmentResult".to_string(),
-				"slots".to_string(),
-				"fee".to_string(),
-			],
-			// Constraints config fields
-			constraints_relay_url: "https://relay.example.com".to_string(),
-			constraints_api_key: None,
-			constraints_bls_public_key:
-				"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
-					.to_string(),
-			constraints_delegate_public_key:
-				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
-					.to_string(),
-			eth_genesis_timestamp: 1606824023,
-			constraints_receivers: vec![
-				"020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202"
-					.to_string(),
-			],
-		};
-
-		// Start local signer server with test configuration
-		let commit_config = integration_tests::test_common::start_local_signer_server_with_config(
-			MODULE_ID,
-			SIGNING_ID,
-			"test-admin-secret",
-			signer_port,
-			app_config,
-		)
-		.await?;
-
-		// Create database
-		let db = create_test_database(&db_path)?;
-		let database = common::types::DatabaseContext::new(std::sync::Arc::new(db));
-
-		// Generate proxy key for committer
-		let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
-			.map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))?;
-		let mut commit_config_guard = commit_config;
-		let proxy_address = commit_config_guard
-			.signer_client
-			.generate_proxy_key_ecdsa(test_bls_pubkey)
-			.await
-			.map_err(|e| eyre::eyre!("Failed to generate proxy key: {}", e))?;
-		let committer_address = proxy_address.message.proxy;
-
-		// Create test slots relative to current time
-		let slot_timer = SlotTimer::new(1606824023);
-		let current_slot = slot_timer.get_current_slot();
-		let test_slots: Vec<u64> = (current_slot..current_slot + 10).collect();
-
-		// Set up test delegations for the test slots
-		setup_test_delegations_with_slots(&database, &committer_address, &test_slots).await?;
-
-		// Create RPC context with constraints fields
-		// Use a valid BLS public key for testing
-		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
-		let relay_url = "https://relay.example.com".to_string();
-		let api_key = None::<String>;
-
-		// Create slot timer with test genesis timestamp
-		let slot_timer = SlotTimer::new(1606824023);
-
-		// Create pricing database for testing
-		let pricing_db = create_test_database(&temp_dir.path().join("test_pricing_db"))?;
-		let pricing_database = common::types::DatabaseContext::new(std::sync::Arc::new(pricing_db));
-
-		let rpc_context = common::types::RpcContext::new(
-			database,
-			pricing_database,
-			commit_config_guard,
-			bls_public_key,
-			relay_url,
-			api_key,
-			slot_timer,
-		);
-
-		// Start RPC server
-		let server_address = format!("127.0.0.1:{}", rpc_port);
-		let server_handle = tokio::spawn(async move {
-			if let Err(e) = commitments::server::run_server(rpc_context).await {
-				eprintln!("RPC server error: {}", e);
-			}
-		});
-
-		// Wait for server to start
-		sleep(Duration::from_millis(100)).await;
-
-		// Create HTTP client to connect to the server
-		let server_url = format!("http://{}", server_address);
-		let client = HttpClientBuilder::default()
-			.request_timeout(Duration::from_secs(30))
-			.build(&server_url)
-			.map_err(|e| eyre::eyre!("Failed to create HTTP client: {}", e))?;
-
-		Ok(Self { client, server_handle, temp_dir, test_slots })
-	}
-}
-
-/// Sets up test delegations for provided test slots
-async fn setup_test_delegations_with_slots(
-	database: &common::types::DatabaseContext,
-	committer_address: &alloy::primitives::Address,
-	test_slots: &[u64],
-) -> eyre::Result<()> {
-	use alloy::primitives::{B256, Bytes};
-	use commit_boost::prelude::{BlsPublicKey, BlsSignature};
-	use common::types::constraints::SignedDelegation;
-
-	for slot in test_slots {
-		// Create a mock delegation for testing
-		let mock_delegation = SignedDelegation {
-			message: common::types::constraints::Delegation {
-				proposer: BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
-					.map_err(|e| eyre::eyre!("Failed to create BLS public key: {:?}", e))?,
-				delegate: BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
-					.map_err(|e| eyre::eyre!("Failed to create BLS public key: {:?}", e))?,
-				committer: *committer_address,
-				slot: *slot,
-				metadata: Bytes::new(),
-			},
-			nonce: 1,
-			signing_id: B256::default(),
-			signature: BlsSignature::deserialize(&[0u8; 96])
-				.map_err(|e| eyre::eyre!("Failed to create BLS signature: {:?}", e))?,
-		};
-
-		// Store the delegation in the database
-		database
-			.store_delegation(*slot, &mock_delegation)
-			.map_err(|e| eyre::eyre!("Failed to store test delegation for slot {}: {}", slot, e))?;
-	}
-
-	Ok(())
-}
-
-/// Creates a test RocksDB database
-fn create_test_database(db_path: &std::path::Path) -> eyre::Result<rocksdb::DB> {
-	use rocksdb::{DB, Options};
-
-	let mut opts = Options::default();
-	opts.create_if_missing(true);
-	opts.create_missing_column_families(true);
-
-	let db = DB::open(&opts, db_path)?;
-	Ok(db)
-}
-
-/// Tests the commitmentRequest RPC method
-async fn test_commitment_request_flow(env: &TestEnvironment) -> eyre::Result<()> {
-	println!("Testing commitmentRequest RPC method...");
-
-	// Create a valid commitment request using the first test slot
-	let test_slot = env.test_slots[0];
-	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
-	let slasher = test_helpers::create_valid_slasher();
-	let commitment_type = test_helpers::create_valid_commitment_type();
-
-	let request = CommitmentRequest { commitment_type, payload, slasher };
-
-	// Make RPC request to the server
-	let response: SignedCommitment = env
-		.client
-		.request("commitmentRequest", (request,))
+async fn test_complete_preconfirmation_workflow() {
+	// Launch both services
+	let harness = TestHarness::builder()
+		.with_commitments_port(None) // Launch commitments service with auto-assigned port
+		.with_relay_port(None) // Launch relay service with auto-assigned port
+		.build()
 		.await
-		.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
+		.unwrap();
 
-	// Verify the response
-	assert_eq!(response.commitment.commitment_type, commitment_type);
-	assert!(response.nonce > 0, "Nonce should be greater than 0");
-	assert!(!response.signature.to_string().is_empty(), "Signature should not be empty");
-	assert_eq!(response.commitment.slasher, slasher);
+	let client = harness.create_client_harness();
+	let slot = 12345;
 
-	println!("commitmentRequest test passed");
-	println!("  - Commitment type: {}", response.commitment.commitment_type);
-	println!("  - Nonce: {}", response.nonce);
-	println!("  - Request hash: {}", response.commitment.request_hash);
+	// === STEP 1: Post delegation to relay ===
+	println!("Step 1: Posting delegation to relay...");
+	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 
-	Ok(())
-}
+	client.post_delegation(&signed_delegation).await.unwrap();
+	println!("Delegation posted to relay");
 
-/// Tests the commitmentResult RPC method
-async fn test_commitment_result_flow(env: &TestEnvironment) -> eyre::Result<()> {
-	println!("Testing commitmentResult RPC method...");
+	// === STEP 2: Gateway processes delegations ===
+	println!("\nStep 2: Gateway processing delegations from relay...");
+	let delegation_response = harness.process_delegations(slot).await.unwrap();
 
-	// First, create a commitment request to get a request hash using the second test slot
-	let test_slot = env.test_slots[1];
-	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
-	let slasher = test_helpers::create_valid_slasher();
-	let commitment_type = test_helpers::create_valid_commitment_type();
+	assert!(delegation_response.success, "Delegation processing should succeed");
+	assert_eq!(delegation_response.matching_delegations.len(), 1, "Should find 1 matching delegation");
+	println!("Gateway processed delegations: found {} matching", delegation_response.matching_delegations.len());
 
-	let request = CommitmentRequest { commitment_type, payload, slasher };
+	// Verify delegation is stored in local database
+	let stored_delegation = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	assert!(stored_delegation.is_some(), "Delegation should be stored in local DB");
+	println!("Delegation stored in local database");
 
-	// Call commitmentRequest to store the commitment
-	let signed_commitment: SignedCommitment = env
-		.client
-		.request("commitmentRequest", (request,))
-		.await
-		.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
+	// === STEP 3: Make commitment request (writes constraint to local DB) ===
+	println!("\nStep 3: Making commitment request...");
+	let signed_tx = harness.create_signed_tx();
+	let slasher = Address::random();
+	let commitment_request = harness.create_commitment_request(slot, signed_tx.clone(), slasher).unwrap();
 
-	let request_hash = signed_commitment.commitment.request_hash;
+	let commitment_result = client.commitment_request(&commitment_request).await.unwrap();
 
-	// Now call commitmentResult with the request hash
-	let result: SignedCommitment = env
-		.client
-		.request("commitmentResult", (request_hash,))
-		.await
-		.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
+	assert_eq!(commitment_result.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(commitment_result.commitment.slasher, slasher);
+	assert!(commitment_result.nonce > 0);
+	println!("Commitment created with hash: {:?}", commitment_result.commitment.request_hash);
 
-	// Verify the result matches the original commitment
-	assert_eq!(result.commitment.commitment_type, signed_commitment.commitment.commitment_type);
-	assert_eq!(result.commitment.payload, signed_commitment.commitment.payload);
-	assert_eq!(result.commitment.request_hash, signed_commitment.commitment.request_hash);
-	assert_eq!(result.commitment.slasher, signed_commitment.commitment.slasher);
-	assert_eq!(result.nonce, signed_commitment.nonce);
-	assert_eq!(result.signing_id, signed_commitment.signing_id);
-	assert_eq!(result.signature, signed_commitment.signature);
+	// Verify commitment is stored
+	let stored_commitment =
+		harness.context.database.get_commitment_by_hash(&commitment_result.commitment.request_hash).unwrap();
+	assert!(stored_commitment.is_some(), "Commitment should be stored");
+	println!("Commitment stored in database");
 
-	println!("commitmentResult test passed");
-	println!("  - Retrieved commitment type: {}", result.commitment.commitment_type);
-	println!("  - Retrieved nonce: {}", result.nonce);
-	println!("  - Retrieved request hash: {}", result.commitment.request_hash);
+	// Verify constraint was written to local DB (this happens during commitment creation)
+	let constraints_for_slot = harness.context.database.get_constraints_for_slot(slot).unwrap();
+	assert!(!constraints_for_slot.is_empty(), "Constraints should be written to local DB");
+	println!("Constraint written to local database: {} constraints", constraints_for_slot.len());
 
-	Ok(())
-}
+	// === STEP 4: Process constraints (posts to relay) ===
+	println!("\nStep 4: Processing and posting constraints to relay...");
+	let process_result = harness.process_constraints(slot, vec![]).await.unwrap();
 
-/// Tests the complete end-to-end flow
-async fn test_end_to_end_flow(env: &TestEnvironment) -> eyre::Result<()> {
-	println!("Testing complete end-to-end flow...");
+	assert!(process_result.success, "Constraint processing should succeed");
+	assert_eq!(process_result.processed_count, 1, "Should process 1 constraint");
+	println!("Processed {} constraints and posted to relay", process_result.processed_count);
 
-	// Create multiple commitment requests using test slots
-	let test_cases = vec![
-		(env.test_slots[0], test_helpers::create_valid_signed_tx()),
-		(env.test_slots[1], test_helpers::create_valid_signed_tx()),
-		(env.test_slots[2], test_helpers::create_valid_signed_tx()),
-	];
+	// === STEP 5: Retrieve commitment result ===
+	println!("\nStep 5: Retrieving commitment result...");
+	let retrieved_commitment = client.commitment_result(&commitment_result.commitment.request_hash).await.unwrap();
 
-	let mut request_hashes = Vec::new();
-	let mut slots = Vec::new();
+	assert_eq!(retrieved_commitment.commitment.request_hash, commitment_result.commitment.request_hash);
+	assert_eq!(retrieved_commitment.commitment.slasher, slasher);
+	assert_eq!(retrieved_commitment.nonce, commitment_result.nonce);
+	assert_eq!(retrieved_commitment.signature, commitment_result.signature);
+	println!("Commitment result retrieved and verified");
 
-	// Process all commitment requests
-	for (slot, signed_tx) in test_cases {
-		let payload = test_helpers::create_valid_inclusion_payload(slot, signed_tx)?;
-		let slasher = test_helpers::create_valid_slasher();
-		let commitment_type = test_helpers::create_valid_commitment_type();
+	// === STEP 6: Retrieve constraints from relay ===
+	println!("\nStep 6: Retrieving constraints from relay...");
+	let headers = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_one.clone()).await;
+	let relay_constraints = client.get_constraints(slot, headers).await.unwrap();
 
-		let request = CommitmentRequest { commitment_type, payload, slasher };
+	assert_eq!(relay_constraints.len(), 1, "Should retrieve 1 signed constraint message");
+	println!("Retrieved {} constraint messages from relay", relay_constraints.len());
 
-		// Call commitmentRequest via RPC
-		let signed_commitment: SignedCommitment = env
-			.client
-			.request("commitmentRequest", (request,))
-			.await
-			.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
+	// === STEP 7: Verify all constraints are correct ===
+	println!("\nStep 7: Verifying constraint correctness...");
+	let signed_constraints = &relay_constraints[0];
 
-		request_hashes.push(signed_commitment.commitment.request_hash);
-		slots.push(slot);
+	// Verify constraint message structure
+	assert_eq!(signed_constraints.message.slot, slot);
+	assert_eq!(signed_constraints.message.proposer, harness.proposer_bls_public_key);
+	assert_eq!(signed_constraints.message.delegate, harness.gateway_bls_one);
+	assert_eq!(signed_constraints.message.constraints.len(), 1);
+	println!("Constraint message structure verified");
 
-		println!("  - Processed commitment for slot {} with hash {}", slot, signed_commitment.commitment.request_hash);
-	}
+	// Verify constraint details
+	let constraint = &signed_constraints.message.constraints[0];
+	assert_eq!(constraint.constraint_type, CONSTRAINT_TYPE);
+	assert!(!constraint.payload.is_empty());
+	println!("Constraint type and payload verified");
 
-	// Retrieve all commitments using commitmentResult
-	for (i, request_hash) in request_hashes.iter().enumerate() {
-		let result: SignedCommitment = env
-			.client
-			.request("commitmentResult", (request_hash,))
-			.await
-			.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
+	// Verify signature is present (not all zeros)
+	let sig_bytes = signed_constraints.signature.serialize();
+	assert!(!sig_bytes.iter().all(|&b| b == 0), "Signature should not be all zeros");
+	assert!(signed_constraints.nonce > 0);
+	println!("Constraint signature verified");
 
-		assert_eq!(result.commitment.request_hash, *request_hash);
-		println!("  - Retrieved commitment {} with hash {}", i + 1, request_hash);
-	}
-
-	// Test error case - non-existent request hash
-	let nonexistent_hash = B256::from_slice(&[0x99; 32]);
-	let error_result = env.client.request::<SignedCommitment, _>("commitmentResult", (nonexistent_hash,)).await;
-
-	assert!(error_result.is_err(), "Should return error for non-existent request hash");
-	println!("  - Correctly handled non-existent request hash");
-
-	println!("✓ End-to-end flow test passed");
-
-	Ok(())
-}
-
-/// Test error handling for commitmentResult with invalid request hash
-#[tokio::test]
-async fn test_commitment_result_error_handling() -> eyre::Result<()> {
-	let test_env = TestEnvironment::setup().await?;
-
-	// Test with non-existent request hash
-	let nonexistent_hash = B256::from_slice(&[0x99; 32]);
-	let result = test_env.client.request::<SignedCommitment, _>("commitmentResult", (nonexistent_hash,)).await;
-
-	assert!(result.is_err(), "Should return error for non-existent request hash");
-
-	if let Err(e) = result {
-		println!("✓ Correctly returned error: {}", e);
-	}
-
-	Ok(())
-}
-
-/// Test multiple concurrent commitment requests
-#[tokio::test]
-async fn test_concurrent_commitment_requests() -> eyre::Result<()> {
-	let test_env = TestEnvironment::setup().await?;
-
-	// Create multiple concurrent requests
-	let mut handles = Vec::new();
-
-	for i in 0..5 {
-		let client = test_env.client.clone();
-		let test_slot = test_env.test_slots[i];
-		let handle = tokio::spawn(async move {
-			let payload =
-				test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())
-					.unwrap();
-			let slasher = test_helpers::create_valid_slasher();
-			let commitment_type = test_helpers::create_valid_commitment_type();
-
-			let request = CommitmentRequest { commitment_type, payload, slasher };
-
-			client.request::<SignedCommitment, _>("commitmentRequest", (request,)).await
-		});
-		handles.push(handle);
-	}
-
-	// Wait for all requests to complete
-	let mut results = Vec::new();
-	for handle in handles {
-		let result = handle.await??;
-		results.push(result);
-	}
-
-	// Verify all requests succeeded
-	assert_eq!(results.len(), 5);
-	for (i, result) in results.iter().enumerate() {
-		assert_eq!(result.commitment.commitment_type, 1);
-		assert!(result.nonce > 0);
-		println!("  - Concurrent request {} completed with nonce {}", i + 1, result.nonce);
-	}
-
-	println!("✓ Concurrent commitment requests test passed");
-
-	Ok(())
-}
-
-/// Test server health and basic connectivity
-#[tokio::test]
-async fn test_server_health() -> eyre::Result<()> {
-	let test_env = TestEnvironment::setup().await?;
-
-	// Test that the server is working correctly using the first test slot
-	let test_slot = test_env.test_slots[0];
-	let payload = test_helpers::create_valid_inclusion_payload(test_slot, test_helpers::create_valid_signed_tx())?;
-	let slasher = test_helpers::create_valid_slasher();
-	let commitment_type = test_helpers::create_valid_commitment_type();
-
-	let request = CommitmentRequest { commitment_type, payload, slasher };
-
-	let response: SignedCommitment = test_env
-		.client
-		.request("commitmentRequest", (request,))
-		.await
-		.map_err(|e| eyre::eyre!("RPC request failed: {}", e))?;
-
-	assert!(response.nonce > 0);
-	println!("✓ Server health test passed - RPC server is working correctly");
-
-	Ok(())
+	// === FINAL VERIFICATION ===
+	println!("\n=== Final Verification ===");
+	println!("Full preconfirmation workflow completed successfully!");
+	println!("   - Delegation posted and processed");
+	println!("   - Commitment created and retrievable");
+	println!("   - Constraints written, processed, and posted to relay");
+	println!("   - All data verified across both services");
 }

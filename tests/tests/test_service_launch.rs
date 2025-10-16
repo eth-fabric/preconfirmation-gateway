@@ -4,7 +4,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_commitments_service_launches() -> Result<()> {
 	// Build harness with explicit commitments port to trigger service launch
-	let harness = TestHarness::builder().with_commitments_port(9876).build().await?;
+	let harness = TestHarness::builder().with_commitments_port(Some(9876)).build().await?;
 
 	// Check that the service was launched
 	assert!(harness.commitments_service.is_some());
@@ -21,7 +21,7 @@ async fn test_commitments_service_launches() -> Result<()> {
 #[tokio::test]
 async fn test_relay_service_launches() -> Result<()> {
 	// Build harness with explicit relay port to trigger service launch
-	let harness = TestHarness::builder().with_relay_port(9877).build().await?;
+	let harness = TestHarness::builder().with_relay_port(Some(9877)).build().await?;
 
 	// Check that the service was launched
 	assert!(harness.relay_service.is_some());
@@ -38,7 +38,7 @@ async fn test_relay_service_launches() -> Result<()> {
 #[tokio::test]
 async fn test_both_services_launch() -> Result<()> {
 	// Build harness with both ports to launch both services
-	let harness = TestHarness::builder().with_commitments_port(9878).with_relay_port(9879).build().await?;
+	let harness = TestHarness::builder().with_commitments_port(Some(9878)).with_relay_port(Some(9879)).build().await?;
 
 	// Check that both services were launched
 	assert!(harness.commitments_service.is_some());

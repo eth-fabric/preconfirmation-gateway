@@ -108,8 +108,9 @@ pub async fn start_local_signer_server_with_config(
 /// Unified test harness builder for all test scenarios
 pub struct TestHarnessBuilder {
 	signer_port: Option<u16>,
-	commitments_port: Option<u16>,
-	relay_port: Option<u16>,
+	// Option<Option<u16>>: None = don't launch, Some(None) = auto-assign, Some(Some(port)) = specific port
+	commitments_port: Option<Option<u16>>,
+	relay_port: Option<Option<u16>>,
 	module_id: String,
 	signing_id: B256,
 	admin_secret: String,
@@ -135,14 +136,14 @@ impl TestHarnessBuilder {
 		self
 	}
 
-	/// Reserve a port for commitments service
-	pub fn with_commitments_port(mut self, port: u16) -> Self {
+	/// Launch commitments service with optional port (None = auto-assign, Some(port) = specific port)
+	pub fn with_commitments_port(mut self, port: Option<u16>) -> Self {
 		self.commitments_port = Some(port);
 		self
 	}
 
-	/// Reserve a port for relay service
-	pub fn with_relay_port(mut self, port: u16) -> Self {
+	/// Launch relay service with optional port (None = auto-assign, Some(port) = specific port)
+	pub fn with_relay_port(mut self, port: Option<u16>) -> Self {
 		self.relay_port = Some(port);
 		self
 	}
@@ -184,14 +185,12 @@ impl TestHarnessBuilder {
 		let mut rng = rand::thread_rng();
 		let signer_port = self.signer_port.unwrap_or_else(|| rng.gen_range(20000..65535));
 
-		// Handle commitments port: if Some(0), generate random; if None, also generate
-		let commitments_port = match self.commitments_port {
-			Some(0) | None => rng.gen_range(20000..65535),
-			Some(port) => port,
-		};
+		// Handle commitments port: if Some(_), we want to launch; the inner Option determines auto vs specific
+		let commitments_port =
+			self.commitments_port.map(|opt_port| opt_port.unwrap_or_else(|| rng.gen_range(20000..65535)));
 
-		// Handle relay port: if Some(0), generate random; otherwise use as-is
-		let relay_port = self.relay_port.map(|port| if port == 0 { rng.gen_range(20000..65535) } else { port });
+		// Handle relay port: if Some(_), we want to launch; the inner Option determines auto vs specific
+		let relay_port = self.relay_port.map(|opt_port| opt_port.unwrap_or_else(|| rng.gen_range(20000..65535)));
 
 		// Create temporary directory for all databases
 		let temp_dir = TempDir::new()?;
@@ -202,7 +201,7 @@ impl TestHarnessBuilder {
 		// Create test InclusionPreconfConfig
 		let app_config = InclusionPreconfConfig {
 			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: commitments_port,
+			commitments_server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
 			commitments_database_url: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
 			constraints_database_url: temp_dir.path().join("test_constraints_db").to_string_lossy().to_string(),
 			delegations_database_url: temp_dir.path().join("test_delegations_db").to_string_lossy().to_string(),
@@ -585,6 +584,22 @@ impl TestHarness {
 		}
 
 		client
+	}
+
+	/// Process delegations from the relay
+	/// This is a convenience wrapper around constraints::service::process_delegations
+	pub async fn process_delegations(&self, slot: u64) -> Result<common::types::ProcessDelegationsResponse> {
+		let relay_url =
+			self.relay_service.as_ref().ok_or_else(|| eyre::eyre!("Relay service not running"))?.url.clone();
+
+		constraints::service::process_delegations(
+			slot,
+			self.gateway_bls_one.clone(),
+			&self.context.database,
+			relay_url,
+			None,
+		)
+		.await
 	}
 
 	/// Process constraints and post them to the relay

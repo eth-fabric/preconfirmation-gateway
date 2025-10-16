@@ -90,7 +90,7 @@ impl ConstraintsClient {
 
 	/// GET delegations from relay for a specific slot
 	pub async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
-		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace(":slot", &slot.to_string()));
+		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace("{slot}", &slot.to_string()));
 
 		debug!("Getting delegations for slot {} from: {}", slot, url);
 

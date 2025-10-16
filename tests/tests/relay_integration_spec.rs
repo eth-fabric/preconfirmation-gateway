@@ -16,7 +16,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_post_delegation_success() {
 	// Launch relay service
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Create delegation
@@ -31,7 +31,7 @@ async fn test_post_delegation_success() {
 
 #[tokio::test]
 async fn test_post_delegation_multiple() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Post multiple delegations for different slots
@@ -47,7 +47,7 @@ async fn test_post_delegation_multiple() {
 
 #[tokio::test]
 async fn test_post_delegation_different_delegates() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Post delegation for gateway_one
@@ -67,7 +67,7 @@ async fn test_post_delegation_different_delegates() {
 
 #[tokio::test]
 async fn test_post_delegation_invalid_signature() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Create delegation but sign with wrong key (gateway instead of proposer)
@@ -87,7 +87,7 @@ async fn test_post_delegation_invalid_signature() {
 
 #[tokio::test]
 async fn test_post_constraints_success() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -114,7 +114,7 @@ async fn test_post_constraints_success() {
 // todo
 #[tokio::test]
 async fn test_post_constraints_without_delegation() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let slot = 99999; // No delegation for this slot
 
 	// Store constraints in local database without posting delegation first
@@ -132,7 +132,7 @@ async fn test_post_constraints_without_delegation() {
 
 #[tokio::test]
 async fn test_post_constraints_multiple_same_slot() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -158,7 +158,7 @@ async fn test_post_constraints_multiple_same_slot() {
 
 #[tokio::test]
 async fn test_get_constraints_success() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -191,7 +191,7 @@ async fn test_get_constraints_success() {
 
 #[tokio::test]
 async fn test_get_constraints_multiple() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -223,7 +223,7 @@ async fn test_get_constraints_multiple() {
 
 #[tokio::test]
 async fn test_get_constraints_nonexistent_slot() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Try to get constraints for slot without any data
@@ -236,7 +236,7 @@ async fn test_get_constraints_nonexistent_slot() {
 
 #[tokio::test]
 async fn test_get_constraints_missing_auth_headers() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -252,7 +252,7 @@ async fn test_get_constraints_missing_auth_headers() {
 
 #[tokio::test]
 async fn test_full_relay_workflow() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 	let slot = 12345;
 
@@ -283,7 +283,7 @@ async fn test_full_relay_workflow() {
 
 #[tokio::test]
 async fn test_concurrent_constraint_posts() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let relay_url = harness.relay_service.as_ref().unwrap().url.clone();
 
 	// Post delegations for multiple slots
@@ -336,7 +336,7 @@ async fn test_concurrent_constraint_posts() {
 
 #[tokio::test]
 async fn test_relay_server_handles_errors_gracefully() {
-	let harness = TestHarness::builder().with_relay_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Test various error conditions

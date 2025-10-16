@@ -15,7 +15,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_commitment_request_rpc_success() {
 	// Launch commitments service (port will be auto-assigned)
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -48,7 +48,7 @@ async fn test_commitment_request_rpc_success() {
 
 #[tokio::test]
 async fn test_commitment_request_rpc_no_delegation() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// No delegation stored for this slot
@@ -65,7 +65,7 @@ async fn test_commitment_request_rpc_no_delegation() {
 
 #[tokio::test]
 async fn test_commitment_request_rpc_invalid_slot() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -88,7 +88,7 @@ async fn test_commitment_request_rpc_invalid_slot() {
 
 #[tokio::test]
 async fn test_commitment_request_rpc_zero_address_slasher() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -111,7 +111,7 @@ async fn test_commitment_request_rpc_zero_address_slasher() {
 
 #[tokio::test]
 async fn test_commitment_request_rpc_multiple_sequential() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -141,7 +141,7 @@ async fn test_commitment_request_rpc_multiple_sequential() {
 
 #[tokio::test]
 async fn test_commitment_request_rpc_duplicate() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -170,7 +170,7 @@ async fn test_commitment_request_rpc_duplicate() {
 
 #[tokio::test]
 async fn test_commitment_result_rpc_success() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -201,7 +201,7 @@ async fn test_commitment_result_rpc_success() {
 
 #[tokio::test]
 async fn test_commitment_result_rpc_nonexistent() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Try to retrieve nonexistent commitment
@@ -214,7 +214,7 @@ async fn test_commitment_result_rpc_nonexistent() {
 
 #[tokio::test]
 async fn test_commitment_result_rpc_multiple_commitments() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Create multiple commitments via RPC
@@ -251,7 +251,7 @@ async fn test_commitment_result_rpc_multiple_commitments() {
 
 #[tokio::test]
 async fn test_fee_rpc_success() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store price
@@ -275,7 +275,7 @@ async fn test_fee_rpc_success() {
 
 #[tokio::test]
 async fn test_fee_rpc_with_different_requests() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store price
@@ -302,7 +302,7 @@ async fn test_fee_rpc_with_different_requests() {
 
 #[tokio::test]
 async fn test_fee_rpc_no_price_stored() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// No price stored
@@ -323,7 +323,7 @@ async fn test_fee_rpc_no_price_stored() {
 
 #[tokio::test]
 async fn test_full_commitment_workflow_via_rpc() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation and price
@@ -357,7 +357,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 
 #[tokio::test]
 async fn test_concurrent_commitment_requests() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
@@ -398,7 +398,7 @@ async fn test_concurrent_commitment_requests() {
 
 #[tokio::test]
 async fn test_rpc_server_handles_errors_gracefully() {
-	let harness = TestHarness::builder().with_commitments_port(0).build().await.unwrap();
+	let harness = TestHarness::builder().with_commitments_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 
 	// Test various error conditions
