@@ -16,7 +16,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_retrieve_commitment_by_request_hash() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create and store a commitment
 	let signed_tx = harness.create_signed_tx();
@@ -64,8 +64,9 @@ async fn test_retrieve_multiple_commitments() {
 	// Create and store multiple commitments
 	let mut stored_commitments = vec![];
 
+	let base_slot = harness.context.slot_timer.get_current_slot() + 1;
 	for i in 0..3 {
-		let slot = 12345 + i;
+		let slot = base_slot + i;
 		let signed_tx = harness.create_signed_tx();
 		let slasher = Address::random();
 		let request = harness.create_commitment_request(slot, signed_tx, slasher).unwrap();
@@ -110,7 +111,7 @@ async fn test_retrieve_multiple_commitments() {
 #[tokio::test]
 async fn test_commitment_fields_preserved_after_storage() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create commitment with specific values
 	let signed_tx = harness.create_signed_tx();
@@ -155,7 +156,7 @@ async fn test_commitment_fields_preserved_after_storage() {
 #[tokio::test]
 async fn test_retrieve_commitment_idempotent() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create and store commitment
 	let signed_tx = harness.create_signed_tx();
@@ -222,7 +223,7 @@ async fn test_retrieve_with_zero_hash() {
 #[tokio::test]
 async fn test_retrieve_after_multiple_stores() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Store multiple different commitments
 	for _ in 0..5 {
@@ -288,7 +289,7 @@ async fn test_retrieve_after_multiple_stores() {
 #[tokio::test]
 async fn test_different_requests_have_different_hashes() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create two different commitments
 	let signed_tx1 = harness.create_signed_tx();

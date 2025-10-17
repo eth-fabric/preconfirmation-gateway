@@ -16,7 +16,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_valid_commitment_request() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Write delegation directly to database
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -53,7 +53,7 @@ async fn test_valid_commitment_request() {
 #[tokio::test]
 async fn test_commitment_request_stores_in_database() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Setup: delegation in database
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -99,7 +99,7 @@ async fn test_commitment_request_stores_in_database() {
 #[tokio::test]
 async fn test_commitment_request_with_different_slasher_addresses() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Setup: delegation in database
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -140,7 +140,7 @@ async fn test_commitment_request_with_different_slasher_addresses() {
 #[tokio::test]
 async fn test_commitment_request_signature_is_valid() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Setup: delegation in database
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -196,7 +196,7 @@ async fn test_commitment_request_without_delegation() {
 #[tokio::test]
 async fn test_commitment_request_wrong_gateway() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Write delegation for gateway_two and committer_two
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_two.clone(), harness.committer_two);
@@ -239,7 +239,7 @@ async fn test_commitment_request_with_zero_slot() {
 #[tokio::test]
 async fn test_commitment_request_with_zero_address_slasher() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create request with zero address as slasher (creation succeeds)
 	let signed_tx = harness.create_signed_tx();
@@ -262,7 +262,7 @@ async fn test_commitment_request_with_zero_address_slasher() {
 #[tokio::test]
 async fn test_commitment_request_with_invalid_transaction() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Write delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -326,7 +326,7 @@ async fn test_commitment_request_for_past_slot() {
 #[tokio::test]
 async fn test_commitment_request_duplicate_request() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Write delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);

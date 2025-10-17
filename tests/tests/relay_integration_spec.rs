@@ -72,7 +72,7 @@ async fn test_post_delegation_invalid_signature() {
 	let client = harness.create_client_harness();
 
 	// Create delegation but sign with wrong key (gateway instead of proposer)
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.gateway_bls_one.clone()).await.unwrap();
@@ -239,7 +239,7 @@ async fn test_get_constraints_nonexistent_slot() {
 async fn test_get_constraints_missing_auth_headers() {
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Try to get constraints without auth headers
 	let empty_headers = axum::http::HeaderMap::new();

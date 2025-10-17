@@ -227,7 +227,7 @@ pub async fn store_constraints_handler(
 	info!("Storing constraints for slot {}", signed_constraints.message.slot);
 
 	// Validate constraints message structure
-	if validate_constraints_message(&signed_constraints.message).is_err() {
+	if validate_constraints_message(&signed_constraints.message, &state.slot_timer).is_err() {
 		error!("Invalid constraints message structure");
 		return StatusCode::BAD_REQUEST;
 	}

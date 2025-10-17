@@ -19,7 +19,7 @@ async fn test_commitment_request_rpc_success() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -69,7 +69,7 @@ async fn test_commitment_request_rpc_invalid_slot() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -92,7 +92,7 @@ async fn test_commitment_request_rpc_zero_address_slasher() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -115,7 +115,7 @@ async fn test_commitment_request_rpc_multiple_sequential() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -145,7 +145,7 @@ async fn test_commitment_request_rpc_duplicate() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -174,7 +174,7 @@ async fn test_commitment_result_rpc_success() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -219,8 +219,9 @@ async fn test_commitment_result_rpc_multiple_commitments() {
 
 	// Setup: Create multiple commitments via RPC
 	let mut created_commitments = vec![];
+	let base_slot = harness.context.slot_timer.get_current_slot() + 1;
 	for i in 0..3 {
-		let slot = 12345 + i;
+		let slot = base_slot + i;
 
 		// Store delegation for this slot
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -259,7 +260,7 @@ async fn test_fee_rpc_success() {
 	harness.context.pricing_database.store_latest_price(price_gwei).unwrap();
 
 	// Create commitment request
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let signed_tx = harness.create_signed_tx();
 	let request = harness.create_commitment_request(slot, signed_tx, Address::random()).unwrap();
 
@@ -282,11 +283,13 @@ async fn test_fee_rpc_with_different_requests() {
 	harness.context.pricing_database.store_latest_price(30).unwrap();
 
 	// Create two different requests
+	let slot1 = harness.context.slot_timer.get_current_slot() + 1;
 	let signed_tx1 = harness.create_signed_tx();
-	let request1 = harness.create_commitment_request(12345, signed_tx1, Address::random()).unwrap();
+	let request1 = harness.create_commitment_request(slot1, signed_tx1, Address::random()).unwrap();
 
+	let slot2 = slot1 + 1;
 	let signed_tx2 = harness.create_signed_tx();
-	let request2 = harness.create_commitment_request(12346, signed_tx2, Address::random()).unwrap();
+	let request2 = harness.create_commitment_request(slot2, signed_tx2, Address::random()).unwrap();
 
 	// Act: Get fees for both
 	let fee1 = client.fee(&request1).await.unwrap();
@@ -306,8 +309,9 @@ async fn test_fee_rpc_no_price_stored() {
 	let client = harness.create_client_harness();
 
 	// No price stored
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let signed_tx = harness.create_signed_tx();
-	let request = harness.create_commitment_request(12345, signed_tx, Address::random()).unwrap();
+	let request = harness.create_commitment_request(slot, signed_tx, Address::random()).unwrap();
 
 	// Act: Make RPC call
 	let result = client.fee(&request).await;
@@ -327,7 +331,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation and price
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -361,7 +365,7 @@ async fn test_concurrent_commitment_requests() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -415,7 +419,7 @@ async fn test_rpc_server_handles_errors_gracefully() {
 
 	// Server should still be responsive after errors
 	// Store delegation and make a valid request
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();

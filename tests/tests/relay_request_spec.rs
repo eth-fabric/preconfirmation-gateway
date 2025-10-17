@@ -17,7 +17,7 @@ use integration_tests::test_common::TestHarness;
 #[tokio::test]
 async fn test_store_and_retrieve_delegation() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -42,7 +42,7 @@ async fn test_store_and_retrieve_delegation() {
 #[tokio::test]
 async fn test_delegation_signature_valid() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create and sign delegation
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -65,8 +65,9 @@ async fn test_multiple_delegations_different_slots() {
 	let harness = TestHarness::builder().build().await.unwrap();
 
 	// Create and store delegations for different slots
+	let base_slot = harness.context.slot_timer.get_current_slot() + 1;
 	for i in 0..3 {
-		let slot = 12345 + i;
+		let slot = base_slot + i;
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 		let signed_delegation =
 			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -75,7 +76,7 @@ async fn test_multiple_delegations_different_slots() {
 
 	// Retrieve each delegation
 	for i in 0..3 {
-		let slot = 12345 + i;
+		let slot = base_slot + i;
 		let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap();
 		assert!(retrieved.is_some());
 		assert_eq!(retrieved.unwrap().message.slot, slot);
@@ -89,14 +90,14 @@ async fn test_delegation_with_different_delegates() {
 	let harness = TestHarness::builder().build().await.unwrap();
 
 	// Create delegation for gateway_one
-	let slot1 = 12345;
+	let slot1 = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation1 = harness.create_delegation(slot1, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation1 =
 		harness.create_signed_delegation(&delegation1, harness.proposer_bls_public_key.clone()).await.unwrap();
 	harness.context.database.store_delegation(slot1, &signed_delegation1).unwrap();
 
 	// Create delegation for gateway_two
-	let slot2 = 12346;
+	let slot2 = slot1 + 1;
 	let delegation2 = harness.create_delegation(slot2, harness.gateway_bls_two.clone(), harness.committer_two);
 	let signed_delegation2 =
 		harness.create_signed_delegation(&delegation2, harness.proposer_bls_public_key.clone()).await.unwrap();
@@ -131,7 +132,7 @@ async fn test_retrieve_nonexistent_delegation() {
 #[tokio::test]
 async fn test_create_signed_constraints() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraint
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
@@ -173,7 +174,7 @@ async fn test_create_signed_constraints() {
 #[tokio::test]
 async fn test_constraints_signature_valid() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create and sign constraints
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
@@ -212,7 +213,7 @@ async fn test_constraints_signature_valid() {
 async fn test_store_and_retrieve_constraints() {
 	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraints
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4]) };
@@ -256,7 +257,7 @@ async fn test_store_and_retrieve_constraints() {
 async fn test_multiple_constraints_same_slot() {
 	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Store multiple different constraints for same slot
 	for i in 0..3 {
@@ -297,7 +298,7 @@ async fn test_multiple_constraints_same_slot() {
 #[tokio::test]
 async fn test_constraints_with_multiple_constraint_items() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraints message with multiple constraints
 	let constraint1 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
@@ -335,7 +336,7 @@ async fn test_constraints_with_multiple_constraint_items() {
 #[tokio::test]
 async fn test_public_vs_private_constraints() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create public constraints (empty receivers)
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
@@ -384,7 +385,7 @@ async fn test_retrieve_constraints_for_nonexistent_slot() {
 #[tokio::test]
 async fn test_create_auth_headers() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create auth headers with BLS signature
 	let headers = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_one.clone()).await;
@@ -401,7 +402,7 @@ async fn test_create_auth_headers() {
 #[tokio::test]
 async fn test_headers_with_different_signers() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create headers with gateway_one
 	let headers1 = harness.create_headers_with_valid_signature(slot, harness.gateway_bls_one.clone()).await;
@@ -422,7 +423,7 @@ async fn test_headers_with_different_signers() {
 #[tokio::test]
 async fn test_delegation_required_for_constraints() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Store delegation first
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -509,7 +510,7 @@ async fn test_constraint_without_delegation() {
 #[tokio::test]
 async fn test_delegation_fields_preserved() {
 	let harness = TestHarness::builder().build().await.unwrap();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create delegation with specific values
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
@@ -537,7 +538,7 @@ async fn test_delegation_fields_preserved() {
 async fn test_constraints_fields_preserved() {
 	let harness = TestHarness::builder().build().await.unwrap();
 	let state = harness.create_relay_state();
-	let slot = 12345;
+	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);

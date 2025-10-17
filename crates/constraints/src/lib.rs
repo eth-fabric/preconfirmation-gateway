@@ -8,5 +8,5 @@ pub use common::types::{ProcessConstraintsResponse, ProcessDelegationsResponse};
 pub use service::{process_constraints, process_delegations};
 pub use utils::{
 	create_constraints_message, create_signed_constraints, parse_bls_public_key, parse_bls_public_keys,
-	validate_constraint, validate_constraints, validate_constraints_message,
+	validate_constraints_message,
 };

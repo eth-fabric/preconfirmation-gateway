@@ -2225,6 +2225,7 @@ dependencies = [
  "commit-boost",
  "common",
  "eyre",
+ "hex",
  "reqwest 0.11.27",
  "serde",
  "serde_json",

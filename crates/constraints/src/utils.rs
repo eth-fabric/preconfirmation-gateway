@@ -1,10 +1,10 @@
 use alloy::primitives::B256;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
-use common::constants::CONSTRAINT_TYPE;
+use common::slot_timer::SlotTimer;
 use eyre::Result;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use common::signer;
 use common::types::constraints::{Constraint, ConstraintsMessage, SignedConstraints};
@@ -39,9 +39,14 @@ pub async fn create_signed_constraints<T>(
 }
 
 /// Validates a constraints message
-pub fn validate_constraints_message(_message: &ConstraintsMessage) -> Result<()> {
-	// TODO: Implement proper validation
-	// For now, just return Ok
+/// In this PoC we assume that constraints must be submitted before the target slot
+pub fn validate_constraints_message(message: &ConstraintsMessage, slot_timer: &SlotTimer) -> Result<()> {
+	// Check that the constraints slot has not already elapsed
+	if message.slot <= slot_timer.get_current_slot() {
+		error!("Constraints slot {} has already elapsed", message.slot);
+		return Err(eyre::eyre!("Constraints slot has already elapsed"));
+	}
+
 	Ok(())
 }
 
@@ -67,21 +72,6 @@ pub fn create_constraints_message(
 	Ok(message)
 }
 
-/// Validates a constraint
-pub fn validate_constraint(constraint: &Constraint) -> Result<()> {
-	if constraint.constraint_type != CONSTRAINT_TYPE {
-		return Err(eyre::eyre!("Invalid constraint type: {}", constraint.constraint_type));
-	}
-
-	if constraint.payload.is_empty() {
-		return Err(eyre::eyre!("Empty constraint payload"));
-	}
-
-	// todo other validation logic
-
-	Ok(())
-}
-
 /// Parse a BLS public key from hex string with error handling
 pub fn parse_bls_public_key(hex_string: &str, field_name: &str) -> Result<BlsPublicKey> {
 	cb_common::utils::bls_pubkey_from_hex(hex_string)
@@ -99,13 +89,88 @@ pub fn parse_bls_public_keys(hex_strings: &[String], field_name: &str) -> Result
 	Ok(keys)
 }
 
-/// Validates multiple constraints
-pub fn validate_constraints(constraints: &[Constraint]) -> Result<()> {
-	for (i, constraint) in constraints.iter().enumerate() {
-		if let Err(e) = validate_constraint(constraint) {
-			return Err(eyre::eyre!("Invalid constraint at index {}: {}", i, e));
-		}
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use commit_boost::prelude::BlsPublicKey;
+
+	#[test]
+	fn test_validate_constraints_message_slot_elapsed() {
+		// Use a valid BLS public key
+		let valid_bls_key = hex::decode(
+			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+
+		// Create slot timer with a genesis timestamp
+		let slot_timer = SlotTimer::new(1742213400);
+
+		// Get current slot and try to create constraints for a slot that has already elapsed
+		let current_slot = slot_timer.get_current_slot();
+
+		let constraints_message = ConstraintsMessage {
+			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			slot: current_slot - 1, // Slot in the past
+			constraints: vec![],
+			receivers: vec![],
+		};
+
+		let result = validate_constraints_message(&constraints_message, &slot_timer);
+		assert!(result.is_err());
+		assert!(result.unwrap_err().to_string().contains("already elapsed"));
 	}
 
-	Ok(())
+	#[test]
+	fn test_validate_constraints_message_current_slot() {
+		// Use a valid BLS public key
+		let valid_bls_key = hex::decode(
+			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+
+		// Create slot timer with a genesis timestamp
+		let slot_timer = SlotTimer::new(1742213400);
+
+		// Get current slot and try to create constraints for the current slot
+		let current_slot = slot_timer.get_current_slot();
+
+		let constraints_message = ConstraintsMessage {
+			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			slot: current_slot, // Current slot
+			constraints: vec![],
+			receivers: vec![],
+		};
+
+		let result = validate_constraints_message(&constraints_message, &slot_timer);
+		assert!(result.is_err());
+		assert!(result.unwrap_err().to_string().contains("already elapsed"));
+	}
+
+	#[test]
+	fn test_validate_constraints_message_future_slot() {
+		// Use a valid BLS public key
+		let valid_bls_key = hex::decode(
+			"af6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+		)
+		.unwrap();
+
+		// Create slot timer with a genesis timestamp
+		let slot_timer = SlotTimer::new(1742213400);
+
+		// Get current slot and try to create constraints for a future slot
+		let current_slot = slot_timer.get_current_slot();
+
+		let constraints_message = ConstraintsMessage {
+			proposer: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			delegate: BlsPublicKey::deserialize(&valid_bls_key).unwrap(),
+			slot: current_slot + 10, // Future slot
+			constraints: vec![],
+			receivers: vec![],
+		};
+
+		let result = validate_constraints_message(&constraints_message, &slot_timer);
+		assert!(result.is_ok());
+	}
 }

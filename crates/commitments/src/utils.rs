@@ -49,10 +49,6 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<Inclus
 				return Err(eyre::eyre!("Signed transaction cannot be empty"));
 			}
 
-			// TODO: Should verify:
-			// - Transaction is for a valid slot
-			// - Enough gas for transaction to be executed successfully
-
 			// Validate signed_tx format and signature
 			verify_signed_tx(&inclusion_payload.signed_tx)?;
 
