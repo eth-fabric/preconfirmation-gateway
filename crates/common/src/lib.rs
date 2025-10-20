@@ -1,3 +1,4 @@
+pub mod beacon;
 pub mod config;
 pub mod constants;
 pub mod db;

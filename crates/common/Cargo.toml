@@ -3,7 +3,11 @@ name = "common"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test-utils = ["mockall"]
+
 [dependencies]
+mockall = { version = "0.13", optional = true }
 eyre = { workspace = true }
 config = { workspace = true }
 rocksdb = { workspace = true }
@@ -16,6 +20,7 @@ alloy-primitives = { workspace = true }
 commit-boost = { workspace = true }
 hex = { workspace = true }
 urc = { workspace = true }
+reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
 
 blst = "0.3"
 
@@ -23,6 +28,7 @@ blst = "0.3"
 tempfile = "3.8"
 tokio-test = "0.4"
 rand = "0.8"
+mockall = "0.13"
 cb-tests = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
 cb-signer = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
-reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
+cb-common = {workspace = true }

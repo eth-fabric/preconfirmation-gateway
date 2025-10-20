@@ -1,4 +1,6 @@
 use commit_boost::prelude::*;
+use common::beacon::BeaconApiClient;
+use common::config::BeaconApiConfig;
 use common::db::{DatabaseType, create_database};
 use common::{config, types};
 use eyre::Result;
@@ -84,9 +86,25 @@ async fn main() -> Result<()> {
 	// Create pricer task
 	let pricer_task = PricerTask::new(pricer_config, pricing_database);
 
+	// Create beacon API client for proposer lookahead
+	// TODO: Make these configurable via InclusionPreconfConfig
+	let beacon_config = BeaconApiConfig {
+		primary_endpoint: std::env::var("BEACON_API_URL")
+			.unwrap_or_else(|_| "https://ethereum-beacon-api.publicnode.com".to_string()),
+		fallback_endpoints: vec![],
+		request_timeout_secs: 30,
+		genesis_time: app_config.eth_genesis_timestamp,
+	};
+	let beacon_client = BeaconApiClient::with_default_client(beacon_config)
+		.map_err(|e| eyre::eyre!("Failed to create beacon API client: {}", e))?;
+
 	// Create proposer lookahead task
-	let proposer_lookahead_task =
-		ProposerLookaheadTask::new(proposer_lookahead_config, slot_timer.clone(), delegations_database.clone());
+	let proposer_lookahead_task = ProposerLookaheadTask::new(
+		proposer_lookahead_config,
+		slot_timer.clone(),
+		delegations_database.clone(),
+		beacon_client,
+	);
 
 	// Spawn delegation task
 	coordinator.spawn_task("delegation_task".to_string(), move || async move { delegation_task.run().await });

@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-common = { path = "../crates/common" }
+common = { path = "../crates/common", features = ["test-utils"] }
 commitments = { path = "../crates/commitments" }
 constraints = { path = "../crates/constraints" }
 relay = { path = "../crates/relay" }
+scheduler = { path = "../crates/scheduler" }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 config = { workspace = true }

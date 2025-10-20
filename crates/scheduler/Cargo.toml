@@ -20,3 +20,6 @@ cb-common = { workspace = true }
 common = { path = "../common" }
 constraints = { path = "../constraints" }
 pricer = { path = "../pricer" }
+
+[dev-dependencies]
+common = { path = "../common", features = ["test-utils"] }

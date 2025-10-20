@@ -1,4 +1,17 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+/// Configuration for Beacon API integration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BeaconApiConfig {
+	/// Primary beacon node endpoint (e.g., Alchemy)
+	pub primary_endpoint: String,
+	/// Fallback beacon node endpoints
+	pub fallback_endpoints: Vec<String>,
+	/// Request timeout in seconds
+	pub request_timeout_secs: u64,
+	/// Beacon chain genesis time (Unix timestamp)
+	pub genesis_time: u64,
+}
 
 // Consolidated configuration that will be loaded by load_commit_module_config
 #[derive(Debug, Clone, Deserialize)]

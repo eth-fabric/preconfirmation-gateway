@@ -674,6 +674,65 @@ impl TestHarness {
 	pub fn populate_lookahead(&self, start_slot: u64, end_slot: u64) -> Result<()> {
 		self.populate_lookahead_before_relay(start_slot, end_slot)
 	}
+
+	/// Create a configured MockHttpClient that returns the harness's proposer key for the specified epoch
+	/// This is useful for testing beacon node integration in proposer_lookahead
+	/// Note: Only available when common crate is built with test-utils feature (automatically enabled for tests)
+	pub fn create_mock_beacon_client_for_epoch(&self, epoch: u64) -> common::beacon::MockHttpClient {
+		use common::beacon::HttpResponse;
+		use common::types::beacon::{BeaconTiming, ProposerDutiesResponse, ValidatorDuty};
+
+		let mut mock_http = common::beacon::MockHttpClient::new();
+		let proposer_key = self.proposer_bls_public_key.clone();
+
+		// Calculate the slot range for this epoch
+		let start_slot = BeaconTiming::epoch_to_first_slot(epoch);
+		let end_slot = BeaconTiming::epoch_to_last_slot(epoch);
+
+		// Create duties for all slots in this epoch
+		let mut duties = Vec::new();
+		for slot in start_slot..=end_slot {
+			let pubkey_bytes = proposer_key.serialize();
+			let pubkey_hex = format!("0x{}", hex::encode(pubkey_bytes));
+
+			duties.push(ValidatorDuty {
+				validator_index: slot.to_string(),
+				pubkey: pubkey_hex,
+				slot: slot.to_string(),
+			});
+		}
+
+		let duties_clone = duties.clone();
+		mock_http.expect_get().times(1).returning(move |url| {
+			assert!(url.contains(&format!("eth/v1/validator/duties/proposer/{}", epoch)));
+			let response =
+				ProposerDutiesResponse { execution_optimistic: false, finalized: true, data: duties_clone.clone() };
+			Ok(HttpResponse { status: 200, body: serde_json::to_vec(&response).unwrap() })
+		});
+
+		mock_http
+	}
+
+	/// Create a BeaconApiClient with a mock HTTP client configured for the specified epoch
+	/// Returns a configured client that will return the harness's proposer key for all slots in the epoch
+	/// Note: Only available when common crate is built with test-utils feature (automatically enabled for tests)
+	pub fn create_mock_beacon_api_client(
+		&self,
+		epoch: u64,
+	) -> eyre::Result<common::beacon::BeaconApiClient<common::beacon::MockHttpClient>> {
+		use common::config::BeaconApiConfig;
+
+		let mock_http = self.create_mock_beacon_client_for_epoch(epoch);
+
+		let beacon_config = BeaconApiConfig {
+			primary_endpoint: "https://test-beacon.example.com".to_string(),
+			fallback_endpoints: vec![],
+			request_timeout_secs: 30,
+			genesis_time: 1606824023,
+		};
+
+		common::beacon::BeaconApiClient::new(beacon_config, mock_http)
+	}
 }
 
 /// Handle for a running service in integration tests
@@ -759,6 +818,18 @@ impl ClientHarness {
 		}
 
 		Ok(())
+	}
+
+	/// Store a delegation and return the response (useful for checking status codes in tests)
+	pub async fn store_delegation(
+		&self,
+		delegation: &common::types::constraints::SignedDelegation,
+	) -> Result<reqwest::Response> {
+		let url = self.relay_url.as_ref().ok_or_else(|| eyre::eyre!("Relay URL not set"))?;
+
+		let response = self.http_client.post(format!("{}/delegation", url)).json(delegation).send().await?;
+
+		Ok(response)
 	}
 
 	/// Post constraints to the relay service

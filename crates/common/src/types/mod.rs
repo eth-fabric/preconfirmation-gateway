@@ -1,3 +1,4 @@
+pub mod beacon;
 pub mod commitments;
 pub mod constraints;
 pub mod context;
@@ -6,6 +7,9 @@ pub mod requests;
 pub mod responses;
 
 // Re-export all types for easy access
+pub use beacon::{
+	BeaconTiming, ProposerDutiesResponse, ValidatorData, ValidatorDuty, ValidatorInfo, ValidatorResponse,
+};
 pub use commitments::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo};
 pub use constraints::{
 	Constraint, ConstraintCapabilities, ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation,
