@@ -63,6 +63,11 @@ impl DatabaseContext {
 		format!("signed_constraints:{}:{}", slot, constraint_id)
 	}
 
+	/// Helper function to format proposer lookahead key
+	fn format_proposer_lookahead_key(slot: u64) -> String {
+		format!("proposer_lookahead:{}", slot)
+	}
+
 	/// Helper function to calculate constraint ID from request hash
 	/// This is used when storing constraints that are derived from commitment requests
 	fn calculate_constraint_id_from_request_hash(request_hash: &B256) -> B256 {
@@ -403,6 +408,29 @@ impl DatabaseContext {
 	pub fn clear_constraints_posted_flag_for_slot(&self, slot: u64) -> Result<()> {
 		let key = Self::format_constraint_posted_flag_key(slot);
 		self.delete(key.as_bytes())
+	}
+
+	/// Store proposer BLS public key for a specific slot in the lookahead
+	pub fn store_proposer_lookahead(
+		&self,
+		slot: u64,
+		proposer_pubkey: &commit_boost::prelude::BlsPublicKey,
+	) -> Result<()> {
+		let key = Self::format_proposer_lookahead_key(slot);
+		let value = serde_json::to_vec(proposer_pubkey)?;
+		self.put(key.as_bytes(), &value)
+	}
+
+	/// Retrieve proposer BLS public key for a specific slot from the lookahead
+	pub fn get_proposer_lookahead(&self, slot: u64) -> Result<Option<commit_boost::prelude::BlsPublicKey>> {
+		let key = Self::format_proposer_lookahead_key(slot);
+		match self.get(key.as_bytes())? {
+			Some(value) => {
+				let proposer_pubkey: commit_boost::prelude::BlsPublicKey = serde_json::from_slice(&value)?;
+				Ok(Some(proposer_pubkey))
+			}
+			None => Ok(None),
+		}
 	}
 
 	/// Store the latest gas price in the database (overwrites previous)

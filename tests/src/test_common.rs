@@ -149,10 +149,7 @@ impl TestHarnessBuilder {
 	}
 
 	/// Setup all databases needed for testing
-	fn setup_databases(
-		&self,
-		temp_dir: &TempDir,
-	) -> Result<(DatabaseContext, DatabaseContext, DatabaseContext, DatabaseContext)> {
+	fn setup_databases(&self, temp_dir: &TempDir) -> Result<(DatabaseContext, DatabaseContext, DatabaseContext)> {
 		let mut opts = Options::default();
 		opts.create_if_missing(true);
 
@@ -171,12 +168,10 @@ impl TestHarnessBuilder {
 		let delegations_db = DB::open(&opts, &delegations_db_path)?;
 		let delegations_database = DatabaseContext::new(Arc::new(delegations_db));
 
-		// Constraints/Relay database
-		let relay_db_path = temp_dir.path().join("test_relay_db");
-		let relay_db = DB::open(&opts, &relay_db_path)?;
-		let relay_database = DatabaseContext::new(Arc::new(relay_db));
+		// Note: We don't open the relay database here because the relay service
+		// will open it when it starts. RocksDB doesn't allow multiple opens.
 
-		Ok((commitments_database, pricing_database, delegations_database, relay_database))
+		Ok((commitments_database, pricing_database, delegations_database))
 	}
 
 	/// Build the test harness
@@ -196,7 +191,7 @@ impl TestHarnessBuilder {
 		let temp_dir = TempDir::new()?;
 
 		// Setup all databases
-		let (database, pricing_database, _delegations_database, _relay_database) = self.setup_databases(&temp_dir)?;
+		let (database, pricing_database, _delegations_database) = self.setup_databases(&temp_dir)?;
 
 		// Create test InclusionPreconfConfig
 		let app_config = InclusionPreconfConfig {
@@ -303,12 +298,33 @@ impl TestHarnessBuilder {
 			bls_public_key: gateway_bls_one.clone(),
 			relay_url: relay_url.clone(),
 			api_key,
-			slot_timer,
+			slot_timer: slot_timer.clone(),
 		};
 
-		// Launch relay service if relay port is specified
-		let relay_service =
-			if let Some(port) = relay_port { Some(Self::launch_relay_service(port, &temp_dir).await?) } else { None };
+		// Pre-populate relay database with proposer lookahead before launching relay service
+		// This ensures tests can post delegations without manual setup
+		let relay_service = if let Some(port) = relay_port {
+			// Populate lookahead for a wide range of slots to cover most test scenarios
+			let current_slot = slot_timer.get_current_slot();
+			let relay_db_path = temp_dir.path().join("relay_db");
+			{
+				let mut opts = rocksdb::Options::default();
+				opts.create_if_missing(true);
+				let db = rocksdb::DB::open(&opts, &relay_db_path)?;
+				let temp_database = DatabaseContext::new(Arc::new(db));
+
+				// Populate lookahead for 1000 slots (covers most tests)
+				for slot in current_slot..=(current_slot + 1000) {
+					temp_database.store_proposer_lookahead(slot, &proposer_bls_public_key)?;
+				}
+				// DB is dropped here, releasing the lock
+			}
+
+			// Now launch the relay service
+			Some(Self::launch_relay_service(port, &temp_dir).await?)
+		} else {
+			None
+		};
 
 		// Launch commitments service if commitments port was explicitly specified (not auto-generated)
 		let commitments_service = if self.commitments_port.is_some() {
@@ -623,6 +639,40 @@ impl TestHarness {
 			None,
 		)
 		.await
+	}
+
+	/// Populate proposer lookahead in the relay database for testing
+	/// This should be called AFTER building the harness to pre-populate the lookahead
+	/// Uses the harness's proposer_bls_public_key for all slots
+	///
+	/// Note: This method temporarily opens the database before the relay service starts.
+	/// Do not call this after the relay service has started as RocksDB doesn't allow
+	/// multiple opens of the same database.
+	pub fn populate_lookahead_before_relay(&self, start_slot: u64, end_slot: u64) -> Result<()> {
+		// Get the relay database path from temp_dir
+		let relay_db_path = self._temp_dir.path().join("relay_db");
+
+		// Open the database temporarily to populate lookahead
+		let mut opts = rocksdb::Options::default();
+		opts.create_if_missing(true); // Create if it doesn't exist yet
+		let db = rocksdb::DB::open(&opts, &relay_db_path)?;
+		let temp_database = DatabaseContext::new(Arc::new(db));
+
+		// Populate the lookahead with the proposer BLS key for all slots
+		for slot in start_slot..=end_slot {
+			temp_database.store_proposer_lookahead(slot, &self.proposer_bls_public_key)?;
+		}
+
+		// Drop the database to close it before relay service starts
+		drop(temp_database);
+
+		Ok(())
+	}
+
+	/// Convenience method: populate lookahead for the current slot + buffer
+	/// This is the preferred method to use in tests - call it right after building the harness
+	pub fn populate_lookahead(&self, start_slot: u64, end_slot: u64) -> Result<()> {
+		self.populate_lookahead_before_relay(start_slot, end_slot)
 	}
 }
 

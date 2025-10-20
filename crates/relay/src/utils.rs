@@ -84,16 +84,31 @@ pub fn validate_delegation_message(delegation: &Delegation, slot_timer: &common:
 }
 
 /// Validate that the given public key is the scheduled proposer for the given slot
-/// TODO: Call beacon node API to verify this pubkey is the scheduled proposer for this slot
-pub fn validate_is_proposer(pubkey: &BlsPublicKey, slot: u64) -> Result<bool> {
+/// Reads from the proposer lookahead stored in the database
+pub fn validate_is_proposer(
+	pubkey: &BlsPublicKey,
+	slot: u64,
+	database: &common::types::database::DatabaseContext,
+) -> Result<bool> {
 	debug!("Validating proposer for slot {} with pubkey: {:?}", slot, pubkey.serialize());
 
-	// TODO: Call beacon node API to verify this pubkey is the scheduled proposer for this slot
-	// For now, always return true to allow all valid signatures through
-	// This should be replaced with actual beacon node validation
-	info!("Proposer validation for slot {} - currently allowing all (TODO: implement beacon node check)", slot);
-
-	Ok(true)
+	// Look up the expected proposer from the lookahead database
+	match database.get_proposer_lookahead(slot)? {
+		Some(expected_proposer) => {
+			// Compare the provided pubkey with the expected proposer
+			if pubkey == &expected_proposer {
+				info!("Proposer validation successful for slot {}", slot);
+				Ok(true)
+			} else {
+				info!("Proposer validation failed for slot {}: provided pubkey does not match expected proposer", slot);
+				Ok(false)
+			}
+		}
+		None => {
+			info!("No proposer lookahead found for slot {}, rejecting validation", slot);
+			Ok(false)
+		}
+	}
 }
 
 #[cfg(test)]

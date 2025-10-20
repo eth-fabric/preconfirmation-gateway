@@ -15,7 +15,7 @@ use integration_tests::test_common::TestHarness;
 
 #[tokio::test]
 async fn test_post_delegation_success() {
-	// Launch relay service
+	// Launch relay service (lookahead is auto-populated)
 	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
 	let client = harness.create_client_harness();
 

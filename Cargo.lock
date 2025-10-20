@@ -5985,6 +5985,7 @@ dependencies = [
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
+ "cb-common",
  "commit-boost",
  "common",
  "constraints",

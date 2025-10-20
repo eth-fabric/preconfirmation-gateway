@@ -147,7 +147,7 @@ pub async fn store_delegation_handler(
 	info!("Delegation signature verified");
 
 	// Validate that the proposer is scheduled for this slot
-	match validate_is_proposer(&delegation.message.proposer, delegation.message.slot) {
+	match validate_is_proposer(&delegation.message.proposer, delegation.message.slot, &state.database) {
 		Ok(true) => {
 			info!("Proposer validation successful for slot {}", delegation.message.slot);
 		}

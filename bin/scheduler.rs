@@ -3,7 +3,8 @@ use common::db::{DatabaseType, create_database};
 use common::{config, types};
 use eyre::Result;
 use scheduler::{
-	ConstraintsTask, DelegationTask, DelegationTaskConfig, PricerTask, PricerTaskConfig, SlotTimer, TaskCoordinator,
+	ConstraintsTask, DelegationTask, DelegationTaskConfig, PricerTask, PricerTaskConfig, ProposerLookaheadConfig,
+	ProposerLookaheadTask, SlotTimer, TaskCoordinator,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -54,6 +55,12 @@ async fn main() -> Result<()> {
 		update_interval_seconds: 12, // 12 seconds for once per slot
 	};
 
+	// Create proposer lookahead task configuration
+	let proposer_lookahead_config = ProposerLookaheadConfig {
+		update_interval_seconds: 60, // Update every 60 seconds
+		lookahead_window: 64,        // 64 slots lookahead
+	};
+
 	// Create delegation task
 	let delegation_task = DelegationTask::new(
 		delegation_config,
@@ -77,6 +84,10 @@ async fn main() -> Result<()> {
 	// Create pricer task
 	let pricer_task = PricerTask::new(pricer_config, pricing_database);
 
+	// Create proposer lookahead task
+	let proposer_lookahead_task =
+		ProposerLookaheadTask::new(proposer_lookahead_config, slot_timer.clone(), delegations_database.clone());
+
 	// Spawn delegation task
 	coordinator.spawn_task("delegation_task".to_string(), move || async move { delegation_task.run().await });
 
@@ -85,6 +96,10 @@ async fn main() -> Result<()> {
 
 	// Spawn pricer task
 	coordinator.spawn_task("pricer_task".to_string(), move || async move { pricer_task.run().await });
+
+	// Spawn proposer lookahead task
+	coordinator
+		.spawn_task("proposer_lookahead_task".to_string(), move || async move { proposer_lookahead_task.run().await });
 
 	info!("Scheduler initialized with {} tasks", coordinator.task_count());
 
