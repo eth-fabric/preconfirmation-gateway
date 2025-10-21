@@ -4,6 +4,7 @@ use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use rand::Rng;
 use serde_json::json;
+use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;
@@ -51,6 +52,9 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
 		],
+		execution_endpoint_url: "http://localhost:8545".to_string(),
+		execution_request_timeout_secs: 10,
+		execution_max_retries: 3,
 	};
 
 	// Start local signer server with test configuration
@@ -69,11 +73,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let db = rocksdb::DB::open(&opts, &db_path)?;
 	let database = common::types::DatabaseContext::new(std::sync::Arc::new(db));
 
-	// Create pricing database
-	let pricing_db_path = temp_dir.path().join("test_pricing_db");
-	let pricing_db = rocksdb::DB::open(&opts, &pricing_db_path)?;
-	let pricing_database = common::types::DatabaseContext::new(std::sync::Arc::new(pricing_db));
-
 	// Generate proxy key for committer using the registered BLS public key
 	let test_bls_pubkey = cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
 		.map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))?;
@@ -91,14 +90,23 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	// Create slot timer with test genesis timestamp
 	let slot_timer = SlotTimer::new(1606824023);
 
+	// Create mock Reth client for tests
+	let execution_config = common::execution::ExecutionApiConfig {
+		endpoint: "http://localhost:8545".to_string(),
+		request_timeout_secs: 10,
+		max_retries: 3,
+	};
+	let execution_client =
+		Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config).unwrap());
+
 	let rpc_context = common::types::RpcContext::new(
 		database,
-		pricing_database,
 		commit_config_guard,
 		bls_public_key,
 		relay_url,
 		api_key,
 		slot_timer,
+		execution_client,
 	);
 
 	// Start RPC server

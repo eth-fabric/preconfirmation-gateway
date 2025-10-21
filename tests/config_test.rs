@@ -36,6 +36,10 @@ fn test_inclusion_preconf_config_methods() {
 		constraints_bls_public_key: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
 		constraints_delegate_public_key: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string(),
 		eth_genesis_timestamp: 1606824023,
+		constraints_receivers: vec!["0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".to_string()],
+		reth_endpoint_url: "http://localhost:8545".to_string(),
+		reth_request_timeout_secs: 10,
+		reth_max_retries: 3,
 	};
 
 	// Test the individual config methods

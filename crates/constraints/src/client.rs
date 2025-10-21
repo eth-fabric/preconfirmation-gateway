@@ -61,33 +61,6 @@ impl ConstraintsClient {
 		}
 	}
 
-	/// GET delegations from relay
-	pub async fn get_delegations(&self) -> Result<Vec<SignedDelegation>> {
-		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace(":slot", ""));
-
-		debug!("Getting delegations from: {}", url);
-
-		let mut request = self.client.get(&url);
-
-		// Add API key if provided
-		if let Some(api_key) = &self.api_key {
-			request = request.header("Authorization", format!("Bearer {}", api_key));
-		}
-
-		let response = request.send().await?;
-
-		if response.status().is_success() {
-			let result: GetDelegationsResponse = response.json().await?;
-			info!("Successfully retrieved {} delegations", result.delegations.len());
-			Ok(result.delegations)
-		} else {
-			let status = response.status();
-			let error_text = response.text().await.unwrap_or_default();
-			error!("Failed to get delegations: {} - {}", status, error_text);
-			Err(eyre::eyre!("Failed to get delegations: {} - {}", status, error_text))
-		}
-	}
-
 	/// GET delegations from relay for a specific slot
 	pub async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
 		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace("{slot}", &slot.to_string()));

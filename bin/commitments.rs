@@ -2,9 +2,11 @@ use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::server;
 use common::db::DatabaseType;
+use common::execution::{ExecutionApiClient, ExecutionApiConfig};
 use common::slot_timer::SlotTimer;
 use common::{config, db, types};
 use eyre;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -20,11 +22,6 @@ async fn main() -> eyre::Result<()> {
 	db::db_healthcheck(&db).await?;
 	let db_context = types::DatabaseContext::new(db);
 
-	// Initialize pricing database
-	let pricing_db = db::create_database(&commit_config, DatabaseType::Pricing)?;
-	db::db_healthcheck(&pricing_db).await?;
-	let pricing_db_context = types::DatabaseContext::new(pricing_db);
-
 	// Get constraints configuration for BLS keys and relay settings
 	let app_config = &commit_config.extra;
 	let bls_public_key = bls_pubkey_from_hex(&app_config.constraints_bls_public_key)
@@ -35,15 +32,23 @@ async fn main() -> eyre::Result<()> {
 	// Create slot timer with genesis timestamp
 	let slot_timer = SlotTimer::new(commit_config.extra.eth_genesis_timestamp());
 
+	// Create execution client RPC API for gas price and estimation
+	let execution_config = ExecutionApiConfig {
+		endpoint: app_config.execution_endpoint_url().to_string(),
+		request_timeout_secs: app_config.execution_request_timeout_secs(),
+		max_retries: app_config.execution_max_retries(),
+	};
+	let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
+
 	// Create RPC context with database context and commit config
 	let rpc_context = types::RpcContext::new(
 		db_context,
-		pricing_db_context,
 		commit_config,
 		bls_public_key,
 		relay_url,
 		api_key,
 		slot_timer,
+		execution_client,
 	);
 
 	server::run_server(rpc_context).await?;

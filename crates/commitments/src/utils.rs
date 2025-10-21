@@ -1,4 +1,8 @@
+use alloy::consensus::TxEnvelope;
+use alloy::network::TransactionBuilder;
 use alloy::primitives::{Address, B256, Bytes, Signature, keccak256};
+use alloy::rlp::Decodable;
+use alloy_consensus::transaction::SignerRecoverable;
 use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::{Result, WrapErr};
 use std::sync::Arc;
@@ -61,10 +65,26 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<Inclus
 	}
 }
 
-/// Verifies a signed transaction by decoding it and validating its signature
-/// This implementation uses Alloy's consensus types for proper transaction verification
-pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
-	debug!("Verifying signed transaction: {:?}", signed_tx);
+/// Decodes an RLP-encoded signed transaction into a TxEnvelope
+///
+/// This helper function extracts the transaction decoding logic so it can be reused
+/// for both verification and conversion to RPC requests.
+///
+/// # Parameters
+///
+/// * `signed_tx` - The RLP-encoded signed transaction bytes
+///
+/// # Returns
+///
+/// The decoded `TxEnvelope` containing the transaction data and signature
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The signed transaction is empty
+/// - The transaction cannot be decoded (invalid RLP format)
+pub fn decode_signed_tx(signed_tx: &Bytes) -> Result<TxEnvelope> {
+	debug!("Decoding signed transaction");
 
 	// Basic validation: ensure the transaction is not empty
 	if signed_tx.is_empty() {
@@ -72,125 +92,226 @@ pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
 	}
 
 	// Try to decode the transaction using Alloy's consensus types
-	use alloy::consensus::TxEnvelope;
-	use alloy::rlp::Decodable;
+	let tx_envelope =
+		TxEnvelope::decode(&mut signed_tx.as_ref()).wrap_err("Failed to decode transaction from RLP bytes")?;
 
-	match TxEnvelope::decode(&mut signed_tx.as_ref()) {
-		Ok(tx_envelope) => {
-			debug!("Successfully decoded transaction envelope");
-			debug!("Transaction type: {:?}", tx_envelope.tx_type());
-
-			// Verify the transaction signature
-			// We'll implement proper signature verification using Alloy's built-in methods
-			debug!("Transaction decoded successfully, type: {:?}", tx_envelope.tx_type());
-
-			// Step 1-4: Extract and verify the signature
-			// We'll recover the signer's address from the signature and validate it
-			match &tx_envelope {
-				TxEnvelope::Legacy(signed_tx) => {
-					debug!("Verifying legacy transaction signature");
-					// Step 3: Recover the signer's address from the signature
-					match signed_tx.recover_signer() {
-						Ok(recovered_address) => {
-							debug!("Recovered signer address: {:?}", recovered_address);
-							debug!("Legacy transaction signature verified");
-						}
-						Err(e) => {
-							return Err(eyre::eyre!("Failed to recover signer from legacy transaction: {}", e));
-						}
-					}
-				}
-				TxEnvelope::Eip1559(signed_tx) => {
-					debug!("Verifying EIP-1559 transaction signature");
-					// Step 3: Recover the signer's address from the signature
-					match signed_tx.recover_signer() {
-						Ok(recovered_address) => {
-							debug!("Recovered signer address: {:?}", recovered_address);
-							debug!("EIP-1559 transaction signature verified");
-						}
-						Err(e) => {
-							return Err(eyre::eyre!("Failed to recover signer from EIP-1559 transaction: {}", e));
-						}
-					}
-				}
-				TxEnvelope::Eip2930(signed_tx) => {
-					debug!("Verifying EIP-2930 transaction signature");
-					// Step 3: Recover the signer's address from the signature
-					match signed_tx.recover_signer() {
-						Ok(recovered_address) => {
-							debug!("Recovered signer address: {:?}", recovered_address);
-							debug!("EIP-2930 transaction signature verified");
-						}
-						Err(e) => {
-							return Err(eyre::eyre!("Failed to recover signer from EIP-2930 transaction: {}", e));
-						}
-					}
-				}
-				TxEnvelope::Eip4844(signed_tx) => {
-					debug!("Verifying EIP-4844 transaction signature");
-					// Step 3: Recover the signer's address from the signature
-					match signed_tx.recover_signer() {
-						Ok(recovered_address) => {
-							debug!("Recovered signer address: {:?}", recovered_address);
-							debug!("EIP-4844 transaction signature verified");
-						}
-						Err(e) => {
-							return Err(eyre::eyre!("Failed to recover signer from EIP-4844 transaction: {}", e));
-						}
-					}
-				}
-				TxEnvelope::Eip7702(signed_tx) => {
-					debug!("Verifying EIP-7702 transaction signature");
-					// Step 3: Recover the signer's address from the signature
-					match signed_tx.recover_signer() {
-						Ok(recovered_address) => {
-							debug!("Recovered signer address: {:?}", recovered_address);
-							debug!("EIP-7702 transaction signature verified");
-						}
-						Err(e) => {
-							return Err(eyre::eyre!("Failed to recover signer from EIP-7702 transaction: {}", e));
-						}
-					}
-				}
-			}
-
-			debug!("Transaction signature verification passed - signature is valid and signer recovered");
-			Ok(())
-		}
-		Err(e) => {
-			debug!("Failed to decode transaction: {}", e);
-			Err(eyre::eyre!("Invalid transaction format: {}", e))
-		}
-	}
+	debug!("Successfully decoded transaction envelope, type: {:?}", tx_envelope.tx_type());
+	Ok(tx_envelope)
 }
 
-/// Calculates fee information for a commitment request
-pub fn calculate_fee_info(
+/// Converts a TxEnvelope to a TransactionRequest suitable for eth_estimateGas
+///
+/// This helper function extracts transaction fields from a signed transaction
+/// and converts them into a format suitable for JSON-RPC calls like eth_estimateGas.
+///
+/// # Parameters
+///
+/// * `tx_envelope` - The decoded transaction envelope
+///
+/// # Returns
+///
+/// An `alloy::rpc::types::TransactionRequest` with all fields populated from the envelope
+///
+/// # Errors
+///
+/// Returns an error if the signer cannot be recovered from the transaction signature
+pub fn tx_envelope_to_rpc_request(tx_envelope: &TxEnvelope) -> Result<alloy::rpc::types::TransactionRequest> {
+	use alloy::rpc::types::TransactionRequest;
+
+	let mut tx_request = TransactionRequest::default();
+
+	match tx_envelope {
+		TxEnvelope::Legacy(signed_tx) => {
+			let from = signed_tx.recover_signer().wrap_err("Failed to recover signer from legacy transaction")?;
+			let tx = signed_tx.tx();
+
+			// Convert TxKind to optional address
+			let to = match tx.to {
+				alloy::primitives::TxKind::Call(addr) => Some(addr),
+				alloy::primitives::TxKind::Create => None,
+			};
+
+			tx_request = tx_request
+				.with_from(from)
+				.with_value(tx.value)
+				.with_gas_limit(tx.gas_limit)
+				.with_gas_price(tx.gas_price)
+				.with_nonce(tx.nonce)
+				.with_input(tx.input.clone());
+
+			if let Some(to_addr) = to {
+				tx_request = tx_request.with_to(to_addr);
+			}
+
+			if let Some(chain_id) = tx.chain_id {
+				tx_request = tx_request.with_chain_id(chain_id);
+			}
+		}
+		TxEnvelope::Eip2930(signed_tx) => {
+			let from = signed_tx.recover_signer().wrap_err("Failed to recover signer from EIP-2930 transaction")?;
+			let tx = signed_tx.tx();
+
+			let to = match tx.to {
+				alloy::primitives::TxKind::Call(addr) => Some(addr),
+				alloy::primitives::TxKind::Create => None,
+			};
+
+			tx_request = tx_request
+				.with_from(from)
+				.with_value(tx.value)
+				.with_gas_limit(tx.gas_limit)
+				.with_gas_price(tx.gas_price)
+				.with_nonce(tx.nonce)
+				.with_input(tx.input.clone())
+				.with_chain_id(tx.chain_id)
+				.with_access_list(tx.access_list.clone());
+
+			if let Some(to_addr) = to {
+				tx_request = tx_request.with_to(to_addr);
+			}
+		}
+		TxEnvelope::Eip1559(signed_tx) => {
+			let from = signed_tx.recover_signer().wrap_err("Failed to recover signer from EIP-1559 transaction")?;
+			let tx = signed_tx.tx();
+
+			let to = match tx.to {
+				alloy::primitives::TxKind::Call(addr) => Some(addr),
+				alloy::primitives::TxKind::Create => None,
+			};
+
+			tx_request = tx_request
+				.with_from(from)
+				.with_value(tx.value)
+				.with_gas_limit(tx.gas_limit)
+				.with_max_fee_per_gas(tx.max_fee_per_gas)
+				.with_max_priority_fee_per_gas(tx.max_priority_fee_per_gas)
+				.with_nonce(tx.nonce)
+				.with_input(tx.input.clone())
+				.with_chain_id(tx.chain_id)
+				.with_access_list(tx.access_list.clone());
+
+			if let Some(to_addr) = to {
+				tx_request = tx_request.with_to(to_addr);
+			}
+		}
+		TxEnvelope::Eip4844(signed_tx) => {
+			let from = signed_tx.recover_signer().wrap_err("Failed to recover signer from EIP-4844 transaction")?;
+			let tx = signed_tx.tx().tx();
+
+			// EIP-4844 transactions have a direct 'to' address field (not TxKind)
+			tx_request = tx_request
+				.with_from(from)
+				.with_to(tx.to) // EIP-4844 'to' is an Address, not TxKind
+				.with_value(tx.value)
+				.with_gas_limit(tx.gas_limit)
+				.with_max_fee_per_gas(tx.max_fee_per_gas)
+				.with_max_priority_fee_per_gas(tx.max_priority_fee_per_gas)
+				.with_nonce(tx.nonce)
+				.with_input(tx.input.clone())
+				.with_chain_id(tx.chain_id)
+				.with_access_list(tx.access_list.clone());
+			// Note: blob-specific fields are not part of standard TransactionRequest for eth_estimateGas
+		}
+		TxEnvelope::Eip7702(signed_tx) => {
+			let from = signed_tx.recover_signer().wrap_err("Failed to recover signer from EIP-7702 transaction")?;
+			let tx = signed_tx.tx();
+
+			// EIP-7702 has a direct 'to' address field (not TxKind)
+			tx_request = tx_request
+				.with_from(from)
+				.with_to(tx.to) // EIP-7702 'to' is an Address, not TxKind
+				.with_value(tx.value)
+				.with_gas_limit(tx.gas_limit)
+				.with_max_fee_per_gas(tx.max_fee_per_gas)
+				.with_max_priority_fee_per_gas(tx.max_priority_fee_per_gas)
+				.with_nonce(tx.nonce)
+				.with_input(tx.input.clone())
+				.with_chain_id(tx.chain_id)
+				.with_access_list(tx.access_list.clone());
+			// Note: authorization_list is not part of standard TransactionRequest for eth_estimateGas
+		}
+	}
+
+	debug!("Converted transaction envelope to RPC request");
+	Ok(tx_request)
+}
+
+/// Verifies a signed transaction by decoding it and validating the signature
+pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
+	debug!("Verifying signed transaction");
+
+	// Decode the transaction
+	let tx_envelope = decode_signed_tx(signed_tx)?;
+
+	// Verify the signature by recovering the signer
+	// This will return an error if the signature is invalid
+	tx_envelope.recover_signer().map_err(|e| eyre::eyre!("Failed to recover signer - invalid signature: {}", e))?;
+
+	debug!("Transaction signature verified");
+	Ok(())
+}
+
+/// Calculates fee information for a commitment request using RPC calls
+///
+/// This function:
+/// 1. Decodes the InclusionPayload from the request
+/// 2. Decodes the signed transaction from the payload
+/// 3. Converts it to a TransactionRequest for gas estimation
+/// 4. Calls eth_estimateGas to get the gas required
+/// 5. Calls eth_gasPrice to get the current gas price
+/// 6. Calculates the total fee as gas_price * estimated_gas
+///
+/// # Parameters
+///
+/// * `request` - The commitment request containing the InclusionPayload
+/// * `execution_client` - The execution client RPC API for gas price and estimation calls
+///
+/// # Returns
+///
+/// `FeeInfo` containing the calculated fee and commitment type
+pub async fn calculate_fee_info<R: common::execution::RpcClient>(
 	request: &CommitmentRequest,
-	pricing_database: &common::types::DatabaseContext,
+	execution_client: &common::execution::ExecutionApiClient<R>,
 ) -> Result<FeeInfo> {
 	debug!("Calculating fee for commitment type: {}", request.commitment_type);
 
-	// Read latest price from pricing database
-	let price_gwei = get_latest_price_from_database(pricing_database)?;
+	// 1. Decode the InclusionPayload from the request
+	let inclusion_payload =
+		InclusionPayload::abi_decode(&request.payload).wrap_err("Failed to decode InclusionPayload from request")?;
+
+	// 2. Decode the signed transaction
+	let tx_envelope = decode_signed_tx(&inclusion_payload.signed_tx)?;
+
+	// 3. Convert to TransactionRequest for gas estimation
+	let tx_request = tx_envelope_to_rpc_request(&tx_envelope)?;
+
+	// 4. Estimate gas required for the transaction
+	let estimated_gas =
+		execution_client.estimate_gas(&tx_request).await.wrap_err("Failed to estimate gas for transaction")?;
+
+	// 5. Get current gas price
+	let gas_price_info =
+		execution_client.get_gas_price().await.wrap_err("Failed to get gas price from execution client node")?;
+
+	// 6. Calculate total fee: gas_price * estimated_gas
+	// Convert gas price from U256 to u64 (clamping if necessary)
+	let gas_price_wei = gas_price_info.gas_price_as_u64_clamped();
+
+	// Calculate total fee in wei
+	let total_fee_wei = (gas_price_wei as u128) * (estimated_gas as u128);
+
+	// Convert from wei to gwei by dividing by 1 billion (1e9)
+	let price_gwei = (total_fee_wei / 1_000_000_000) as u64;
 
 	let request_hash = request.request_hash()?;
+	let fee_payload = FeePayload { request_hash, price_gwei };
 
-	let fee_payload = FeePayload { request_hash: request_hash, price_gwei: price_gwei };
+	debug!(
+		"Calculated fee: estimated_gas={}, gas_price={} wei, total_fee={} wei ({} gwei)",
+		estimated_gas, gas_price_wei, total_fee_wei, price_gwei
+	);
 
-	debug!("Calculated fee with price {} gwei", price_gwei);
 	Ok(FeeInfo { fee_payload: fee_payload.abi_encode()?, commitment_type: request.commitment_type })
-}
-
-/// Get the latest price from the pricing database
-fn get_latest_price_from_database(pricing_database: &common::types::DatabaseContext) -> Result<u64> {
-	match pricing_database.get_latest_price().map_err(|e| eyre::eyre!("Database error: {}", e))? {
-		Some(price) => {
-			debug!("Retrieved price {} gwei from pricing database", price);
-			Ok(price)
-		}
-		None => Err(eyre::eyre!("No price found in pricing database")),
-	}
 }
 
 /// Validates a request hash format
@@ -457,32 +578,60 @@ mod tests {
 
 	#[tokio::test]
 	async fn test_calculate_fee_info() -> Result<()> {
-		use common::types::DatabaseContext;
-		use rocksdb::{DB, Options};
-		use std::sync::Arc;
-		use tempfile::TempDir;
+		use common::execution::{ExecutionApiClient, ExecutionApiConfig, MockRpcClient};
+
+		// Create a valid inclusion payload
+		let valid_tx = create_valid_signed_transaction();
+		let inclusion_payload = InclusionPayload { slot: 100, signed_tx: valid_tx.clone() };
 
 		let request = CommitmentRequest {
-			commitment_type: 3,
-			payload: Bytes::from(vec![0x07, 0x08, 0x09]),
+			commitment_type: 1,
+			payload: inclusion_payload.abi_encode()?,
 			slasher: "0x9876543210987654321098765432109876543210".parse()?,
 		};
 
-		// Create a test pricing database
-		let temp_dir = TempDir::new().unwrap();
-		let db_path = temp_dir.path().join("test_pricing_db");
-		let mut opts = Options::default();
-		opts.create_if_missing(true);
-		let db = DB::open(&opts, &db_path).unwrap();
-		let pricing_database = DatabaseContext::new(Arc::new(db));
+		// Create mock RPC client
+		let mut mock_client = MockRpcClient::new();
 
-		// Store a test price in the database
-		pricing_database.store_latest_price(5).map_err(|e| eyre::eyre!("Database error: {}", e))?;
+		// Setup expectations in the order they're called:
+		// 1. eth_estimateGas (called first by calculate_fee_info)
+		let gas_estimate_response = serde_json::json!({
+			"jsonrpc": "2.0",
+			"result": "0x5208", // 21000 in hex (standard gas for simple transfer)
+			"id": 2
+		});
+		mock_client.expect_call().times(1).returning(move |_, _| Ok(gas_estimate_response.clone()));
 
-		let fee_info = calculate_fee_info(&request, &pricing_database).unwrap();
+		// 2. eth_gasPrice (called second by calculate_fee_info)
+		let gas_price_response = serde_json::json!({
+			"jsonrpc": "2.0",
+			"result": "0x12a05f200", // 5 gwei in hex
+			"id": 1
+		});
+		mock_client.expect_call().times(1).returning(move |_, _| Ok(gas_price_response.clone()));
 
-		// Test with the price we stored (5 gwei)
-		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: 5 };
+		// 3. eth_blockNumber (called by get_gas_price internally)
+		let block_number_response = serde_json::json!({
+			"jsonrpc": "2.0",
+			"result": "0x1234567", // Some block number in hex
+			"id": 3
+		});
+		mock_client.expect_call().times(1).returning(move |_, _| Ok(block_number_response.clone()));
+
+		// Create ExecutionApiClient with mock
+		let reth_config = ExecutionApiConfig {
+			endpoint: "http://localhost:8545".to_string(),
+			request_timeout_secs: 10,
+			max_retries: 3,
+		};
+		let execution_client = ExecutionApiClient::new(reth_config, mock_client)?;
+
+		// Calculate fee info
+		let fee_info = calculate_fee_info(&request, &execution_client).await?;
+
+		// Expected fee: 5 gwei * 21000 gas = 105000 gwei
+		let expected_price_gwei = 105000;
+		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: expected_price_gwei };
 
 		assert_eq!(fee_info.commitment_type, request.commitment_type);
 		assert_eq!(fee_info.fee_payload, fee_payload.abi_encode()?);

@@ -200,16 +200,16 @@ pub fn slots_handler<T>(
 }
 
 #[instrument(name = "fee", skip(_context, _extensions))]
-pub fn fee_handler<T>(
+pub async fn fee_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext<T>,
-	_extensions: &Extensions,
+	_context: std::sync::Arc<RpcContext<T>>,
+	_extensions: Extensions,
 ) -> RpcResult<FeeInfo> {
 	info!("Processing fee request");
 	let request: CommitmentRequest = params.one()?;
 
-	// Use helper function to calculate fee
-	let fee_info = match utils::calculate_fee_info(&request, _context.pricing_database()) {
+	// Use helper function to calculate fee using RPC calls
+	let fee_info = match utils::calculate_fee_info(&request, _context.execution_client()).await {
 		Ok(fee_info) => fee_info,
 		Err(e) => {
 			error!("Failed to calculate fee info: {}", e);

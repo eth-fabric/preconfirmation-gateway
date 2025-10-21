@@ -151,6 +151,9 @@ mod tests {
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
 			],
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 		};
 		let slot_timer = SlotTimer::new(1606824023); // Mainnet genesis
 											   // Create a mock database context for testing

@@ -55,7 +55,7 @@ async fn test_local_generate_proxy_key_ecdsa() -> Result<()> {
 	// Verify the proxy address is not empty
 	assert!(!proxy_address.is_empty(), "Proxy address should not be empty");
 
-	println!("✅ Generated proxy address: {}", proxy_address);
+	println!(" Generated proxy address: {}", proxy_address);
 
 	Ok(())
 }

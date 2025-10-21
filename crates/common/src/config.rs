@@ -42,6 +42,11 @@ pub struct InclusionPreconfConfig {
 
 	// Constraints receivers configuration
 	pub constraints_receivers: Vec<String>,
+
+	// Reth RPC configuration
+	pub execution_endpoint_url: String,
+	pub execution_request_timeout_secs: u64,
+	pub execution_max_retries: u32,
 }
 
 // Configuration access methods
@@ -66,6 +71,19 @@ impl InclusionPreconfConfig {
 	// Scheduler configuration access
 	pub fn eth_genesis_timestamp(&self) -> u64 {
 		self.eth_genesis_timestamp
+	}
+
+	// Reth RPC configuration access
+	pub fn execution_endpoint_url(&self) -> &str {
+		&self.execution_endpoint_url
+	}
+
+	pub fn execution_request_timeout_secs(&self) -> u64 {
+		self.execution_request_timeout_secs
+	}
+
+	pub fn execution_max_retries(&self) -> u32 {
+		self.execution_max_retries
 	}
 }
 
@@ -99,6 +117,9 @@ mod tests {
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
 			],
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 		};
 
 		// Test direct field access

@@ -15,8 +15,6 @@ pub enum DatabaseType {
 	Constraints,
 	/// Delegations database
 	Delegations,
-	/// Pricing database
-	Pricing,
 }
 
 /// Create a RocksDB database from commit-boost config
@@ -31,7 +29,6 @@ pub fn create_database(
 		DatabaseType::Commitments => app_config.commitments_database_url.clone(),
 		DatabaseType::Constraints => app_config.constraints_database_url.clone(),
 		DatabaseType::Delegations => app_config.delegations_database_url.clone(),
-		DatabaseType::Pricing => app_config.pricing_database_url.clone(),
 	};
 
 	// Create database directory if it doesn't exist

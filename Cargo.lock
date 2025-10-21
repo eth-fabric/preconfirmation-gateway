@@ -2077,6 +2077,7 @@ name = "commitments"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "alloy-consensus",
  "alloy-primitives 1.4.0",
  "cb-common",
  "commit-boost",
@@ -5155,19 +5156,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pricer"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "common",
- "eyre",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "primitive-types"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6058,7 +6046,6 @@ dependencies = [
  "constraints",
  "eyre",
  "hex",
- "pricer",
  "reqwest 0.11.27",
  "rocksdb",
  "serde",

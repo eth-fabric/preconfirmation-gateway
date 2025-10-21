@@ -5,8 +5,8 @@ use common::db::{DatabaseType, create_database};
 use common::{config, types};
 use eyre::Result;
 use scheduler::{
-	ConstraintsTask, DelegationTask, DelegationTaskConfig, PricerTask, PricerTaskConfig, ProposerLookaheadConfig,
-	ProposerLookaheadTask, SlotTimer, TaskCoordinator,
+	ConstraintsTask, DelegationTask, DelegationTaskConfig, ProposerLookaheadConfig, ProposerLookaheadTask, SlotTimer,
+	TaskCoordinator,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,11 +35,6 @@ async fn main() -> Result<()> {
 		.map_err(|e| eyre::eyre!("Failed to create delegations database: {}", e))?;
 	let delegations_database = types::DatabaseContext::new(delegations_db);
 
-	// Create pricing database
-	let pricing_db = create_database(&commit_config, DatabaseType::Pricing)
-		.map_err(|e| eyre::eyre!("Failed to create pricing database: {}", e))?;
-	let pricing_database = types::DatabaseContext::new(pricing_db);
-
 	// Create shared commit config for tasks
 	let shared_commit_config = Arc::new(Mutex::new(commit_config));
 
@@ -50,11 +45,6 @@ async fn main() -> Result<()> {
 	let delegation_config = DelegationTaskConfig {
 		check_interval_seconds: 1, // 1 second interval as requested
 		lookahead_window: 64,      // 64 slots lookahead
-	};
-
-	// Create pricer task configuration
-	let pricer_config = PricerTaskConfig {
-		update_interval_seconds: 12, // 12 seconds for once per slot
 	};
 
 	// Create proposer lookahead task configuration
@@ -83,9 +73,6 @@ async fn main() -> Result<()> {
 		app_config.constraints_api_key.clone(),
 	);
 
-	// Create pricer task
-	let pricer_task = PricerTask::new(pricer_config, pricing_database);
-
 	// Create beacon API client for proposer lookahead
 	// TODO: Make these configurable via InclusionPreconfConfig
 	let beacon_config = BeaconApiConfig {
@@ -111,9 +98,6 @@ async fn main() -> Result<()> {
 
 	// Spawn constraints task
 	coordinator.spawn_task("constraints_task".to_string(), move || async move { constraints_task.run().await });
-
-	// Spawn pricer task
-	coordinator.spawn_task("pricer_task".to_string(), move || async move { pricer_task.run().await });
 
 	// Spawn proposer lookahead task
 	coordinator

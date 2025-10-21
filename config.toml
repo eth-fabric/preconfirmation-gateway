@@ -61,5 +61,10 @@ constraints_delegate_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57b
 # Scheduler configuration
 eth_genesis_timestamp = 1606824023
 
+# Execution client RPC configuration
+execution_endpoint_url = "http://localhost:8545"
+execution_request_timeout_secs = 10
+execution_max_retries = 3
+
 # Constraints receivers configuration
 constraints_receivers = ["0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"]

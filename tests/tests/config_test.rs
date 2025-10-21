@@ -31,6 +31,9 @@ fn test_config_load_from_existing_file() {
 			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 				.to_string(),
 		],
+		execution_endpoint_url: "http://localhost:8545".to_string(),
+		execution_request_timeout_secs: 10,
+		execution_max_retries: 3,
 	};
 
 	// Test direct field access
@@ -68,6 +71,9 @@ fn test_inclusion_preconf_config_methods() {
 			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 				.to_string(),
 		],
+		execution_endpoint_url: "http://localhost:8545".to_string(),
+		execution_request_timeout_secs: 10,
+		execution_max_retries: 3,
 	};
 
 	// Test direct field access instead of removed methods
@@ -127,6 +133,9 @@ fn test_config_field_access() {
 			"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 				.to_string(),
 		],
+		execution_endpoint_url: "http://localhost:8545".to_string(),
+		execution_request_timeout_secs: 10,
+		execution_max_retries: 3,
 	};
 
 	// Test server config fields

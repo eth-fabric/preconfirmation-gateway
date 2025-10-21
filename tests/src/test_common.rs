@@ -149,7 +149,7 @@ impl TestHarnessBuilder {
 	}
 
 	/// Setup all databases needed for testing
-	fn setup_databases(&self, temp_dir: &TempDir) -> Result<(DatabaseContext, DatabaseContext, DatabaseContext)> {
+	fn setup_databases(&self, temp_dir: &TempDir) -> Result<(DatabaseContext, DatabaseContext)> {
 		let mut opts = Options::default();
 		opts.create_if_missing(true);
 
@@ -157,11 +157,6 @@ impl TestHarnessBuilder {
 		let db_path = temp_dir.path().join("test_commitments_db");
 		let db = DB::open(&opts, &db_path)?;
 		let commitments_database = DatabaseContext::new(Arc::new(db));
-
-		// Pricing database
-		let pricing_db_path = temp_dir.path().join("test_pricing_db");
-		let pricing_db = DB::open(&opts, &pricing_db_path)?;
-		let pricing_database = DatabaseContext::new(Arc::new(pricing_db));
 
 		// Delegations database
 		let delegations_db_path = temp_dir.path().join("test_delegations_db");
@@ -171,7 +166,7 @@ impl TestHarnessBuilder {
 		// Note: We don't open the relay database here because the relay service
 		// will open it when it starts. RocksDB doesn't allow multiple opens.
 
-		Ok((commitments_database, pricing_database, delegations_database))
+		Ok((commitments_database, delegations_database))
 	}
 
 	/// Build the test harness
@@ -191,7 +186,7 @@ impl TestHarnessBuilder {
 		let temp_dir = TempDir::new()?;
 
 		// Setup all databases
-		let (database, pricing_database, _delegations_database) = self.setup_databases(&temp_dir)?;
+		let (database, _delegations_database) = self.setup_databases(&temp_dir)?;
 
 		// Create test InclusionPreconfConfig
 		let app_config = InclusionPreconfConfig {
@@ -210,6 +205,9 @@ impl TestHarnessBuilder {
 			constraints_delegate_public_key: hex::encode(PUBKEY),
 			eth_genesis_timestamp: 1606824023,
 			constraints_receivers: vec![hex::encode(PUBKEY)],
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 		};
 
 		// Start local signer server with config
@@ -290,15 +288,24 @@ impl TestHarnessBuilder {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
+		// Create mock Reth client for tests
+		use common::execution::{ExecutionApiClient, ExecutionApiConfig};
+		let execution_config = ExecutionApiConfig {
+			endpoint: "http://localhost:8545".to_string(),
+			request_timeout_secs: 10,
+			max_retries: 3,
+		};
+		let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
+
 		// Create RPC context - use gateway_one as the primary gateway
 		let context = RpcContext {
 			database,
-			pricing_database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key: gateway_bls_one.clone(),
 			relay_url: relay_url.clone(),
 			api_key,
 			slot_timer: slot_timer.clone(),
+			execution_client,
 		};
 
 		// Pre-populate relay database with proposer lookahead before launching relay service
@@ -1142,18 +1149,22 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		// Create pricing database for testing
-		let pricing_db = DB::open(&opts, &temp_dir.path().join("test_pricing_db")).unwrap();
-		let pricing_database = DatabaseContext::new(Arc::new(pricing_db));
+		// Create mock execution RPC client for tests
+		let execution_config = common::execution::ExecutionApiConfig {
+			endpoint: "http://localhost:8545".to_string(),
+			request_timeout_secs: 10,
+			max_retries: 3,
+		};
+		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
 
 		Ok(RpcContext {
 			database,
-			pricing_database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
 			api_key,
 			slot_timer,
+			execution_client,
 		})
 	}
 
@@ -1197,6 +1208,9 @@ pub mod test_helpers {
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
 			],
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 		};
 
 		// Start local signer server with config
@@ -1220,18 +1234,22 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		// Create pricing database for testing
-		let pricing_db = DB::open(&opts, &temp_dir.path().join("test_pricing_db")).unwrap();
-		let pricing_database = DatabaseContext::new(Arc::new(pricing_db));
+		// Create mock execution RPC client for tests
+		let execution_config = common::execution::ExecutionApiConfig {
+			endpoint: "http://localhost:8545".to_string(),
+			request_timeout_secs: 10,
+			max_retries: 3,
+		};
+		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
 
 		Ok(RpcContext {
 			database,
-			pricing_database,
 			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
 			bls_public_key,
 			relay_url,
 			api_key,
 			slot_timer,
+			execution_client,
 		})
 	}
 }
