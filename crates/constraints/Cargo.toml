@@ -25,3 +25,4 @@ cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branc
 
 [dev-dependencies]
 hex = { workspace = true }
+mockall = "0.12"

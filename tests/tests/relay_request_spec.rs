@@ -36,7 +36,7 @@ async fn test_store_and_retrieve_delegation() {
 	assert_eq!(retrieved_delegation.message.delegate, harness.gateway_bls_one);
 	assert_eq!(retrieved_delegation.message.committer, harness.committer_one);
 
-	println!("✅ Delegation stored and retrieved successfully");
+	println!(" Delegation stored and retrieved successfully");
 }
 
 #[tokio::test]
@@ -57,7 +57,7 @@ async fn test_delegation_signature_valid() {
 	let is_valid = relay::utils::verify_delegation_signature(&signed_delegation, chain).unwrap();
 	assert!(is_valid);
 
-	println!("✅ Delegation signature is valid");
+	println!(" Delegation signature is valid");
 }
 
 #[tokio::test]
@@ -82,7 +82,7 @@ async fn test_multiple_delegations_different_slots() {
 		assert_eq!(retrieved.unwrap().message.slot, slot);
 	}
 
-	println!("✅ Multiple delegations stored and retrieved correctly");
+	println!(" Multiple delegations stored and retrieved correctly");
 }
 
 #[tokio::test]
@@ -112,7 +112,7 @@ async fn test_delegation_with_different_delegates() {
 	assert_eq!(retrieved1.message.committer, harness.committer_one);
 	assert_eq!(retrieved2.message.committer, harness.committer_two);
 
-	println!("✅ Delegations with different delegates handled correctly");
+	println!(" Delegations with different delegates handled correctly");
 }
 
 #[tokio::test]
@@ -124,7 +124,7 @@ async fn test_retrieve_nonexistent_delegation() {
 	let result = harness.context.database.get_delegation_for_slot(nonexistent_slot).unwrap();
 
 	assert!(result.is_none());
-	println!("✅ Correctly returns None for nonexistent delegation");
+	println!(" Correctly returns None for nonexistent delegation");
 }
 
 // ===== CONSTRAINTS TESTS =====
@@ -168,7 +168,7 @@ async fn test_create_signed_constraints() {
 	assert_eq!(signed_constraints.message.constraints[0].constraint_type, CONSTRAINT_TYPE);
 	assert_ne!(signed_constraints.signature, commit_boost::prelude::BlsSignature::empty());
 
-	println!("✅ Signed constraints created successfully");
+	println!(" Signed constraints created successfully");
 }
 
 #[tokio::test]
@@ -206,7 +206,7 @@ async fn test_constraints_signature_valid() {
 	let is_valid = relay::utils::verify_constraints_signature(&signed_constraints, chain).unwrap();
 	assert!(is_valid);
 
-	println!("✅ Constraints signature is valid");
+	println!(" Constraints signature is valid");
 }
 
 #[tokio::test]
@@ -250,7 +250,7 @@ async fn test_store_and_retrieve_constraints() {
 	assert_eq!(retrieved[0].message.slot, slot);
 	assert_eq!(retrieved[0].message.constraints.len(), 1);
 
-	println!("✅ Constraints stored and retrieved successfully");
+	println!(" Constraints stored and retrieved successfully");
 }
 
 #[tokio::test]
@@ -292,7 +292,7 @@ async fn test_multiple_constraints_same_slot() {
 	let retrieved = state.database.get_signed_constraints_for_slot(slot).unwrap();
 
 	assert_eq!(retrieved.len(), 3);
-	println!("✅ Multiple constraints for same slot handled correctly");
+	println!(" Multiple constraints for same slot handled correctly");
 }
 
 #[tokio::test]
@@ -330,7 +330,7 @@ async fn test_constraints_with_multiple_constraint_items() {
 	};
 
 	assert_eq!(signed_constraints.message.constraints.len(), 3);
-	println!("✅ Constraints with multiple items created successfully");
+	println!(" Constraints with multiple items created successfully");
 }
 
 #[tokio::test]
@@ -364,7 +364,7 @@ async fn test_public_vs_private_constraints() {
 	// Hashes should be different
 	assert_ne!(public_hash, private_hash);
 
-	println!("✅ Public and private constraints produce different hashes");
+	println!(" Public and private constraints produce different hashes");
 }
 
 #[tokio::test]
@@ -377,7 +377,7 @@ async fn test_retrieve_constraints_for_nonexistent_slot() {
 	let result = state.database.get_signed_constraints_for_slot(nonexistent_slot).unwrap();
 
 	assert!(result.is_empty());
-	println!("✅ Correctly returns empty for nonexistent constraints");
+	println!(" Correctly returns empty for nonexistent constraints");
 }
 
 // ===== AUTH HEADER TESTS =====
@@ -396,7 +396,7 @@ async fn test_create_auth_headers() {
 	assert!(headers.contains_key("x-receiver-nonce"));
 	assert!(headers.contains_key("x-receiver-signingid"));
 
-	println!("✅ Auth headers created successfully");
+	println!(" Auth headers created successfully");
 }
 
 #[tokio::test]
@@ -415,7 +415,7 @@ async fn test_headers_with_different_signers() {
 	let sig2 = headers2.get("x-receiver-signature").unwrap();
 	assert_ne!(sig1, sig2);
 
-	println!("✅ Different signers produce different auth headers");
+	println!(" Different signers produce different auth headers");
 }
 
 // ===== INTEGRATION BETWEEN DELEGATIONS AND CONSTRAINTS =====
@@ -465,7 +465,7 @@ async fn test_delegation_required_for_constraints() {
 	let is_valid = relay::utils::verify_constraints_signature(&signed_constraints, chain).unwrap();
 	assert!(is_valid);
 
-	println!("✅ Delegation and constraints workflow works correctly");
+	println!(" Delegation and constraints workflow works correctly");
 }
 
 #[tokio::test]
@@ -504,7 +504,7 @@ async fn test_constraint_without_delegation() {
 
 	// Constraints can be created, but handler would reject without delegation
 	assert_ne!(signed_constraints.signature, commit_boost::prelude::BlsSignature::empty());
-	println!("✅ Constraints can be created without delegation (handler enforcement needed)");
+	println!(" Constraints can be created without delegation (handler enforcement needed)");
 }
 
 #[tokio::test]
@@ -531,7 +531,7 @@ async fn test_delegation_fields_preserved() {
 	assert_eq!(retrieved.signing_id, signed_delegation.signing_id);
 	assert_eq!(retrieved.signature, signed_delegation.signature);
 
-	println!("✅ All delegation fields preserved after storage");
+	println!(" All delegation fields preserved after storage");
 }
 
 #[tokio::test]
@@ -583,5 +583,5 @@ async fn test_constraints_fields_preserved() {
 	assert_eq!(retrieved_constraints.signing_id, signed_constraints.signing_id);
 	assert_eq!(retrieved_constraints.signature, signed_constraints.signature);
 
-	println!("✅ All constraints fields preserved after storage");
+	println!(" All constraints fields preserved after storage");
 }

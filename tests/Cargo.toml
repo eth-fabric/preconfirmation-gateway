@@ -9,6 +9,7 @@ commitments = { path = "../crates/commitments" }
 constraints = { path = "../crates/constraints" }
 relay = { path = "../crates/relay" }
 scheduler = { path = "../crates/scheduler" }
+proposer = { path = "../crates/proposer" }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 config = { workspace = true }

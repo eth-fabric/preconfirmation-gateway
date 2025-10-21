@@ -54,7 +54,7 @@ async fn test_retrieve_commitment_by_request_hash() {
 	assert_eq!(retrieved_commitment.commitment.request_hash, signed_commitment.commitment.request_hash);
 	assert_eq!(retrieved_commitment.nonce, signed_commitment.nonce);
 
-	println!("✅ Commitment retrieved successfully by request hash");
+	println!(" Commitment retrieved successfully by request hash");
 }
 
 #[tokio::test]
@@ -105,7 +105,7 @@ async fn test_retrieve_multiple_commitments() {
 		assert_eq!(retrieved_commitment.signature, stored.signature);
 	}
 
-	println!("✅ Multiple commitments retrieved successfully");
+	println!(" Multiple commitments retrieved successfully");
 }
 
 #[tokio::test]
@@ -150,7 +150,7 @@ async fn test_commitment_fields_preserved_after_storage() {
 	assert_eq!(retrieved.signing_id, signed_commitment.signing_id);
 	assert_eq!(retrieved.signature, signed_commitment.signature);
 
-	println!("✅ All commitment fields preserved after storage");
+	println!(" All commitment fields preserved after storage");
 }
 
 #[tokio::test]
@@ -191,7 +191,7 @@ async fn test_retrieve_commitment_idempotent() {
 	assert_eq!(retrieved1.commitment.request_hash, retrieved2.commitment.request_hash);
 	assert_eq!(retrieved1.signature, retrieved2.signature);
 
-	println!("✅ Retrieving commitment is idempotent");
+	println!(" Retrieving commitment is idempotent");
 }
 
 // ===== NEGATIVE TESTS =====
@@ -205,7 +205,7 @@ async fn test_retrieve_nonexistent_commitment() {
 	let result = harness.context.database.get_commitment_by_hash(&nonexistent_hash).unwrap();
 
 	assert!(result.is_none());
-	println!("✅ Correctly returns None for nonexistent commitment");
+	println!(" Correctly returns None for nonexistent commitment");
 }
 
 #[tokio::test]
@@ -217,7 +217,7 @@ async fn test_retrieve_with_zero_hash() {
 	let result = harness.context.database.get_commitment_by_hash(&zero_hash).unwrap();
 
 	assert!(result.is_none());
-	println!("✅ Correctly handles zero hash");
+	println!(" Correctly handles zero hash");
 }
 
 #[tokio::test]
@@ -283,7 +283,7 @@ async fn test_retrieve_after_multiple_stores() {
 	assert_eq!(retrieved_commitment.commitment.slasher, specific_slasher);
 	assert_eq!(retrieved_commitment.commitment.request_hash, target_commitment.commitment.request_hash);
 
-	println!("✅ Can retrieve specific commitment among many");
+	println!(" Can retrieve specific commitment among many");
 }
 
 #[tokio::test]
@@ -317,5 +317,5 @@ async fn test_different_requests_have_different_hashes() {
 	// Different requests should have different hashes
 	assert_ne!(commitment1.commitment.request_hash, commitment2.commitment.request_hash);
 
-	println!("✅ Different commitment requests produce different hashes");
+	println!(" Different commitment requests produce different hashes");
 }

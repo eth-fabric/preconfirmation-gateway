@@ -105,6 +105,47 @@ pub async fn start_local_signer_server_with_config(
 	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: app_config })
 }
 
+/// Starts a local signer server for testing with ProposerConfig
+pub async fn start_local_signer_server_with_proposer_config(
+	module_id: &str,
+	signing_id: B256,
+	admin_secret: &str,
+	port: u16,
+	proposer_config: proposer::ProposerConfig,
+) -> Result<StartCommitModuleConfig<proposer::ProposerConfig>> {
+	use cb_tests::{signer_service, utils};
+
+	utils::setup_test_env();
+
+	let mut cfg = utils::get_commit_boost_config(utils::get_pbs_static_config(utils::get_pbs_config(0)));
+
+	let module_id = ModuleId(module_id.to_string());
+
+	cfg.modules = Some(vec![utils::create_module_config(module_id.clone(), signing_id)]);
+
+	let jwts = HashMap::from([(module_id.clone(), admin_secret.to_string())]);
+
+	let mod_cfgs = load_module_signing_configs(&cfg, &jwts)?;
+
+	let start_config = signer_service::start_server(port, &mod_cfgs, admin_secret.to_string(), false).await?;
+	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
+
+	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
+	let signer_url = format!("http://{}", start_config.endpoint)
+		.parse()
+		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
+
+	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
+
+	// Create SignerClient with the same parameters as the local signer
+	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
+
+	// Use the chain from the config
+	let chain = cfg.chain;
+
+	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: proposer_config })
+}
+
 /// Unified test harness builder for all test scenarios
 pub struct TestHarnessBuilder {
 	signer_port: Option<u16>,
@@ -146,6 +187,103 @@ impl TestHarnessBuilder {
 	pub fn with_relay_port(mut self, port: Option<u16>) -> Self {
 		self.relay_port = Some(port);
 		self
+	}
+
+	/// Build a proposer-specific test harness
+	/// This creates a harness configured for testing the proposer binary
+	pub async fn build_proposer_harness(self) -> Result<ProposerTestHarness> {
+		// Auto-generate ports if not specified
+		let mut rng = rand::thread_rng();
+		let signer_port = self.signer_port.unwrap_or_else(|| rng.gen_range(20000..65535));
+
+		// Handle relay port: if Some(_), we want to launch; the inner Option determines auto vs specific
+		let relay_port = self.relay_port.map(|opt_port| opt_port.unwrap_or_else(|| rng.gen_range(20000..65535)));
+
+		// Create temporary directory for all databases
+		let temp_dir = TempDir::new()?;
+
+		// Use consensus BLS public key (this is registered with the signer service)
+		let consensus_bls_public_key = cb_common::types::BlsPublicKey::deserialize(&PUBKEY)
+			.map_err(|e| eyre::eyre!("Failed to deserialize consensus BLS public key: {:?}", e))?;
+
+		// Construct relay URL based on relay port if specified
+		let relay_url = if let Some(port) = relay_port {
+			format!("http://127.0.0.1:{}", port)
+		} else {
+			"http://127.0.0.1:3001".to_string() // Default test relay URL
+		};
+
+		// Create ProposerConfig with temporary values for delegate and committer
+		// We'll generate the delegate key after starting the signer
+		let delegate_placeholder = format!("0x{}", hex::encode(PUBKEY));
+		let committer_address = Address::random();
+
+		let proposer_config = proposer::ProposerConfig {
+			proposer_bls_public_key: format!("0x{}", hex::encode(PUBKEY)),
+			delegate_bls_public_key: delegate_placeholder.clone(),
+			committer_address: format!("{:?}", committer_address),
+			relay_url: relay_url.clone(),
+			relay_api_key: None,
+			beacon_api_url: "https://ethereum-beacon-api.publicnode.com".to_string(),
+			beacon_genesis_timestamp: 1606824023,
+			poll_interval_seconds: 60,
+		};
+
+		// Start local signer server with ProposerConfig
+		let mut commit_config = start_local_signer_server_with_proposer_config(
+			&self.module_id,
+			self.signing_id,
+			&self.admin_secret,
+			signer_port,
+			proposer_config.clone(),
+		)
+		.await?;
+
+		// Generate delegate key using the signer that was just started
+		let delegate_bls =
+			commit_config.signer_client.generate_proxy_key_bls(consensus_bls_public_key.clone()).await?.message.proxy;
+
+		// Update the config with the actual delegate key
+		commit_config.extra.delegate_bls_public_key = format!("0x{}", hex::encode(delegate_bls.serialize()));
+
+		// Pre-populate relay database with proposer lookahead before launching relay service
+		let relay_service = if let Some(port) = relay_port {
+			// Populate lookahead for a wide range of slots
+			let slot_timer = SlotTimer::new(1606824023);
+			let current_slot = slot_timer.get_current_slot();
+			let relay_db_path = temp_dir.path().join("relay_db");
+			{
+				let mut opts = rocksdb::Options::default();
+				opts.create_if_missing(true);
+				let db = rocksdb::DB::open(&opts, &relay_db_path)?;
+				let temp_database = DatabaseContext::new(Arc::new(db));
+
+				// Populate lookahead for 1000 slots (covers most tests)
+				for slot in current_slot..=(current_slot + 1000) {
+					temp_database.store_proposer_lookahead(slot, &consensus_bls_public_key)?;
+				}
+				// DB is dropped here, releasing the lock
+			}
+
+			// Now launch the relay service
+			Some(Self::launch_relay_service(port, &temp_dir).await?)
+		} else {
+			None
+		};
+
+		// Store the updated proposer config before moving commit_config
+		let final_proposer_config = commit_config.extra.clone();
+
+		Ok(ProposerTestHarness {
+			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
+			proposer_bls_public_key: consensus_bls_public_key,
+			delegate_bls_public_key: delegate_bls,
+			committer_address,
+			relay_service,
+			proposer_config: final_proposer_config, // Use the updated config with actual delegate key
+			_temp_dir: temp_dir,
+			_signer_port: signer_port,
+		})
 	}
 
 	/// Setup all databases needed for testing
@@ -437,6 +575,73 @@ pub struct TestHarness {
 	pub relay_service: Option<ServiceHandle>,
 	_temp_dir: TempDir,
 	_signer_port: u16,
+}
+
+/// Test harness specifically for proposer testing
+/// This harness is configured with ProposerConfig instead of InclusionPreconfConfig
+pub struct ProposerTestHarness {
+	pub commit_config: Arc<tokio::sync::Mutex<StartCommitModuleConfig<proposer::ProposerConfig>>>,
+	pub proposer_bls_public_key: cb_common::types::BlsPublicKey,
+	pub delegate_bls_public_key: cb_common::types::BlsPublicKey,
+	pub committer_address: Address,
+	pub relay_service: Option<ServiceHandle>,
+	pub proposer_config: proposer::ProposerConfig,
+	_temp_dir: TempDir,
+	_signer_port: u16,
+}
+
+impl ProposerTestHarness {
+	/// Create a mock beacon API client that returns duties for the proposer
+	pub fn create_mock_beacon_api_client(
+		&self,
+		epoch: u64,
+	) -> Result<common::beacon::BeaconApiClient<common::beacon::MockHttpClient>> {
+		use common::beacon::{HttpResponse, MockHttpClient};
+		use common::config::BeaconApiConfig;
+		use common::types::beacon::{BeaconTiming, ProposerDutiesResponse, ValidatorDuty};
+
+		let mut mock_http = MockHttpClient::new();
+		let proposer_key = self.proposer_bls_public_key.clone();
+
+		// Calculate the slot range for this epoch
+		let start_slot = BeaconTiming::epoch_to_first_slot(epoch);
+		let end_slot = BeaconTiming::epoch_to_last_slot(epoch);
+
+		// Create duties for all slots in this epoch
+		let mut duties = Vec::new();
+		for slot in start_slot..=end_slot {
+			let pubkey_bytes = proposer_key.serialize();
+			let pubkey_hex = format!("0x{}", hex::encode(pubkey_bytes));
+
+			duties.push(ValidatorDuty {
+				validator_index: slot.to_string(),
+				pubkey: pubkey_hex,
+				slot: slot.to_string(),
+			});
+		}
+
+		let duties_clone = duties.clone();
+		mock_http.expect_get().times(1).returning(move |url| {
+			assert!(url.contains(&format!("eth/v1/validator/duties/proposer/{}", epoch)));
+			let response =
+				ProposerDutiesResponse { execution_optimistic: false, finalized: true, data: duties_clone.clone() };
+			Ok(HttpResponse { status: 200, body: serde_json::to_vec(&response).unwrap() })
+		});
+
+		let beacon_config = BeaconApiConfig {
+			primary_endpoint: "https://test-beacon.example.com".to_string(),
+			fallback_endpoints: vec![],
+			request_timeout_secs: 30,
+			genesis_time: 1606824023,
+		};
+
+		common::beacon::BeaconApiClient::new(beacon_config, mock_http)
+	}
+
+	/// Get the slot timer for the test
+	pub fn slot_timer(&self) -> common::slot_timer::SlotTimer {
+		common::slot_timer::SlotTimer::new(self.proposer_config.beacon_genesis_timestamp)
+	}
 }
 
 impl TestHarness {

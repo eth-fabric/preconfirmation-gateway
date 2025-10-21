@@ -2,7 +2,7 @@ use alloy::primitives::{Address, B256};
 use commit_boost::prelude::{
 	BlsPublicKey, StartCommitModuleConfig,
 	commit::{
-		request::SignProxyRequest,
+		request::{SignConsensusRequest, SignProxyRequest},
 		response::{BlsSignResponse, EcdsaSignResponse},
 	},
 	verify_proposer_commitment_signature_bls_for_message, verify_proposer_commitment_signature_ecdsa_for_message,
@@ -74,6 +74,39 @@ pub async fn call_proxy_bls_signer<T>(
 	};
 
 	Ok(proxy_response_bls)
+}
+
+/// Calls the BLS signer to sign a hash using the consensus key (not proxy)
+pub async fn call_bls_signer<T>(
+	commit_config: &mut StartCommitModuleConfig<T>,
+	message_hash: B256,
+	bls_public_key: BlsPublicKey,
+) -> Result<BlsSignResponse> {
+	debug!("Calling BLS signer for message hash: {:?} with consensus key", message_hash);
+
+	// Build the consensus signature request
+	let consensus_request = SignConsensusRequest::builder(bls_public_key.clone()).with_root(message_hash);
+
+	// Make the actual API call to the signer service using consensus signature
+	let bls_response = commit_config
+		.signer_client
+		.request_consensus_signature(consensus_request)
+		.await
+		.wrap_err("Failed to request consensus BLS signature from signer service")?;
+
+	match verify_proposer_commitment_signature_bls_for_message(
+		commit_config.chain,
+		&bls_public_key,
+		&message_hash,
+		&bls_response.signature,
+		&SIGNING_ID,
+		bls_response.nonce,
+	) {
+		true => info!("Consensus signature verified successfully"),
+		false => error!("Consensus signature verification failed"),
+	};
+
+	Ok(bls_response)
 }
 
 /// Generates a proxy key using the signer client

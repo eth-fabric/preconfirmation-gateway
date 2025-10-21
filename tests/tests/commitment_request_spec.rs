@@ -47,7 +47,7 @@ async fn test_valid_commitment_request() {
 	assert!(signed_commitment.nonce > 0);
 	assert!(!signed_commitment.signature.to_string().is_empty());
 
-	println!("✅ Valid commitment request processed successfully");
+	println!(" Valid commitment request processed successfully");
 }
 
 #[tokio::test]
@@ -93,7 +93,7 @@ async fn test_commitment_request_stores_in_database() {
 	assert_eq!(stored_commitment.commitment.commitment_type, COMMITMENT_TYPE);
 	assert_eq!(stored_commitment.commitment.slasher, request.slasher);
 
-	println!("✅ Commitment correctly stored in database");
+	println!(" Commitment correctly stored in database");
 }
 
 #[tokio::test]
@@ -134,7 +134,7 @@ async fn test_commitment_request_with_different_slasher_addresses() {
 	assert_eq!(result2.commitment.slasher, slasher2);
 	assert_ne!(result1.commitment.to_message_hash().unwrap(), result2.commitment.to_message_hash().unwrap());
 
-	println!("✅ Different slasher addresses produce different commitments");
+	println!(" Different slasher addresses produce different commitments");
 }
 
 #[tokio::test]
@@ -167,7 +167,7 @@ async fn test_commitment_request_signature_is_valid() {
 	assert_ne!(recovered, alloy::primitives::Address::ZERO);
 
 	// Note: The recovered address may differ from committer_one due to proxy key derivation
-	println!("✅ Commitment signature is valid and recoverable (recovered: {})", recovered);
+	println!(" Commitment signature is valid and recoverable (recovered: {})", recovered);
 }
 
 // ===== NEGATIVE TESTS =====
@@ -190,7 +190,7 @@ async fn test_commitment_request_without_delegation() {
 	assert!(validation_result.is_ok());
 
 	// But in the real handler workflow, it would fail when checking for delegation
-	println!("✅ Request validates, but would fail in handler without delegation");
+	println!(" Request validates, but would fail in handler without delegation");
 }
 
 #[tokio::test]
@@ -210,7 +210,7 @@ async fn test_commitment_request_wrong_gateway() {
 
 	// But if we try to sign with committer_one (wrong committer), it won't match the delegation
 	// In the real handler, this would check that the context's BLS key matches the delegation's delegate
-	println!("✅ Different gateway/committer combinations handled correctly");
+	println!(" Different gateway/committer combinations handled correctly");
 }
 
 #[tokio::test]
@@ -233,7 +233,7 @@ async fn test_commitment_request_with_zero_slot() {
 		err
 	);
 
-	println!("✅ Commitment request correctly fails with slot 0");
+	println!(" Commitment request correctly fails with slot 0");
 }
 
 #[tokio::test]
@@ -256,7 +256,7 @@ async fn test_commitment_request_with_zero_address_slasher() {
 		err
 	);
 
-	println!("✅ Commitment request validation correctly rejects zero address slasher");
+	println!(" Commitment request validation correctly rejects zero address slasher");
 }
 
 #[tokio::test]
@@ -287,7 +287,7 @@ async fn test_commitment_request_with_invalid_transaction() {
 		err
 	);
 
-	println!("✅ Commitment request validation correctly rejects invalid transaction");
+	println!(" Commitment request validation correctly rejects invalid transaction");
 }
 
 #[tokio::test]
@@ -318,7 +318,7 @@ async fn test_commitment_request_for_past_slot() {
 				"Expected slot/past error, got: {}",
 				e
 			);
-			println!("✅ System correctly rejects commitments for past slots");
+			println!(" System correctly rejects commitments for past slots");
 		}
 	}
 }
@@ -358,5 +358,5 @@ async fn test_commitment_request_duplicate_request() {
 	assert_eq!(result1.signature, result2.signature);
 	assert_eq!(result1.commitment.request_hash, result2.commitment.request_hash);
 
-	println!("✅ Duplicate commitment requests are deterministic (same nonce and signature)");
+	println!(" Duplicate commitment requests are deterministic (same nonce and signature)");
 }

@@ -7,6 +7,23 @@ use tracing::{debug, error, info};
 use common::constants::routes;
 use common::types::{SignedConstraints, SignedDelegation};
 
+/// Trait for constraints client operations (mockable for testing)
+#[cfg_attr(test, mockall::automock)]
+#[allow(async_fn_in_trait)]
+pub trait ConstraintsClientTrait: Send + Sync {
+	/// POST signed constraints to relay
+	async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<()>;
+
+	/// POST signed delegation to relay
+	async fn post_delegation(&self, signed_delegation: &SignedDelegation) -> Result<()>;
+
+	/// GET delegations from relay for a specific slot
+	async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>>;
+
+	/// Health check for the relay
+	async fn health_check(&self) -> Result<bool>;
+}
+
 /// HTTP client for communicating with constraints relay
 pub struct ConstraintsClient {
 	client: Client,
@@ -88,6 +105,32 @@ impl ConstraintsClient {
 		}
 	}
 
+	/// POST signed delegation to relay
+	pub async fn post_delegation(&self, signed_delegation: &SignedDelegation) -> Result<()> {
+		let url = format!("{}{}", self.base_url, routes::relay::DELEGATION);
+
+		debug!("Posting delegation to: {}", url);
+
+		let mut request = self.client.post(&url).json(signed_delegation);
+
+		// Add API key if provided
+		if let Some(api_key) = &self.api_key {
+			request = request.header("Authorization", format!("Bearer {}", api_key));
+		}
+
+		let response = request.send().await?;
+
+		if response.status().is_success() {
+			info!("Successfully posted delegation (status: {})", response.status());
+			Ok(())
+		} else {
+			let status = response.status();
+			let error_text = response.text().await.unwrap_or_default();
+			error!("Failed to post delegation: {} - {}", status, error_text);
+			Err(eyre::eyre!("Failed to post delegation (status {}): {}", status, error_text))
+		}
+	}
+
 	/// Health check for the relay
 	pub async fn health_check(&self) -> Result<bool> {
 		let url = format!("{}{}", self.base_url, routes::relay::HEALTH);
@@ -97,6 +140,24 @@ impl ConstraintsClient {
 		let response = self.client.get(&url).timeout(Duration::from_secs(5)).send().await?;
 
 		Ok(response.status().is_success())
+	}
+}
+
+impl ConstraintsClientTrait for ConstraintsClient {
+	async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<()> {
+		self.post_constraints(signed_constraints).await
+	}
+
+	async fn post_delegation(&self, signed_delegation: &SignedDelegation) -> Result<()> {
+		self.post_delegation(signed_delegation).await
+	}
+
+	async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
+		self.get_delegations_for_slot(slot).await
+	}
+
+	async fn health_check(&self) -> Result<bool> {
+		self.health_check().await
 	}
 }
 
@@ -119,5 +180,12 @@ mod tests {
 
 		assert_eq!(client.base_url, defaults::RELAY_URL);
 		assert_eq!(client.api_key, None);
+	}
+
+	#[test]
+	fn test_mockall_trait() {
+		// This test verifies that the MockConstraintsClientTrait is generated
+		// and can be used in tests
+		let _mock = MockConstraintsClientTrait::new();
 	}
 }

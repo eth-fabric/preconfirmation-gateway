@@ -2110,7 +2110,7 @@ dependencies = [
  "config",
  "eyre",
  "hex",
- "mockall",
+ "mockall 0.13.1",
  "rand 0.8.5",
  "reqwest 0.12.23",
  "rocksdb",
@@ -2229,6 +2229,7 @@ dependencies = [
  "common",
  "eyre",
  "hex",
+ "mockall 0.12.1",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
@@ -3981,6 +3982,7 @@ dependencies = [
  "http-body 1.0.1",
  "http-body-util",
  "jsonrpsee",
+ "proposer",
  "rand 0.8.5",
  "relay",
  "reqwest 0.12.23",
@@ -4580,6 +4582,21 @@ dependencies = [
 
 [[package]]
 name = "mockall"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
+dependencies = [
+ "cfg-if",
+ "downcast",
+ "fragile",
+ "lazy_static",
+ "mockall_derive 0.12.1",
+ "predicates",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
@@ -4587,9 +4604,21 @@ dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "mockall_derive",
+ "mockall_derive 0.13.1",
  "predicates",
  "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -5112,6 +5141,7 @@ dependencies = [
  "common",
  "constraints",
  "eyre",
+ "proposer",
  "relay",
  "scheduler",
  "tokio",
@@ -5219,6 +5249,24 @@ dependencies = [
  "parking_lot",
  "protobuf",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "proposer"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "cb-common",
+ "commit-boost",
+ "common",
+ "constraints",
+ "eyre",
+ "hex",
+ "mockall 0.12.1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
