@@ -369,3 +369,68 @@ async fn test_relay_server_handles_errors_gracefully() {
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 	client.post_delegation(&signed_delegation).await.unwrap();
 }
+
+#[tokio::test]
+async fn test_get_constraints_current_slot_requires_authentication() {
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
+	let client = harness.create_client_harness();
+
+	// Use current slot
+	let current_slot = harness.context.slot_timer.get_current_slot();
+
+	// Setup: Post delegation for current slot
+	let delegation = harness.create_delegation(current_slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
+	client.post_delegation(&signed_delegation).await.unwrap();
+
+	// Store and process constraints
+	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint_id = B256::random();
+	harness.context.database.store_constraint(current_slot, &constraint_id, &constraint).unwrap();
+
+	let result = harness.process_constraints(current_slot, vec![]).await.unwrap();
+	assert!(result.success);
+
+	// Act: Try to get constraints WITHOUT auth headers (should fail for current slot)
+	let empty_headers = axum::http::HeaderMap::new();
+	let result = client.get_constraints(current_slot, empty_headers).await;
+
+	// Assert: Should fail due to missing authentication
+	assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_get_constraints_future_slot_requires_authentication() {
+	let harness = TestHarness::builder().with_relay_port(None).build().await.unwrap();
+	let client = harness.create_client_harness();
+
+	// Use a future slot
+	let current_slot = harness.context.slot_timer.get_current_slot();
+	let future_slot = current_slot + 100;
+
+	// Setup: Post delegation for future slot
+	let delegation = harness.create_delegation(future_slot, harness.gateway_bls_one.clone(), harness.committer_one);
+	let signed_delegation =
+		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
+	client.post_delegation(&signed_delegation).await.unwrap();
+
+	// Store and process constraints
+	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
+	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint_id = B256::random();
+	harness.context.database.store_constraint(future_slot, &constraint_id, &constraint).unwrap();
+
+	let result = harness.process_constraints(future_slot, vec![]).await.unwrap();
+	assert!(result.success);
+
+	// Act: Try to get constraints WITHOUT auth headers (should fail for future slot)
+	let empty_headers = axum::http::HeaderMap::new();
+	let result = client.get_constraints(future_slot, empty_headers).await;
+
+	// Assert: Should fail due to missing authentication
+	assert!(result.is_err());
+}
+
+// NOTE: Testing that past slots ignore receivers[] list is covered in unit tests

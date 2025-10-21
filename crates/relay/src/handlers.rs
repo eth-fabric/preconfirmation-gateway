@@ -285,8 +285,33 @@ pub async fn get_constraints_for_slot_handler(
 	Path(slot): Path<u64>,
 	headers: HeaderMap,
 ) -> Result<Json<Vec<SignedConstraints>>, StatusCode> {
-	info!("Getting constraints for slot {} with signature verification", slot);
-	info!("Handler called with slot: {}", slot);
+	info!("Getting constraints for slot {}", slot);
+
+	// Get current slot to check if target slot has passed
+	let current_slot = state.slot_timer.get_current_slot();
+
+	// If we're at slot_target + 1 or beyond, bypass authentication
+	if current_slot > slot {
+		info!("Slot {} has passed (current slot: {}), bypassing authentication", slot, current_slot);
+
+		// Simply fetch and return all constraints for this slot
+		let signed_constraints = match state.database.get_signed_constraints_for_slot(slot) {
+			Ok(constraints) => {
+				info!("Retrieved {} signed constraints from database for slot {}", constraints.len(), slot);
+				constraints
+			}
+			Err(e) => {
+				error!("Failed to get signed constraints for slot {}: {}", slot, e);
+				return Err(StatusCode::INTERNAL_SERVER_ERROR);
+			}
+		};
+
+		info!("Returning {} constraints for past slot {}", signed_constraints.len(), slot);
+		return Ok(Json(signed_constraints));
+	}
+
+	// Slot has not passed yet - enforce authentication
+	info!("Slot {} has not passed yet (current slot: {}), enforcing authentication", slot, current_slot);
 	info!("Headers count: {}", headers.len());
 
 	// Extract and parse BLS signature, public key, nonce, and signing_id from headers
@@ -306,13 +331,13 @@ pub async fn get_constraints_for_slot_handler(
 	);
 
 	// Debug output
-	println!("DEBUG: Slot: {}", slot);
-	println!("DEBUG: Slot hash: {:?}", slot_hash);
-	println!("DEBUG: Public key: {:?}", public_key.serialize());
-	println!("DEBUG: Signature: {:?}", bls_signature.serialize());
-	println!("DEBUG: Nonce: {}", nonce);
-	println!("DEBUG: Signing ID: {:?}", signing_id);
-	println!("DEBUG: Signature verification result: {}", is_valid);
+	debug!("DEBUG: Slot: {}", slot);
+	debug!("DEBUG: Slot hash: {:?}", slot_hash);
+	debug!("DEBUG: Public key: {:?}", public_key.serialize());
+	debug!("DEBUG: Signature: {:?}", bls_signature.serialize());
+	debug!("DEBUG: Nonce: {}", nonce);
+	debug!("DEBUG: Signing ID: {:?}", signing_id);
+	debug!("DEBUG: Signature verification result: {}", is_valid);
 
 	if !is_valid {
 		error!("Invalid BLS signature for slot {}", slot);
@@ -322,7 +347,7 @@ pub async fn get_constraints_for_slot_handler(
 	// Get signed constraints from database
 	let signed_constraints = match state.database.get_signed_constraints_for_slot(slot) {
 		Ok(constraints) => {
-			println!("DEBUG: Retrieved {} signed constraints from database for slot {}", constraints.len(), slot);
+			debug!("DEBUG: Retrieved {} signed constraints from database for slot {}", constraints.len(), slot);
 			constraints
 		}
 		Err(e) => {
@@ -743,5 +768,162 @@ mod tests {
 		let (_, _, nonce, signing_id) = result.unwrap();
 		assert_eq!(nonce, 1337);
 		assert_eq!(signing_id, alloy::primitives::B256::from_slice(&[0x01; 32]));
+	}
+
+	#[tokio::test]
+	async fn test_get_constraints_past_slot_bypasses_authentication() {
+		use commit_boost::prelude::BlsSignature;
+
+		let (database, _temp_dir) = create_test_database();
+
+		// Create a slot timer with a genesis timestamp that makes the current slot high
+		// Genesis timestamp far in the past so current slot is very high
+		let genesis_timestamp = 1606824023; // Beacon chain genesis
+		let slot_timer = common::slot_timer::SlotTimer::new(genesis_timestamp);
+		let current_slot = slot_timer.get_current_slot();
+
+		// Create a constraint for a past slot (current_slot - 10)
+		let past_slot = current_slot.saturating_sub(10);
+
+		let constraints_message = ConstraintsMessage {
+			proposer:
+				"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+					.parse()
+					.unwrap(),
+			delegate:
+				"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+					.parse()
+					.unwrap(),
+			slot: past_slot,
+			constraints: vec![],
+			receivers: vec![
+				"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+					.parse()
+					.unwrap(),
+			],
+		};
+
+		let signed_constraints = SignedConstraints {
+			message: constraints_message,
+			nonce: 1337,
+			signing_id: "0x3078313233340000000000000000000000000000000000000000000000000000".parse().unwrap(),
+			signature: BlsSignature::empty(),
+		};
+
+		// Store constraints in database
+		Arc::new(database.clone()).store_signed_constraints(&signed_constraints).unwrap();
+
+		let config = crate::config::RelayConfig::default();
+		let state = RelayState { database: Arc::new(database), config, slot_timer };
+
+		// Call handler without auth headers
+		let headers = HeaderMap::new();
+		let result = get_constraints_for_slot_handler(State(state), Path(past_slot), headers).await;
+
+		// Should succeed without authentication
+		assert!(result.is_ok());
+		let constraints = result.unwrap();
+		assert_eq!(constraints.0.len(), 1);
+	}
+
+	#[tokio::test]
+	async fn test_get_constraints_current_slot_requires_authentication() {
+		let (database, _temp_dir) = create_test_database();
+
+		// Create a slot timer for current slot
+		let genesis_timestamp = 1606824023;
+		let slot_timer = common::slot_timer::SlotTimer::new(genesis_timestamp);
+		let current_slot = slot_timer.get_current_slot();
+
+		let config = crate::config::RelayConfig::default();
+		let state = RelayState { database: Arc::new(database), config, slot_timer };
+
+		// Call handler without auth headers for current slot
+		let headers = HeaderMap::new();
+		let result = get_constraints_for_slot_handler(State(state), Path(current_slot), headers).await;
+
+		// Should fail due to missing authentication
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[tokio::test]
+	async fn test_get_constraints_future_slot_requires_authentication() {
+		let (database, _temp_dir) = create_test_database();
+
+		// Create a slot timer for future slot
+		let genesis_timestamp = 1606824023;
+		let slot_timer = common::slot_timer::SlotTimer::new(genesis_timestamp);
+		let current_slot = slot_timer.get_current_slot();
+		let future_slot = current_slot + 100;
+
+		let config = crate::config::RelayConfig::default();
+		let state = RelayState { database: Arc::new(database), config, slot_timer };
+
+		// Call handler without auth headers for future slot
+		let headers = HeaderMap::new();
+		let result = get_constraints_for_slot_handler(State(state), Path(future_slot), headers).await;
+
+		// Should fail due to missing authentication
+		assert!(result.is_err());
+		assert_eq!(result.unwrap_err(), StatusCode::BAD_REQUEST);
+	}
+
+	#[tokio::test]
+	async fn test_get_constraints_past_slot_returns_all_constraints_regardless_of_receivers() {
+		use commit_boost::prelude::BlsSignature;
+
+		let (database, _temp_dir) = create_test_database();
+
+		// Create a slot timer with genesis far in the past
+		let genesis_timestamp = 1606824023;
+		let slot_timer = common::slot_timer::SlotTimer::new(genesis_timestamp);
+		let current_slot = slot_timer.get_current_slot();
+
+		// Create a constraint for a past slot with specific receivers
+		let past_slot = current_slot.saturating_sub(10);
+
+		// Create constraint with a specific receiver list
+		let receiver_pubkey: commit_boost::prelude::BlsPublicKey =
+			"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+				.parse()
+				.unwrap();
+
+		let constraints_message = ConstraintsMessage {
+			proposer:
+				"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+					.parse()
+					.unwrap(),
+			delegate:
+				"0x93247f2209abcacf57b75a51dafae777f9dd38bc7053d1af526f220a7489a6d3a2753e5f3e8b1cfe39b56f43611df74a"
+					.parse()
+					.unwrap(),
+			slot: past_slot,
+			constraints: vec![],
+			receivers: vec![receiver_pubkey], // Specific receiver
+		};
+
+		let signed_constraints = SignedConstraints {
+			message: constraints_message,
+			nonce: 1337,
+			signing_id: "0x3078313233340000000000000000000000000000000000000000000000000000".parse().unwrap(),
+			signature: BlsSignature::empty(),
+		};
+
+		// Store constraints in database
+		Arc::new(database.clone()).store_signed_constraints(&signed_constraints).unwrap();
+
+		let config = crate::config::RelayConfig::default();
+		let state = RelayState { database: Arc::new(database), config, slot_timer };
+
+		// Call handler without auth headers (so no matching public key)
+		let headers = HeaderMap::new();
+		let result = get_constraints_for_slot_handler(State(state), Path(past_slot), headers).await;
+
+		// Should succeed and return all constraints (no filtering by receivers)
+		assert!(result.is_ok());
+		let constraints = result.unwrap();
+		assert_eq!(constraints.0.len(), 1);
+		assert_eq!(constraints.0[0].message.receivers.len(), 1);
 	}
 }
