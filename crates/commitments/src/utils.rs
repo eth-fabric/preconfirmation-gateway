@@ -2,9 +2,11 @@ use alloy::consensus::TxEnvelope;
 use alloy::network::TransactionBuilder;
 use alloy::primitives::{Address, B256, Bytes, Signature, keccak256};
 use alloy::rlp::Decodable;
+use alloy_consensus::SignableTransaction;
 use alloy_consensus::transaction::SignerRecoverable;
 use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::{Result, WrapErr};
+use std::hash::Hash;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
@@ -438,7 +440,9 @@ pub fn create_valid_signed_transaction() -> Bytes {
 	use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
 	use alloy::primitives::{Address, Bytes, Signature, TxKind, U256};
 	use alloy::rlp::Encodable;
+	use alloy::signers::{SignerSync, local::PrivateKeySigner};
 
+	let signer = PrivateKeySigner::random();
 	let tx = TxEip1559 {
 		chain_id: 1,
 		nonce: 0,
@@ -452,8 +456,9 @@ pub fn create_valid_signed_transaction() -> Bytes {
 	};
 
 	// Create a mock signature that will pass the format validation
-	let mock_signature = Signature::new(U256::from(1u64), U256::from(2u64), false);
-	let signed_tx = Signed::new_unhashed(tx, mock_signature);
+	let encoded_tx = tx.encoded_for_signing();
+	let signature = signer.sign_message_sync(&encoded_tx).expect("Failed to sign message");
+	let signed_tx = Signed::new_unhashed(tx, signature);
 	let tx_envelope = TxEnvelope::Eip1559(signed_tx);
 	let mut encoded_tx = Vec::new();
 	tx_envelope.encode(&mut encoded_tx);

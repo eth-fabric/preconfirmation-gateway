@@ -1,0 +1,50 @@
+# Commitment Request Spammer Configuration
+# This file configures the spammer binary for testing the gateway's commitmentRequest endpoint
+
+# Mode: "one-shot" or "continuous"
+# - one-shot: Send a single commitment request and exit
+# - continuous: Send commitment requests periodically at the specified interval
+mode = "continuous"
+
+# Gateway RPC endpoint
+# This should point to your running gateway's RPC server
+gateway_url = "http://127.0.0.1:8080"
+
+# Interval between requests in seconds (only used in continuous mode)
+# In continuous mode, a new commitment request will be sent every interval_secs seconds
+interval_secs = 5
+
+# Sender private key (must have ETH balance for test transactions)
+# This is the private key used to sign the transactions in the commitment requests
+# The address must have sufficient ETH balance on the chain you're testing against
+# Example below is the first Anvil/Hardhat test account private key
+sender_private_key = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+# Slasher contract address (optional, random if not provided)
+# If not specified, a random address will be used for each request
+slasher_address = "0x1234567890123456789012345678901234567890"
+
+# Chain ID for transactions
+# 1 = Ethereum mainnet, 11155111 = Sepolia, 31337 = Local/Anvil
+chain_id = 1
+
+# Genesis timestamp for slot calculation
+# Ethereum mainnet: 1606824023
+# This is used to calculate the current slot number for commitment requests
+genesis_timestamp = 1606824023
+
+# Transaction parameters
+# These control the gas and value parameters of the generated transactions
+[transaction]
+# Gas limit for each transaction (21000 is standard for simple ETH transfers)
+gas_limit = 21000
+
+# Maximum fee per gas in wei (20 gwei in this example)
+max_fee_per_gas = 20000000000
+
+# Maximum priority fee per gas in wei (2 gwei in this example)
+max_priority_fee_per_gas = 2000000000
+
+# Value to send in each transaction in wei (0.001 ETH in this example)
+value_wei = 1000000000000000
+

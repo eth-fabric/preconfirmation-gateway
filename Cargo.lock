@@ -5154,6 +5154,7 @@ dependencies = [
 name = "preconfirmation-gateway"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "cb-common",
  "commit-boost",
@@ -5162,10 +5163,13 @@ dependencies = [
  "constraints",
  "eyre",
  "gateway",
+ "jsonrpsee",
  "proposer",
  "relay",
  "rocksdb",
+ "serde",
  "tokio",
+ "toml 0.9.7",
  "tracing",
  "tracing-subscriber",
 ]

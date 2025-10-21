@@ -15,6 +15,10 @@ path = "relay.rs"
 name = "proposer"
 path = "proposer.rs"
 
+[[bin]]
+name = "spammer"
+path = "spammer.rs"
+
 [dependencies]
 common = { path = "../crates/common" }
 commitments = { path = "../crates/commitments" }
@@ -29,6 +33,10 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 commit-boost = { workspace = true }
+jsonrpsee = { workspace = true }
+alloy = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 
 # todo eventually remove
 cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
