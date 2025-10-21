@@ -4,17 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [[bin]]
-name = "commitments"
-path = "commitments.rs"
-
+name = "gateway"
+path = "gateway.rs"
 
 [[bin]]
 name = "relay"
 path = "relay.rs"
-
-[[bin]]
-name = "scheduler"
-path = "scheduler.rs"
 
 [[bin]]
 name = "proposer"
@@ -24,9 +19,10 @@ path = "proposer.rs"
 common = { path = "../crates/common" }
 commitments = { path = "../crates/commitments" }
 constraints = { path = "../crates/constraints" }
-scheduler = { path = "../crates/scheduler" }
+gateway = { path = "../crates/gateway" }
 relay = { path = "../crates/relay" }
 proposer = { path = "../crates/proposer" }
+rocksdb = { workspace = true }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 tokio = { workspace = true }

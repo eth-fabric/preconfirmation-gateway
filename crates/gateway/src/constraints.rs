@@ -2,11 +2,12 @@ use eyre::Result;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
-use commit_boost::prelude::StartCommitModuleConfig;
+use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
 use common::config::InclusionPreconfConfig;
 use common::slot_timer::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
-use common::types::DatabaseContext;
-use constraints::process_constraints;
+use common::types::{DatabaseContext, ProcessConstraintsResponse};
+use constraints::client::ConstraintsClient;
+use constraints::utils::{create_constraints_message, create_signed_constraints};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -140,8 +141,8 @@ impl ConstraintsTask {
 
 		info!("Processing constraints for slot {}", slot);
 
-		// Call constraints processing function directly
-		let response = process_constraints(
+		// Call constraints processing function
+		let response = process_constraints::<InclusionPreconfConfig>(
 			slot,
 			gateway_public_key,
 			proposer_public_key,
@@ -167,6 +168,80 @@ impl ConstraintsTask {
 		}
 
 		Ok(())
+	}
+}
+
+/// Process constraints for a specific slot
+/// This function can be used by any gateway implementation to process constraints
+pub async fn process_constraints<T>(
+	slot: u64,
+	gateway_public_key: BlsPublicKey,
+	proposer_public_key: BlsPublicKey,
+	receivers: Vec<BlsPublicKey>,
+	database: &DatabaseContext,
+	commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
+	relay_url: String,
+	api_key: Option<String>,
+) -> Result<ProcessConstraintsResponse> {
+	info!("Processing constraints for slot {} with gateway public key", slot);
+
+	// 1. Get constraints for the specific slot
+	let slot_constraints = database
+		.get_constraints_for_slot(slot)
+		.map_err(|e| eyre::eyre!("Failed to get constraints for slot {}: {}", slot, e))?;
+
+	if slot_constraints.is_empty() {
+		info!("No constraints found for slot {}", slot);
+		return Ok(ProcessConstraintsResponse {
+			success: true,
+			slot,
+			processed_count: 0,
+			signed_constraints: None,
+			message: format!("No constraints found for slot {}", slot),
+		});
+	}
+
+	// 2. Create constraints message from slot constraints
+	let constraints_message = create_constraints_message(
+		slot_constraints.clone(),
+		proposer_public_key,
+		gateway_public_key.clone(), // gateway acts as the delegate for signing
+		slot,
+		receivers,
+	)?;
+
+	// 3. Sign the constraints message with the provided gateway public key
+	let signed_constraints = create_signed_constraints(&constraints_message, commit_config, gateway_public_key).await?;
+
+	// 4. Send to relay using the client
+	let client = ConstraintsClient::new(relay_url, api_key);
+
+	match client.post_constraints(&signed_constraints).await {
+		Ok(_) => {
+			info!("Successfully sent constraints for slot {} to relay", slot);
+
+			Ok(ProcessConstraintsResponse {
+				success: true,
+				slot,
+				processed_count: constraints_message.constraints.len(),
+				signed_constraints: Some(signed_constraints),
+				message: format!(
+					"Successfully processed {} constraints for slot {}",
+					constraints_message.constraints.len(),
+					slot
+				),
+			})
+		}
+		Err(e) => {
+			error!("Failed to send constraints for slot {} to relay: {}", slot, e);
+			return Ok(ProcessConstraintsResponse {
+				success: false,
+				slot,
+				processed_count: 0,
+				signed_constraints: None,
+				message: format!("Failed to send constraints for slot {} to relay: {}", slot, e),
+			});
+		}
 	}
 }
 

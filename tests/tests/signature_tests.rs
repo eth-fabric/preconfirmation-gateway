@@ -20,7 +20,7 @@ pub async fn generate_proxy_key_with_local_signer(
 ) -> Result<String> {
 	let port = rand::thread_rng().gen_range(20000..65535);
 	// Use the new function to get the commit config
-	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port).await?;
+	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port, ()).await?;
 
 	// Use the appropriate SignerClient method based on the scheme
 	let proxy_address = match scheme {
@@ -111,7 +111,7 @@ async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	let port = rand::thread_rng().gen_range(20000..65535);
 
 	// Start the local signer server and get the reconstructed StartCommitModuleConfig
-	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port).await?;
+	let mut commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, ADMIN_SECRET, port, ()).await?;
 
 	// First, generate a proxy key for the committer using the same signer service instance
 	let test_bls_pubkey = BlsPublicKey::deserialize(&PUBKEY).unwrap();

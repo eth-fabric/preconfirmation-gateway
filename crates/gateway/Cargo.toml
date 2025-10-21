@@ -1,5 +1,5 @@
 [package]
-name = "scheduler"
+name = "gateway"
 version = "0.1.0"
 edition = "2021"
 
@@ -19,6 +19,7 @@ cb-common = { workspace = true }
 # Workspace dependencies
 common = { path = "../common" }
 constraints = { path = "../constraints" }
+commitments = { path = "../commitments" }
 
 [dev-dependencies]
 common = { path = "../common", features = ["test-utils"] }

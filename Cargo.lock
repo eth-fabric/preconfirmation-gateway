@@ -3312,6 +3312,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42012b0f064e01aa58b545fe3727f90f7dd4020f4a3ea735b50344965f5a57e9"
 
 [[package]]
+name = "gateway"
+version = "0.1.0"
+dependencies = [
+ "cb-common",
+ "commit-boost",
+ "commitments",
+ "common",
+ "constraints",
+ "eyre",
+ "hex",
+ "reqwest 0.11.27",
+ "rocksdb",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3978,6 +3998,7 @@ dependencies = [
  "constraints",
  "eyre",
  "futures",
+ "gateway",
  "hex",
  "http-body 1.0.1",
  "http-body-util",
@@ -3987,7 +4008,6 @@ dependencies = [
  "relay",
  "reqwest 0.12.23",
  "rocksdb",
- "scheduler",
  "serde",
  "serde_json",
  "tempfile",
@@ -5141,9 +5161,10 @@ dependencies = [
  "common",
  "constraints",
  "eyre",
+ "gateway",
  "proposer",
  "relay",
- "scheduler",
+ "rocksdb",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -6082,25 +6103,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891d81b926048e76efe18581bf793546b4c0eaf8448d72be8de2bbee5fd166e1"
 dependencies = [
  "windows-sys 0.61.1",
-]
-
-[[package]]
-name = "scheduler"
-version = "0.1.0"
-dependencies = [
- "cb-common",
- "commit-boost",
- "common",
- "constraints",
- "eyre",
- "hex",
- "reqwest 0.11.27",
- "rocksdb",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
 ]
 
 [[package]]

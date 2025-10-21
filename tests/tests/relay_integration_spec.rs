@@ -314,7 +314,7 @@ async fn test_concurrent_constraint_posts() {
 		let relay_url_clone = relay_url.clone();
 
 		let handle = tokio::spawn(async move {
-			constraints::service::process_constraints(
+			gateway::constraints::process_constraints(
 				slot,
 				gateway,
 				proposer,

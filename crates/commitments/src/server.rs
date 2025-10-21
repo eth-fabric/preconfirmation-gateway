@@ -5,12 +5,12 @@ use jsonrpsee::server::Server;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use super::methods;
+use crate::CommitmentsServerState;
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::config::InclusionPreconfConfig;
-use common::types;
 
 // Functions for working with commit-boost configuration
-pub async fn run_server<T: Send + Sync + 'static>(rpc_context: types::RpcContext<T>) -> Result<()>
+pub async fn run_server<T: Send + Sync + 'static>(rpc_context: CommitmentsServerState<T>) -> Result<()>
 where
 	T: Clone + Into<InclusionPreconfConfig>,
 {

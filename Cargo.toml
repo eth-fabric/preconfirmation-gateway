@@ -5,7 +5,7 @@ members = [
     "crates/commitments",
     "crates/constraints",
     "crates/relay",
-    "crates/scheduler",
+    "crates/gateway",
     "crates/proposer",
     "tests",
 ]

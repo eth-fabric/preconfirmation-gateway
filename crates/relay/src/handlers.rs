@@ -8,10 +8,10 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 
 use crate::utils::{
-	validate_delegation_message, validate_is_proposer, verify_constraints_signature, verify_delegation_signature,
+	validate_constraints_message, validate_delegation_message, validate_is_proposer, verify_constraints_signature,
+	verify_delegation_signature,
 };
 use common::types::database::DatabaseContext;
-use constraints::utils::validate_constraints_message;
 
 /// Extract and parse BLS signature, public key, nonce, and signing_id from headers
 fn extract_bls_auth_headers(

@@ -4,8 +4,8 @@ use common::slot_timer::SlotTimer;
 use common::types::DatabaseContext;
 use eyre::Result;
 use integration_tests::test_common::TestHarness;
+use relay::proposer_lookahead::{ProposerLookaheadConfig, ProposerLookaheadTask};
 use rocksdb::{DB, Options};
-use scheduler::proposer_lookahead::{ProposerLookaheadConfig, ProposerLookaheadTask};
 use std::sync::Arc;
 use tempfile::TempDir;
 

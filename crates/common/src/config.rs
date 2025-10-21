@@ -13,6 +13,189 @@ pub struct BeaconApiConfig {
 	pub genesis_time: u64,
 }
 
+// ==================== Configuration Trait System ====================
+
+/// Commitments service configuration trait
+/// Defines the minimal interface required by the commitments RPC server
+pub trait CommitmentsConfig {
+	fn server_host(&self) -> &str;
+	fn server_port(&self) -> u16;
+	fn database_url(&self) -> &str;
+	fn log_level(&self) -> &str;
+	fn bls_public_key(&self) -> &str;
+}
+
+/// Gateway configuration trait
+/// Defines the interface for gateway orchestration configuration
+/// Nests a CommitmentsConfig for the commitments server component
+pub trait GatewayConfig {
+	type CommitmentsConfig: CommitmentsConfig;
+
+	fn commitments_config(&self) -> &Self::CommitmentsConfig;
+	fn relay_url(&self) -> &str;
+	fn constraints_api_key(&self) -> Option<&str>;
+	fn genesis_timestamp(&self) -> u64;
+	fn delegation_database_url(&self) -> &str;
+	fn execution_endpoint_url(&self) -> &str;
+	fn execution_request_timeout_secs(&self) -> u64;
+	fn execution_max_retries(&self) -> u32;
+	fn constraints_receivers(&self) -> &[String];
+}
+
+/// Proposer configuration trait
+/// Defines the interface for proposer service configuration
+pub trait ProposerConfig {
+	fn proposer_bls_public_key(&self) -> &str;
+	fn delegate_bls_public_key(&self) -> &str;
+	fn relay_url(&self) -> &str;
+	fn beacon_api_url(&self) -> &str;
+	fn genesis_timestamp(&self) -> u64;
+}
+
+/// Relay configuration trait
+/// Defines the interface for relay service configuration
+pub trait RelayConfig {
+	fn port(&self) -> u16;
+	fn database_path(&self) -> &str;
+	fn log_level(&self) -> &str;
+	fn genesis_timestamp(&self) -> u64;
+	fn constraint_capabilities(&self) -> &[u64];
+}
+
+// ==================== Concrete Inclusion Preconf Configurations ====================
+
+/// Commitments service configuration for inclusion preconfs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InclusionCommitmentsConfig {
+	pub server_host: String,
+	pub server_port: u16,
+	pub database_url: String,
+	pub log_level: String,
+	pub bls_public_key: String,
+	// Inclusion-specific extras
+	pub enable_method_tracing: bool,
+	pub traced_methods: Vec<String>,
+}
+
+impl CommitmentsConfig for InclusionCommitmentsConfig {
+	fn server_host(&self) -> &str {
+		&self.server_host
+	}
+
+	fn server_port(&self) -> u16 {
+		self.server_port
+	}
+
+	fn database_url(&self) -> &str {
+		&self.database_url
+	}
+
+	fn log_level(&self) -> &str {
+		&self.log_level
+	}
+
+	fn bls_public_key(&self) -> &str {
+		&self.bls_public_key
+	}
+}
+
+/// Gateway configuration for inclusion preconfs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InclusionGatewayConfig {
+	/// Nested commitments configuration
+	pub commitments: InclusionCommitmentsConfig,
+
+	/// Gateway orchestration configuration
+	pub relay_url: String,
+	pub constraints_api_key: Option<String>,
+	pub genesis_timestamp: u64,
+	pub delegation_database_url: String,
+
+	/// Execution client configuration
+	pub execution_endpoint_url: String,
+	pub execution_request_timeout_secs: u64,
+	pub execution_max_retries: u32,
+
+	/// Constraints receivers
+	pub constraints_receivers: Vec<String>,
+	pub delegate_public_key: String,
+}
+
+impl GatewayConfig for InclusionGatewayConfig {
+	type CommitmentsConfig = InclusionCommitmentsConfig;
+
+	fn commitments_config(&self) -> &Self::CommitmentsConfig {
+		&self.commitments
+	}
+
+	fn relay_url(&self) -> &str {
+		&self.relay_url
+	}
+
+	fn constraints_api_key(&self) -> Option<&str> {
+		self.constraints_api_key.as_deref()
+	}
+
+	fn genesis_timestamp(&self) -> u64 {
+		self.genesis_timestamp
+	}
+
+	fn delegation_database_url(&self) -> &str {
+		&self.delegation_database_url
+	}
+
+	fn execution_endpoint_url(&self) -> &str {
+		&self.execution_endpoint_url
+	}
+
+	fn execution_request_timeout_secs(&self) -> u64 {
+		self.execution_request_timeout_secs
+	}
+
+	fn execution_max_retries(&self) -> u32 {
+		self.execution_max_retries
+	}
+
+	fn constraints_receivers(&self) -> &[String] {
+		&self.constraints_receivers
+	}
+}
+
+/// Proposer configuration for inclusion preconfs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InclusionProposerConfig {
+	pub proposer_bls_public_key: String,
+	pub delegate_bls_public_key: String,
+	pub committer_address: String,
+	pub relay_url: String,
+	pub relay_api_key: Option<String>,
+	pub beacon_api_url: String,
+	pub beacon_genesis_timestamp: u64,
+	pub poll_interval_seconds: u64,
+}
+
+impl ProposerConfig for InclusionProposerConfig {
+	fn proposer_bls_public_key(&self) -> &str {
+		&self.proposer_bls_public_key
+	}
+
+	fn delegate_bls_public_key(&self) -> &str {
+		&self.delegate_bls_public_key
+	}
+
+	fn relay_url(&self) -> &str {
+		&self.relay_url
+	}
+
+	fn beacon_api_url(&self) -> &str {
+		&self.beacon_api_url
+	}
+
+	fn genesis_timestamp(&self) -> u64 {
+		self.beacon_genesis_timestamp
+	}
+}
+
 // Consolidated configuration that will be loaded by load_commit_module_config
 #[derive(Debug, Clone, Deserialize)]
 pub struct InclusionPreconfConfig {

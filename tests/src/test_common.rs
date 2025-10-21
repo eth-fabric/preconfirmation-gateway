@@ -5,10 +5,11 @@ use cb_common::{
 	types::{Jwt, ModuleId},
 };
 use commit_boost::prelude::StartCommitModuleConfig;
+use commitments::CommitmentsServerState;
 use common::config::InclusionPreconfConfig;
 use common::slot_timer::SlotTimer;
 use common::types::commitments::InclusionPayload;
-use common::types::{Commitment, CommitmentRequest, DatabaseContext, RpcContext, SignedCommitment};
+use common::types::{Commitment, CommitmentRequest, DatabaseContext, SignedCommitment};
 use eyre::Result;
 use rand::Rng;
 use rocksdb::{DB, Options};
@@ -23,14 +24,15 @@ pub const PUBKEY: [u8; 48] =
 	hex!("883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4");
 
 /// Starts a local signer server for testing and reconstructs a StartCommitModuleConfig
-/// This function allows unit tests to start a local signer service and get a properly configured
-/// StartCommitModuleConfig that can be used to test signing functionality.
-pub async fn start_local_signer_server(
+/// This generic function allows unit tests to start a local signer service and get a properly configured
+/// StartCommitModuleConfig that can be used to test signing functionality with any extra config type.
+pub async fn start_local_signer_server<T>(
 	module_id: &str,
 	signing_id: B256,
 	admin_secret: &str,
 	port: u16,
-) -> Result<StartCommitModuleConfig<()>> {
+	extra_config: T,
+) -> Result<StartCommitModuleConfig<T>> {
 	use cb_tests::{signer_service, utils};
 
 	utils::setup_test_env();
@@ -61,89 +63,7 @@ pub async fn start_local_signer_server(
 	// Use the chain from the config
 	let chain = cfg.chain;
 
-	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: () })
-}
-
-/// Starts a local signer server for testing with custom configuration
-pub async fn start_local_signer_server_with_config(
-	module_id: &str,
-	signing_id: B256,
-	admin_secret: &str,
-	port: u16,
-	app_config: InclusionPreconfConfig,
-) -> Result<StartCommitModuleConfig<InclusionPreconfConfig>> {
-	use cb_tests::{signer_service, utils};
-
-	utils::setup_test_env();
-
-	let mut cfg = utils::get_commit_boost_config(utils::get_pbs_static_config(utils::get_pbs_config(0)));
-
-	let module_id = ModuleId(module_id.to_string());
-
-	cfg.modules = Some(vec![utils::create_module_config(module_id.clone(), signing_id)]);
-
-	let jwts = HashMap::from([(module_id.clone(), admin_secret.to_string())]);
-
-	let mod_cfgs = load_module_signing_configs(&cfg, &jwts)?;
-
-	let start_config = signer_service::start_server(port, &mod_cfgs, admin_secret.to_string(), false).await?;
-	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
-
-	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
-	let signer_url = format!("http://{}", start_config.endpoint)
-		.parse()
-		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
-
-	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
-
-	// Create SignerClient with the same parameters as the local signer
-	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
-
-	// Use the chain from the config
-	let chain = cfg.chain;
-
-	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: app_config })
-}
-
-/// Starts a local signer server for testing with ProposerConfig
-pub async fn start_local_signer_server_with_proposer_config(
-	module_id: &str,
-	signing_id: B256,
-	admin_secret: &str,
-	port: u16,
-	proposer_config: proposer::ProposerConfig,
-) -> Result<StartCommitModuleConfig<proposer::ProposerConfig>> {
-	use cb_tests::{signer_service, utils};
-
-	utils::setup_test_env();
-
-	let mut cfg = utils::get_commit_boost_config(utils::get_pbs_static_config(utils::get_pbs_config(0)));
-
-	let module_id = ModuleId(module_id.to_string());
-
-	cfg.modules = Some(vec![utils::create_module_config(module_id.clone(), signing_id)]);
-
-	let jwts = HashMap::from([(module_id.clone(), admin_secret.to_string())]);
-
-	let mod_cfgs = load_module_signing_configs(&cfg, &jwts)?;
-
-	let start_config = signer_service::start_server(port, &mod_cfgs, admin_secret.to_string(), false).await?;
-	let jwt_config = mod_cfgs.get(&module_id).expect("JWT config for test module not found");
-
-	// Reconstruct StartCommitModuleConfig using the same URL and JWT secret as the local signer
-	let signer_url = format!("http://{}", start_config.endpoint)
-		.parse()
-		.map_err(|e| eyre::eyre!("Failed to parse signer URL: {}", e))?;
-
-	let module_jwt = Jwt(jwt_config.jwt_secret.clone());
-
-	// Create SignerClient with the same parameters as the local signer
-	let signer_client = SignerClient::new(signer_url, None, module_jwt, module_id.clone())?;
-
-	// Use the chain from the config
-	let chain = cfg.chain;
-
-	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: proposer_config })
+	Ok(StartCommitModuleConfig { id: module_id, chain, signer_client, extra: extra_config })
 }
 
 /// Unified test harness builder for all test scenarios
@@ -230,7 +150,7 @@ impl TestHarnessBuilder {
 		};
 
 		// Start local signer server with ProposerConfig
-		let mut commit_config = start_local_signer_server_with_proposer_config(
+		let mut commit_config = start_local_signer_server(
 			&self.module_id,
 			self.signing_id,
 			&self.admin_secret,
@@ -349,14 +269,9 @@ impl TestHarnessBuilder {
 		};
 
 		// Start local signer server with config
-		let commit_config = start_local_signer_server_with_config(
-			&self.module_id,
-			self.signing_id,
-			&self.admin_secret,
-			signer_port,
-			app_config,
-		)
-		.await?;
+		let commit_config =
+			start_local_signer_server(&self.module_id, self.signing_id, &self.admin_secret, signer_port, app_config)
+				.await?;
 
 		// Use consensus BLS public key (this is registered with the signer service)
 		let consensus_bls_public_key = cb_common::types::BlsPublicKey::deserialize(&PUBKEY)
@@ -435,16 +350,16 @@ impl TestHarnessBuilder {
 		};
 		let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
 
-		// Create RPC context - use gateway_one as the primary gateway
-		let context = RpcContext {
+		// Create commitments server state - use gateway_one as the primary gateway
+		let context = CommitmentsServerState::new(
 			database,
-			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
-			bls_public_key: gateway_bls_one.clone(),
-			relay_url: relay_url.clone(),
+			commit_config,
+			gateway_bls_one.clone(),
+			relay_url.clone(),
 			api_key,
-			slot_timer: slot_timer.clone(),
+			slot_timer.clone(),
 			execution_client,
-		};
+		);
 
 		// Pre-populate relay database with proposer lookahead before launching relay service
 		// This ensures tests can post delegations without manual setup
@@ -493,7 +408,9 @@ impl TestHarnessBuilder {
 	}
 
 	/// Launch the commitments RPC server
-	async fn launch_commitments_service(rpc_context: RpcContext<InclusionPreconfConfig>) -> Result<ServiceHandle> {
+	async fn launch_commitments_service(
+		rpc_context: CommitmentsServerState<InclusionPreconfConfig>,
+	) -> Result<ServiceHandle> {
 		let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
 		// Get the port from the commit config
@@ -565,7 +482,7 @@ impl TestHarnessBuilder {
 /// Unified test harness for all test scenarios  
 /// Holds setup state and provides helpers to create properly signed objects
 pub struct TestHarness {
-	pub context: RpcContext<InclusionPreconfConfig>,
+	pub context: CommitmentsServerState<InclusionPreconfConfig>,
 	pub proposer_bls_public_key: cb_common::types::BlsPublicKey,
 	pub gateway_bls_one: cb_common::types::BlsPublicKey,
 	pub gateway_bls_two: cb_common::types::BlsPublicKey,
@@ -815,12 +732,12 @@ impl TestHarness {
 	}
 
 	/// Process delegations from the relay
-	/// This is a convenience wrapper around constraints::service::process_delegations
+	/// This is a convenience wrapper around gateway::delegations::process_delegations
 	pub async fn process_delegations(&self, slot: u64) -> Result<common::types::ProcessDelegationsResponse> {
 		let relay_url =
 			self.relay_service.as_ref().ok_or_else(|| eyre::eyre!("Relay service not running"))?.url.clone();
 
-		constraints::service::process_delegations(
+		gateway::delegations::process_delegations(
 			slot,
 			self.gateway_bls_one.clone(),
 			&self.context.database,
@@ -831,7 +748,7 @@ impl TestHarness {
 	}
 
 	/// Process constraints and post them to the relay
-	/// This is a convenience wrapper around constraints::service::process_constraints
+	/// This is a convenience wrapper around gateway::constraints::process_constraints
 	pub async fn process_constraints(
 		&self,
 		slot: u64,
@@ -840,7 +757,7 @@ impl TestHarness {
 		let relay_url =
 			self.relay_service.as_ref().ok_or_else(|| eyre::eyre!("Relay service not running"))?.url.clone();
 
-		constraints::service::process_constraints(
+		gateway::constraints::process_constraints(
 			slot,
 			self.gateway_bls_one.clone(),
 			self.proposer_bls_public_key.clone(),
@@ -1326,7 +1243,7 @@ pub mod test_helpers {
 	/// Creates a test RPC context with a temporary RocksDB database and local signer server
 	/// This function provides a complete test environment for RPC handler tests
 	/// The port is randomly generated to avoid conflicts between concurrent tests
-	pub async fn create_test_context() -> Result<RpcContext> {
+	pub async fn create_test_context() -> Result<CommitmentsServerState<()>> {
 		let temp_dir = TempDir::new().unwrap();
 		let db_path = temp_dir.path().join("test_db");
 
@@ -1340,7 +1257,7 @@ pub mod test_helpers {
 		let port = rng.gen_range(20000..65535);
 
 		// Start local signer server to get proper config
-		let commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", port).await?;
+		let commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", port, ()).await?;
 
 		// TODO: Get these from configuration - using defaults for tests
 		// Use a valid BLS public key for testing
@@ -1362,20 +1279,20 @@ pub mod test_helpers {
 		};
 		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
 
-		Ok(RpcContext {
+		Ok(CommitmentsServerState::new(
 			database,
-			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
+			commit_config,
 			bls_public_key,
 			relay_url,
 			api_key,
 			slot_timer,
 			execution_client,
-		})
+		))
 	}
 
-	/// Creates a test RPC context with InclusionPreconfConfig for server tests
+	/// Creates a test CommitmentsServerState with InclusionPreconfConfig for server tests
 	/// This function provides a complete test environment for server tests that need the full config
-	pub async fn create_test_context_with_config() -> Result<RpcContext<InclusionPreconfConfig>> {
+	pub async fn create_test_context_with_config() -> Result<CommitmentsServerState<InclusionPreconfConfig>> {
 		let temp_dir = TempDir::new().unwrap();
 		let db_path = temp_dir.path().join("test_db");
 
@@ -1419,14 +1336,8 @@ pub mod test_helpers {
 		};
 
 		// Start local signer server with config
-		let commit_config = start_local_signer_server_with_config(
-			MODULE_ID,
-			SIGNING_ID,
-			"test-admin-secret",
-			rpc_port,
-			app_config.clone(),
-		)
-		.await?;
+		let commit_config =
+			start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", rpc_port, app_config.clone()).await?;
 
 		// Use a valid BLS public key for testing
 		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
@@ -1447,14 +1358,14 @@ pub mod test_helpers {
 		};
 		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
 
-		Ok(RpcContext {
+		Ok(CommitmentsServerState::new(
 			database,
-			commit_config: Arc::new(tokio::sync::Mutex::new(commit_config)),
+			commit_config,
 			bls_public_key,
 			relay_url,
 			api_key,
 			slot_timer,
 			execution_client,
-		})
+		))
 	}
 }

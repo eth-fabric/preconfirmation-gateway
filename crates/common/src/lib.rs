@@ -10,6 +10,4 @@ pub mod utils;
 
 // Re-export commonly used types and functions for easier access
 pub use db::{DatabaseType, create_database, db_healthcheck};
-pub use types::{
-	Commitment, CommitmentRequest, DatabaseContext, FeeInfo, RpcContext, SignedCommitment, SlotInfoResponse,
-};
+pub use types::{Commitment, CommitmentRequest, DatabaseContext, FeeInfo, SignedCommitment, SlotInfoResponse};

@@ -58,7 +58,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	};
 
 	// Start local signer server with test configuration
-	let commit_config = integration_tests::test_common::start_local_signer_server_with_config(
+	let commit_config = integration_tests::test_common::start_local_signer_server(
 		MODULE_ID,
 		SIGNING_ID,
 		"test-admin-secret",
@@ -99,7 +99,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let execution_client =
 		Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config).unwrap());
 
-	let rpc_context = common::types::RpcContext::new(
+	let rpc_context = commitments::CommitmentsServerState::new(
 		database,
 		commit_config_guard,
 		bls_public_key,

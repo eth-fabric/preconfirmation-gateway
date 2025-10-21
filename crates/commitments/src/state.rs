@@ -1,14 +1,15 @@
-use crate::execution::{ExecutionApiClient, ReqwestRpcClient};
-use crate::slot_timer::SlotTimer;
-use crate::types::database::DatabaseContext;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
+use common::execution::{ExecutionApiClient, ReqwestRpcClient};
+use common::slot_timer::SlotTimer;
+use common::types::database::DatabaseContext;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-/// RPC context that provides access to shared resources for all RPC handlers
+/// Server state that provides access to shared resources for all RPC handlers
+/// This holds runtime resources (database connections, RPC clients, timers) needed by the commitments service
 #[derive(Clone)]
-pub struct RpcContext<T = ()> {
-	/// Database context for PostgreSQL operations
+pub struct CommitmentsServerState<T> {
+	/// Database context for RocksDB operations
 	pub database: DatabaseContext,
 	/// Commit module configuration for commit-boost operations (Arc<Mutex> for thread safety)
 	pub commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
@@ -25,9 +26,9 @@ pub struct RpcContext<T = ()> {
 }
 
 // Manual Debug implementation since ExecutionApiClient might not derive Debug properly
-impl<T> std::fmt::Debug for RpcContext<T> {
+impl<T> std::fmt::Debug for CommitmentsServerState<T> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("RpcContext")
+		f.debug_struct("CommitmentsServerState")
 			.field("database", &self.database)
 			.field("bls_public_key", &self.bls_public_key)
 			.field("relay_url", &self.relay_url)
@@ -37,8 +38,8 @@ impl<T> std::fmt::Debug for RpcContext<T> {
 	}
 }
 
-impl<T> RpcContext<T> {
-	/// Create a new RPC context with the given database context and commit config
+impl<T> CommitmentsServerState<T> {
+	/// Create a new commitments server state with the given database context and commit config
 	pub fn new(
 		database: DatabaseContext,
 		commit_config: StartCommitModuleConfig<T>,

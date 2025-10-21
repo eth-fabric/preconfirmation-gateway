@@ -1,11 +1,11 @@
 use jsonrpsee::server::RpcModule;
 
 use super::handlers;
-use common::types::RpcContext;
+use crate::CommitmentsServerState;
 
 pub fn setup_commitment_methods<T: Send + Sync + 'static>(
-	rpc_context: RpcContext<T>,
-) -> eyre::Result<RpcModule<RpcContext<T>>> {
+	rpc_context: CommitmentsServerState<T>,
+) -> eyre::Result<RpcModule<CommitmentsServerState<T>>> {
 	let mut module = RpcModule::new(rpc_context);
 
 	module.register_async_method("commitmentRequest", handlers::commitment_request_handler)?;

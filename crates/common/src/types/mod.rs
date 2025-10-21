@@ -1,7 +1,6 @@
 pub mod beacon;
 pub mod commitments;
 pub mod constraints;
-pub mod context;
 pub mod database;
 pub mod requests;
 pub mod responses;
@@ -14,7 +13,6 @@ pub use commitments::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, 
 pub use constraints::{
 	Constraint, ConstraintCapabilities, ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation,
 };
-pub use context::RpcContext;
 pub use database::DatabaseContext;
 pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};
 pub use responses::{

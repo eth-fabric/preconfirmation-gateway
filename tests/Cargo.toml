@@ -8,7 +8,7 @@ common = { path = "../crates/common", features = ["test-utils"] }
 commitments = { path = "../crates/commitments" }
 constraints = { path = "../crates/constraints" }
 relay = { path = "../crates/relay" }
-scheduler = { path = "../crates/scheduler" }
+gateway = { path = "../crates/gateway" }
 proposer = { path = "../crates/proposer" }
 anyhow = { workspace = true }
 eyre = { workspace = true }

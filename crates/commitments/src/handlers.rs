@@ -3,16 +3,17 @@ use jsonrpsee::core::RpcResult;
 use tracing::{error, info, instrument};
 
 use super::utils;
+use crate::CommitmentsServerState;
 use alloy::primitives::B256;
 use commit_boost::prelude::commit::request::EncryptionScheme;
 use common::constants::COMMITMENT_TYPE;
 use common::types::commitments::Offering;
-use common::types::{CommitmentRequest, FeeInfo, RpcContext, SignedCommitment, SlotInfo, SlotInfoResponse};
+use common::types::{CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
 pub async fn commitment_request_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: std::sync::Arc<RpcContext<T>>,
+	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment request");
@@ -105,7 +106,7 @@ pub async fn commitment_request_handler<T>(
 #[instrument(name = "commitment_result", skip(_context, _extensions))]
 pub fn commitment_result_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext<T>,
+	_context: &CommitmentsServerState<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
 	info!("Processing commitment result request");
@@ -139,7 +140,7 @@ pub fn commitment_result_handler<T>(
 #[instrument(name = "slots", skip(_context, _extensions))]
 pub fn slots_handler<T>(
 	_params: jsonrpsee::types::Params<'_>,
-	_context: &RpcContext<T>,
+	_context: &CommitmentsServerState<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
 	info!("Processing slots request");
@@ -202,7 +203,7 @@ pub fn slots_handler<T>(
 #[instrument(name = "fee", skip(_context, _extensions))]
 pub async fn fee_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: std::sync::Arc<RpcContext<T>>,
+	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<FeeInfo> {
 	info!("Processing fee request");
@@ -262,7 +263,7 @@ pub struct GenerateProxyKeyResponse {
 #[instrument(name = "generate_proxy_key", skip(_context, _extensions))]
 pub async fn generate_proxy_key_handler<T>(
 	params: jsonrpsee::types::Params<'_>,
-	_context: std::sync::Arc<RpcContext<T>>,
+	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<GenerateProxyKeyResponse> {
 	info!("Processing generate proxy key request");

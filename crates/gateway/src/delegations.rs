@@ -3,10 +3,12 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
+use commit_boost::prelude::BlsPublicKey;
 use common::config::InclusionPreconfConfig;
 use common::slot_timer::SlotTimer;
-use common::types::DatabaseContext;
-use constraints::{parse_bls_public_key, process_delegations};
+use common::types::{DatabaseContext, ProcessDelegationsResponse, SignedDelegation};
+use constraints::client::ConstraintsClient;
+use constraints::parse_bls_public_key;
 
 /// Configuration for the delegation task
 #[derive(Debug, Clone)]
@@ -94,7 +96,7 @@ impl DelegationTask {
 
 		info!("Processing delegations for slot {}", slot);
 
-		// Call constraints processing function directly
+		// Call delegations processing function
 		let response = process_delegations(
 			slot,
 			delegate_bls_public_key,
@@ -179,4 +181,56 @@ mod tests {
 		);
 		// Test passes if creation doesn't panic
 	}
+}
+
+/// Process delegations for a specific slot and delegate
+/// This function can be used by any gateway implementation to process delegations
+pub async fn process_delegations(
+	slot: u64,
+	delegate_bls_public_key: BlsPublicKey,
+	database: &DatabaseContext,
+	relay_url: String,
+	api_key: Option<String>,
+) -> Result<ProcessDelegationsResponse> {
+	info!("Processing delegations request for slot {} and delegate", slot);
+
+	// Create client and fetch delegations for the slot
+	let client = ConstraintsClient::new(relay_url, api_key);
+
+	let delegations = client.get_delegations_for_slot(slot).await?;
+
+	info!("Retrieved {} delegations for slot {}", delegations.len(), slot);
+
+	// Store total count before filtering
+	let total_delegations = delegations.len();
+
+	// Filter delegations that match the delegate BLS public key
+	let matching_delegations: Vec<SignedDelegation> = delegations
+		.into_iter()
+		.filter(|signed_delegation| {
+			// Compare delegate BLS public keys
+			signed_delegation.message.delegate == delegate_bls_public_key
+		})
+		.collect();
+
+	let matching_count = matching_delegations.len();
+	info!("Found {} matching delegations for delegate", matching_count);
+
+	// Store matching delegations in the database
+	for delegation in &matching_delegations {
+		if let Err(e) = database.store_delegation(slot, delegation) {
+			error!("Failed to store delegation for slot {}: {}", slot, e);
+			// Continue processing other delegations even if one fails
+		} else {
+			info!("Stored delegation for slot {} with committer {}", slot, delegation.message.committer);
+		}
+	}
+
+	Ok(ProcessDelegationsResponse {
+		success: true,
+		slot,
+		total_delegations,
+		matching_delegations,
+		message: format!("Found {} matching delegations out of {} total", matching_count, total_delegations),
+	})
 }
