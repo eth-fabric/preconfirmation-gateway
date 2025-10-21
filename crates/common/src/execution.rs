@@ -589,4 +589,135 @@ mod tests {
 		let parsed = U256::from_str_radix(empty_hex, 16).unwrap();
 		assert_eq!(parsed, U256::from(0));
 	}
+
+	// ============================================================================
+	// Anvil Integration Tests
+	// ============================================================================
+
+	#[tokio::test]
+	async fn test_anvil_get_gas_price() -> Result<()> {
+		use alloy::node_bindings::Anvil;
+
+		// Spin up a local Anvil node
+		let anvil = Anvil::new().block_time(1).try_spawn()?;
+
+		// Create ExecutionApiClient with Anvil's endpoint
+		let rpc_url = anvil.endpoint_url();
+		let config = ExecutionApiConfig { endpoint: rpc_url.to_string(), request_timeout_secs: 10, max_retries: 3 };
+		let client = ExecutionApiClient::with_default_client(config)?;
+
+		// Test get_gas_price
+		let gas_price_info = client.get_gas_price().await?;
+
+		// Verify the result
+		assert!(gas_price_info.gas_price > U256::ZERO, "Gas price should be non-zero");
+		assert!(gas_price_info.block_number >= 0, "Block number should be valid");
+
+		// Verify timestamp is reasonable (within last hour)
+		let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+		assert!(gas_price_info.timestamp <= now, "Timestamp should not be in the future");
+		assert!(gas_price_info.timestamp > now - 3600, "Timestamp should be recent");
+
+		println!(
+			"Anvil gas price test passed: {} wei at block {}",
+			gas_price_info.gas_price, gas_price_info.block_number
+		);
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_anvil_get_block_number() -> Result<()> {
+		use alloy::node_bindings::Anvil;
+
+		// Spin up a local Anvil node with 1 second block time
+		let anvil = Anvil::new().block_time(1).try_spawn()?;
+
+		// Create ExecutionApiClient with Anvil's endpoint
+		let rpc_url = anvil.endpoint_url();
+		let config = ExecutionApiConfig { endpoint: rpc_url.to_string(), request_timeout_secs: 10, max_retries: 3 };
+		let client = ExecutionApiClient::with_default_client(config)?;
+
+		// Sleep briefly to let Anvil mine some blocks
+		tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+		// Test get_block_number
+		let block_number = client.get_block_number().await?;
+		assert!(block_number > 0, "Block number should be greater than 0 after sleeping");
+
+		// Verify we can call it multiple times
+		let block_number_2 = client.get_block_number().await?;
+		assert!(block_number_2 >= block_number, "Block number should not decrease");
+
+		println!("Anvil block number test passed: block {}", block_number);
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_anvil_estimate_gas() -> Result<()> {
+		use alloy::network::TransactionBuilder;
+		use alloy::node_bindings::Anvil;
+		use alloy::rpc::types::TransactionRequest;
+
+		// Spin up a local Anvil node with pre-funded accounts
+		let anvil = Anvil::new().block_time(1).try_spawn()?;
+
+		// Create ExecutionApiClient with Anvil's endpoint
+		let rpc_url = anvil.endpoint_url();
+		let config = ExecutionApiConfig { endpoint: rpc_url.to_string(), request_timeout_secs: 10, max_retries: 3 };
+		let client = ExecutionApiClient::with_default_client(config)?;
+
+		// Build a simple ETH transfer transaction
+		// Anvil pre-funds the first 10 accounts, so we can use them
+		let from = anvil.addresses()[0];
+		let to = anvil.addresses()[1];
+		let tx = TransactionRequest::default()
+			.with_from(from)
+			.with_to(to)
+			.with_value(U256::from(1_000_000_000_000_000_000u64)); // 1 ETH
+
+		// Test estimate_gas
+		let gas_estimate = client.estimate_gas(&tx).await?;
+
+		// Verify the gas estimate is reasonable for a simple transfer
+		assert!(gas_estimate >= 21000, "Gas estimate should be at least 21000 for simple transfer");
+		assert!(gas_estimate <= 100000, "Gas estimate should be reasonable (not excessive)");
+
+		println!("Anvil estimate gas test passed: {} gas", gas_estimate);
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn test_anvil_block_progression() -> Result<()> {
+		use alloy::node_bindings::Anvil;
+
+		// Spin up a local Anvil node with 1 second block time
+		let anvil = Anvil::new().block_time(1).try_spawn()?;
+
+		// Create ExecutionApiClient with Anvil's endpoint
+		let rpc_url = anvil.endpoint_url();
+		let config = ExecutionApiConfig { endpoint: rpc_url.to_string(), request_timeout_secs: 10, max_retries: 3 };
+		let client = ExecutionApiClient::with_default_client(config)?;
+
+		// Get initial block number
+		let initial_block = client.get_block_number().await?;
+		println!("Initial block: {}", initial_block);
+
+		// Wait for a few blocks to be mined
+		tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+
+		// Get new block number
+		let new_block = client.get_block_number().await?;
+		println!("New block after 3 seconds: {}", new_block);
+
+		// Verify block number increased (should have mined at least 2-3 blocks)
+		assert!(new_block > initial_block, "Block number should have increased");
+		assert!(new_block >= initial_block + 2, "Should have mined at least 2 blocks in 3 seconds");
+
+		println!("Anvil block progression test passed: {} -> {} blocks", initial_block, new_block);
+
+		Ok(())
+	}
 }

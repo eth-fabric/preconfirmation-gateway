@@ -29,6 +29,7 @@ tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 alloy = { version = "^1.0.35", features = [
     "full",
     "getrandom",
+    "node-bindings",
     "providers",
     "rpc-types-beacon",
     "serde",
