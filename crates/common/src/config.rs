@@ -20,7 +20,7 @@ pub struct BeaconApiConfig {
 pub trait CommitmentsConfig {
 	fn server_host(&self) -> &str;
 	fn server_port(&self) -> u16;
-	fn database_url(&self) -> &str;
+	fn database_path(&self) -> &str;
 	fn log_level(&self) -> &str;
 	fn bls_public_key(&self) -> &str;
 }
@@ -35,7 +35,7 @@ pub trait GatewayConfig {
 	fn relay_url(&self) -> &str;
 	fn constraints_api_key(&self) -> Option<&str>;
 	fn genesis_timestamp(&self) -> u64;
-	fn delegation_database_url(&self) -> &str;
+	fn delegation_database_path(&self) -> &str;
 	fn execution_endpoint_url(&self) -> &str;
 	fn execution_request_timeout_secs(&self) -> u64;
 	fn execution_max_retries(&self) -> u32;
@@ -69,7 +69,7 @@ pub trait RelayConfig {
 pub struct InclusionCommitmentsConfig {
 	pub server_host: String,
 	pub server_port: u16,
-	pub database_url: String,
+	pub database_path: String,
 	pub log_level: String,
 	pub bls_public_key: String,
 	// Inclusion-specific extras
@@ -86,8 +86,8 @@ impl CommitmentsConfig for InclusionCommitmentsConfig {
 		self.server_port
 	}
 
-	fn database_url(&self) -> &str {
-		&self.database_url
+	fn database_path(&self) -> &str {
+		&self.database_path
 	}
 
 	fn log_level(&self) -> &str {
@@ -109,7 +109,7 @@ pub struct InclusionGatewayConfig {
 	pub relay_url: String,
 	pub constraints_api_key: Option<String>,
 	pub genesis_timestamp: u64,
-	pub delegation_database_url: String,
+	pub delegation_database_path: String,
 
 	/// Execution client configuration
 	pub execution_endpoint_url: String,
@@ -140,8 +140,8 @@ impl GatewayConfig for InclusionGatewayConfig {
 		self.genesis_timestamp
 	}
 
-	fn delegation_database_url(&self) -> &str {
-		&self.delegation_database_url
+	fn delegation_database_path(&self) -> &str {
+		&self.delegation_database_path
 	}
 
 	fn execution_endpoint_url(&self) -> &str {
@@ -193,123 +193,5 @@ impl ProposerConfig for InclusionProposerConfig {
 
 	fn genesis_timestamp(&self) -> u64 {
 		self.beacon_genesis_timestamp
-	}
-}
-
-// Consolidated configuration that will be loaded by load_commit_module_config
-#[derive(Debug, Clone, Deserialize)]
-pub struct InclusionPreconfConfig {
-	// Commitments Server configuration
-	pub commitments_server_host: String,
-	pub commitments_server_port: u16,
-
-	// Database configuration
-	pub commitments_database_url: String,
-	pub constraints_database_url: String,
-	pub delegations_database_url: String,
-	pub pricing_database_url: String,
-
-	// Logging configuration
-	pub log_level: String,
-	pub enable_method_tracing: bool,
-	pub traced_methods: Vec<String>,
-
-	// Constraints configuration
-	pub constraints_relay_url: String,
-	pub constraints_api_key: Option<String>,
-	pub constraints_bls_public_key: String,
-	pub constraints_delegate_public_key: String,
-
-	// Scheduler configuration
-	pub eth_genesis_timestamp: u64,
-
-	// Constraints receivers configuration
-	pub constraints_receivers: Vec<String>,
-
-	// Reth RPC configuration
-	pub execution_endpoint_url: String,
-	pub execution_request_timeout_secs: u64,
-	pub execution_max_retries: u32,
-}
-
-// Configuration access methods
-impl InclusionPreconfConfig {
-	// New methods for accessing specific database URLs
-	pub fn commitments_database_url(&self) -> &str {
-		&self.commitments_database_url
-	}
-
-	pub fn constraints_database_url(&self) -> &str {
-		&self.constraints_database_url
-	}
-
-	pub fn delegations_database_url(&self) -> &str {
-		&self.delegations_database_url
-	}
-
-	pub fn pricing_database_url(&self) -> &str {
-		&self.pricing_database_url
-	}
-
-	// Scheduler configuration access
-	pub fn eth_genesis_timestamp(&self) -> u64 {
-		self.eth_genesis_timestamp
-	}
-
-	// Reth RPC configuration access
-	pub fn execution_endpoint_url(&self) -> &str {
-		&self.execution_endpoint_url
-	}
-
-	pub fn execution_request_timeout_secs(&self) -> u64 {
-		self.execution_request_timeout_secs
-	}
-
-	pub fn execution_max_retries(&self) -> u32 {
-		self.execution_max_retries
-	}
-}
-
-#[cfg(test)]
-mod tests {
-	use super::*;
-
-	/// Test configuration loading and validation
-	#[test]
-	fn test_constraints_configuration() {
-		let config = InclusionPreconfConfig {
-			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: 9090,
-			commitments_database_url: "test.db".to_string(),
-			constraints_database_url: "constraints.db".to_string(),
-			delegations_database_url: "delegations.db".to_string(),
-			pricing_database_url: "pricing.db".to_string(),
-			log_level: "debug".to_string(),
-			enable_method_tracing: false,
-			traced_methods: vec![],
-			constraints_relay_url: "https://relay.example.com".to_string(),
-			constraints_api_key: Some("test-api-key".to_string()),
-			constraints_bls_public_key:
-				"010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101"
-					.to_string(),
-			constraints_delegate_public_key:
-				"030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303"
-					.to_string(),
-			eth_genesis_timestamp: 1606824023, // Mainnet genesis
-			constraints_receivers: vec![
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
-					.to_string(),
-			],
-			execution_endpoint_url: "http://localhost:8545".to_string(),
-			execution_request_timeout_secs: 10,
-			execution_max_retries: 3,
-		};
-
-		// Test direct field access
-		assert_eq!(config.constraints_relay_url, "https://relay.example.com");
-		assert_eq!(config.constraints_api_key, Some("test-api-key".to_string()));
-
-		// Test scheduler config access
-		assert_eq!(config.eth_genesis_timestamp(), 1606824023);
 	}
 }

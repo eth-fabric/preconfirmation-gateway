@@ -22,14 +22,14 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let rpc_port = rng.gen_range(30000..39999);
 
 	// Create test configuration
-	let app_config = common::config::InclusionPreconfConfig {
-		commitments_server_host: "127.0.0.1".to_string(),
-		commitments_server_port: rpc_port,
-		commitments_database_url: db_path.to_string_lossy().to_string(),
-		constraints_database_url: format!("{}_constraints", db_path.to_string_lossy()),
-		delegations_database_url: format!("{}_delegations", db_path.to_string_lossy()),
-		pricing_database_url: format!("{}_pricing", db_path.to_string_lossy()),
+	let commitments_config = common::config::InclusionCommitmentsConfig {
+		server_host: "127.0.0.1".to_string(),
+		server_port: rpc_port,
+		database_path: db_path.to_string_lossy().to_string(),
 		log_level: "debug".to_string(),
+		bls_public_key:
+			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
+				.to_string(),
 		enable_method_tracing: true,
 		traced_methods: vec![
 			"commitmentRequest".to_string(),
@@ -38,23 +38,24 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"fee".to_string(),
 			"generateProxyKey".to_string(),
 		],
-		// Constraints config fields
-		constraints_relay_url: "https://relay.example.com".to_string(),
+	};
+
+	let app_config = common::config::InclusionGatewayConfig {
+		commitments: commitments_config,
+		relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
-		constraints_bls_public_key:
-			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
-				.to_string(),
-		constraints_delegate_public_key:
-			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
-				.to_string(),
-		eth_genesis_timestamp: 1606824023,
+		genesis_timestamp: 1606824023,
+		delegation_database_path: format!("{}_delegations", db_path.to_string_lossy()),
+		execution_endpoint_url: "http://localhost:8545".to_string(),
+		execution_request_timeout_secs: 10,
+		execution_max_retries: 3,
 		constraints_receivers: vec![
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
 		],
-		execution_endpoint_url: "http://localhost:8545".to_string(),
-		execution_request_timeout_secs: 10,
-		execution_max_retries: 3,
+		delegate_public_key:
+			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
+				.to_string(),
 	};
 
 	// Start local signer server with test configuration

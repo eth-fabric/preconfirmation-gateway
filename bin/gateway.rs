@@ -1,10 +1,11 @@
 use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::{CommitmentsServerState, server};
-use common::db::{DatabaseType, create_database};
+use common::config::{CommitmentsConfig, GatewayConfig, InclusionGatewayConfig};
+use common::db::create_database;
 use common::execution::{ExecutionApiClient, ExecutionApiConfig};
 use common::slot_timer::SlotTimer;
-use common::{config, types};
+use common::types;
 use eyre::Result;
 use gateway::{ConstraintsTask, DelegationTask, DelegationTaskConfig, TaskCoordinator};
 use std::sync::Arc;
@@ -19,61 +20,82 @@ async fn main() -> Result<()> {
 
 	info!("Starting gateway service (commitments server + gateway tasks)");
 
-	// Load consolidated configuration using commit-boost's config loader
-	let commit_config = load_commit_module_config::<config::InclusionPreconfConfig>()
+	// Load gateway configuration using commit-boost's config loader
+	let commit_config = load_commit_module_config::<InclusionGatewayConfig>()
 		.map_err(|e| eyre::eyre!("Failed to load commit module config: {}", e))?;
 
-	let app_config = commit_config.extra.clone();
-	info!("Using Ethereum genesis timestamp: {}", app_config.eth_genesis_timestamp);
+	// Wrap in Arc<Mutex<>> so it can be shared between tasks
+	let shared_commit_config = Arc::new(Mutex::new(commit_config));
+
+	// Extract config values
+	let gateway_config = {
+		let config_guard = shared_commit_config.lock().await;
+		config_guard.extra.clone()
+	};
+	let commitments_config = gateway_config.commitments_config();
+	let genesis_timestamp = gateway_config.genesis_timestamp();
+	info!("Using Ethereum genesis timestamp: {}", genesis_timestamp);
 
 	// Create slot timer
-	let slot_timer = SlotTimer::new(app_config.eth_genesis_timestamp);
+	let slot_timer = SlotTimer::new(genesis_timestamp);
 
 	// Create databases
-	let commitments_db = create_database(&commit_config, DatabaseType::Commitments)
+	let commitments_db = create_database(commitments_config.database_path())
 		.map_err(|e| eyre::eyre!("Failed to create commitments database: {}", e))?;
 	let commitments_database = types::DatabaseContext::new(commitments_db);
 
-	let delegations_db = create_database(&commit_config, DatabaseType::Delegations)
+	let delegations_db = create_database(gateway_config.delegation_database_path())
 		.map_err(|e| eyre::eyre!("Failed to create delegations database: {}", e))?;
 	let delegations_database = types::DatabaseContext::new(delegations_db);
 
 	// Get BLS public key for commitments server
-	let bls_public_key = bls_pubkey_from_hex(&app_config.constraints_bls_public_key)
+	let bls_public_key = bls_pubkey_from_hex(commitments_config.bls_public_key())
 		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 
 	// Create execution client for commitments server
 	let execution_config = ExecutionApiConfig {
-		endpoint: app_config.execution_endpoint_url.clone(),
-		request_timeout_secs: app_config.execution_request_timeout_secs,
-		max_retries: app_config.execution_max_retries,
+		endpoint: gateway_config.execution_endpoint_url().to_string(),
+		request_timeout_secs: gateway_config.execution_request_timeout_secs(),
+		max_retries: gateway_config.execution_max_retries(),
 	};
 	let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
 
-	// Create commitments server state
-	let commitments_state = CommitmentsServerState::new(
-		commitments_database,
-		commit_config,
-		bls_public_key,
-		app_config.constraints_relay_url.clone(),
-		app_config.constraints_api_key.clone(),
-		slot_timer.clone(),
-		execution_client,
-	);
+	// Create commitments server state (CommitmentsServerState will handle wrapping in Arc<Mutex<>>)
+	// We need to temporarily take ownership to construct the state, but CommitmentsServerState
+	// wraps it in Arc<Mutex<>> internally, so we can't share the same Arc
+	// Instead, we reconstruct the config by reading from the shared Arc
+	let commitments_state = {
+		let config_guard = shared_commit_config.lock().await;
+		let commit_config_for_server = StartCommitModuleConfig {
+			id: config_guard.id.clone(),
+			chain: config_guard.chain,
+			signer_client: config_guard.signer_client.clone(),
+			extra: config_guard.extra.clone(),
+		};
+		drop(config_guard);
+
+		CommitmentsServerState::new(
+			commitments_database,
+			commit_config_for_server,
+			bls_public_key,
+			gateway_config.relay_url().to_string(),
+			gateway_config.constraints_api_key().map(|s| s.to_string()),
+			slot_timer.clone(),
+			execution_client,
+		)
+	};
 
 	// Spawn commitments RPC server
 	info!(
 		"Starting commitments RPC server on {}:{}",
-		app_config.commitments_server_host, app_config.commitments_server_port
+		commitments_config.server_host(),
+		commitments_config.server_port()
 	);
 	tokio::spawn(async move {
 		if let Err(e) = server::run_server(commitments_state).await {
 			tracing::error!("Commitments server error: {}", e);
 		}
 	});
-
-	// Create shared commit config for gateway tasks
-	let shared_commit_config = Arc::new(Mutex::new(load_commit_module_config::<config::InclusionPreconfConfig>()?));
 
 	// Create task coordinator for gateway tasks
 	let mut coordinator = TaskCoordinator::new();
@@ -84,24 +106,28 @@ async fn main() -> Result<()> {
 		lookahead_window: 64,      // 64 slots lookahead
 	};
 
+	// Clone gateway config for tasks
+	let gateway_config_clone = gateway_config.clone();
+	let gateway_config_clone2 = gateway_config.clone();
+
 	// Create delegation task
 	let delegation_task = DelegationTask::new(
 		delegation_config,
-		app_config.clone(),
+		gateway_config_clone,
 		slot_timer.clone(),
 		delegations_database.clone(),
-		app_config.constraints_relay_url.clone(),
-		app_config.constraints_api_key.clone(),
+		gateway_config.relay_url().to_string(),
+		gateway_config.constraints_api_key().map(|s| s.to_string()),
 	);
 
 	// Create constraints task
 	let constraints_task = ConstraintsTask::new(
-		app_config.clone(),
+		gateway_config_clone2,
 		slot_timer.clone(),
 		delegations_database.clone(),
 		shared_commit_config.clone(),
-		app_config.constraints_relay_url.clone(),
-		app_config.constraints_api_key.clone(),
+		gateway_config.relay_url().to_string(),
+		gateway_config.constraints_api_key().map(|s| s.to_string()),
 	);
 
 	// Spawn delegation task

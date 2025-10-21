@@ -4,7 +4,7 @@ use tokio::time::sleep;
 use tracing::{error, info, warn};
 
 use commit_boost::prelude::BlsPublicKey;
-use common::config::InclusionPreconfConfig;
+use common::config::InclusionGatewayConfig;
 use common::slot_timer::SlotTimer;
 use common::types::{DatabaseContext, ProcessDelegationsResponse, SignedDelegation};
 use constraints::client::ConstraintsClient;
@@ -22,7 +22,7 @@ pub struct DelegationTaskConfig {
 /// Delegation task that periodically checks for delegations in upcoming slots
 pub struct DelegationTask {
 	config: DelegationTaskConfig,
-	app_config: InclusionPreconfConfig,
+	app_config: InclusionGatewayConfig,
 	slot_timer: SlotTimer,
 	database: DatabaseContext,
 	relay_url: String,
@@ -33,7 +33,7 @@ impl DelegationTask {
 	/// Create a new delegation task
 	pub fn new(
 		config: DelegationTaskConfig,
-		app_config: InclusionPreconfConfig,
+		app_config: InclusionGatewayConfig,
 		slot_timer: SlotTimer,
 		database: DatabaseContext,
 		relay_url: String,
@@ -91,8 +91,7 @@ impl DelegationTask {
 	/// Process delegations for a specific slot
 	async fn process_delegations_for_slot(&self, slot: u64) -> Result<()> {
 		// Parse the delegate BLS public key
-		let delegate_bls_public_key =
-			parse_bls_public_key(&self.app_config.constraints_delegate_public_key, "delegate")?;
+		let delegate_bls_public_key = parse_bls_public_key(&self.app_config.delegate_public_key, "delegate")?;
 
 		info!("Processing delegations for slot {}", slot);
 
@@ -129,33 +128,38 @@ mod tests {
 
 	#[test]
 	fn test_delegation_task_creation() {
+		use common::config::InclusionCommitmentsConfig;
+
 		let config = DelegationTaskConfig { check_interval_seconds: 1, lookahead_window: 64 };
-		let app_config = InclusionPreconfConfig {
-			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: 8080,
-			commitments_database_url: "test.db".to_string(),
-			constraints_database_url: "constraints.db".to_string(),
-			delegations_database_url: "delegations.db".to_string(),
-			pricing_database_url: "pricing.db".to_string(),
+
+		let commitments_config = InclusionCommitmentsConfig {
+			server_host: "127.0.0.1".to_string(),
+			server_port: 8080,
+			database_path: "test.db".to_string(),
 			log_level: "info".to_string(),
+			bls_public_key:
+				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+					.to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_relay_url: "https://relay.example.com".to_string(),
+		};
+
+		let app_config = InclusionGatewayConfig {
+			commitments: commitments_config,
+			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
-			constraints_bls_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
-			constraints_delegate_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
-			eth_genesis_timestamp: 1606824023,
+			genesis_timestamp: 1606824023,
+			delegation_database_path: "delegations.db".to_string(),
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 			constraints_receivers: vec![
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
 			],
-			execution_endpoint_url: "http://localhost:8545".to_string(),
-			execution_request_timeout_secs: 10,
-			execution_max_retries: 3,
+			delegate_public_key:
+				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+					.to_string(),
 		};
 		let slot_timer = SlotTimer::new(1606824023); // Mainnet genesis
 											   // Create a mock database context for testing

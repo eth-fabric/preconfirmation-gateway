@@ -1,13 +1,10 @@
-use commit_boost::prelude::*;
 use common::beacon::BeaconApiClient;
 use common::config::BeaconApiConfig;
-use common::db::{DatabaseType, create_database};
+use common::db::create_database;
 use common::slot_timer::SlotTimer;
 use common::types::DatabaseContext;
 use relay::{ProposerLookaheadConfig, ProposerLookaheadTask, config::RelayConfig, run_relay_server, setup_logging};
-use rocksdb::DB;
 use std::env;
-use std::sync::Arc;
 use tracing::info;
 
 #[tokio::main]
@@ -26,11 +23,8 @@ async fn main() -> eyre::Result<()> {
 	let slot_timer = SlotTimer::new(config.relay.genesis_timestamp);
 
 	// Open database for proposer lookahead
-	let db_path = config.relay.database_path.clone();
-	let mut opts = rocksdb::Options::default();
-	opts.create_if_missing(true);
-	let db = DB::open(&opts, &db_path)?;
-	let database = DatabaseContext::new(Arc::new(db));
+	let db = create_database(config.relay.database_path.to_str().ok_or_else(|| eyre::eyre!("Invalid database path"))?)?;
+	let database = DatabaseContext::new(db);
 
 	// Create beacon API client for proposer lookahead
 	let beacon_config = BeaconApiConfig {

@@ -6,7 +6,7 @@ use cb_common::{
 };
 use commit_boost::prelude::StartCommitModuleConfig;
 use commitments::CommitmentsServerState;
-use common::config::InclusionPreconfConfig;
+use common::config::{InclusionCommitmentsConfig, InclusionGatewayConfig};
 use common::slot_timer::SlotTimer;
 use common::types::commitments::InclusionPayload;
 use common::types::{Commitment, CommitmentRequest, DatabaseContext, SignedCommitment};
@@ -246,26 +246,28 @@ impl TestHarnessBuilder {
 		// Setup all databases
 		let (database, _delegations_database) = self.setup_databases(&temp_dir)?;
 
-		// Create test InclusionPreconfConfig
-		let app_config = InclusionPreconfConfig {
-			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
-			commitments_database_url: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
-			constraints_database_url: temp_dir.path().join("test_constraints_db").to_string_lossy().to_string(),
-			delegations_database_url: temp_dir.path().join("test_delegations_db").to_string_lossy().to_string(),
-			pricing_database_url: temp_dir.path().join("test_pricing_db").to_string_lossy().to_string(),
+		// Create test InclusionGatewayConfig
+		let commitments_config = InclusionCommitmentsConfig {
+			server_host: "127.0.0.1".to_string(),
+			server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
+			database_path: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
 			log_level: "info".to_string(),
+			bls_public_key: hex::encode(PUBKEY),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_relay_url: "https://relay.example.com".to_string(),
+		};
+
+		let app_config = InclusionGatewayConfig {
+			commitments: commitments_config,
+			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
-			constraints_bls_public_key: hex::encode(PUBKEY),
-			constraints_delegate_public_key: hex::encode(PUBKEY),
-			eth_genesis_timestamp: 1606824023,
-			constraints_receivers: vec![hex::encode(PUBKEY)],
+			genesis_timestamp: 1606824023,
+			delegation_database_path: temp_dir.path().join("test_delegations_db").to_string_lossy().to_string(),
 			execution_endpoint_url: "http://localhost:8545".to_string(),
 			execution_request_timeout_secs: 10,
 			execution_max_retries: 3,
+			constraints_receivers: vec![hex::encode(PUBKEY)],
+			delegate_public_key: hex::encode(PUBKEY),
 		};
 
 		// Start local signer server with config
@@ -409,14 +411,17 @@ impl TestHarnessBuilder {
 
 	/// Launch the commitments RPC server
 	async fn launch_commitments_service(
-		rpc_context: CommitmentsServerState<InclusionPreconfConfig>,
+		rpc_context: CommitmentsServerState<InclusionGatewayConfig>,
 	) -> Result<ServiceHandle> {
+		use common::config::{CommitmentsConfig, GatewayConfig};
+
 		let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
 		// Get the port from the commit config
 		let commit_config = rpc_context.commit_config.lock().await;
-		let app_config: InclusionPreconfConfig = commit_config.extra.clone();
-		let port = app_config.commitments_server_port;
+		let gateway_config = &commit_config.extra;
+		let commitments_config = gateway_config.commitments_config();
+		let port = commitments_config.server_port();
 		let url = format!("http://127.0.0.1:{}", port);
 		drop(commit_config); // Release the lock
 
@@ -482,7 +487,7 @@ impl TestHarnessBuilder {
 /// Unified test harness for all test scenarios  
 /// Holds setup state and provides helpers to create properly signed objects
 pub struct TestHarness {
-	pub context: CommitmentsServerState<InclusionPreconfConfig>,
+	pub context: CommitmentsServerState<InclusionGatewayConfig>,
 	pub proposer_bls_public_key: cb_common::types::BlsPublicKey,
 	pub gateway_bls_one: cb_common::types::BlsPublicKey,
 	pub gateway_bls_two: cb_common::types::BlsPublicKey,
@@ -495,7 +500,7 @@ pub struct TestHarness {
 }
 
 /// Test harness specifically for proposer testing
-/// This harness is configured with ProposerConfig instead of InclusionPreconfConfig
+/// This harness is configured with ProposerConfig instead of InclusionGatewayConfig
 pub struct ProposerTestHarness {
 	pub commit_config: Arc<tokio::sync::Mutex<StartCommitModuleConfig<proposer::ProposerConfig>>>,
 	pub proposer_bls_public_key: cb_common::types::BlsPublicKey,
@@ -1290,9 +1295,9 @@ pub mod test_helpers {
 		))
 	}
 
-	/// Creates a test CommitmentsServerState with InclusionPreconfConfig for server tests
+	/// Creates a test CommitmentsServerState with InclusionGatewayConfig for server tests
 	/// This function provides a complete test environment for server tests that need the full config
-	pub async fn create_test_context_with_config() -> Result<CommitmentsServerState<InclusionPreconfConfig>> {
+	pub async fn create_test_context_with_config() -> Result<CommitmentsServerState<InclusionGatewayConfig>> {
 		let temp_dir = TempDir::new().unwrap();
 		let db_path = temp_dir.path().join("test_db");
 
@@ -1307,32 +1312,34 @@ pub mod test_helpers {
 		let _constraints_port = rpc_port + 1;
 
 		// Create test config
-		let app_config = InclusionPreconfConfig {
-			commitments_server_host: "127.0.0.1".to_string(),
-			commitments_server_port: rpc_port,
-			commitments_database_url: "./test_db".to_string(),
-			constraints_database_url: "./test_constraints_db".to_string(),
-			delegations_database_url: "./test_delegations_db".to_string(),
-			pricing_database_url: "./test_pricing_db".to_string(),
+		let commitments_config = InclusionCommitmentsConfig {
+			server_host: "127.0.0.1".to_string(),
+			server_port: rpc_port,
+			database_path: "./test_db".to_string(),
 			log_level: "info".to_string(),
+			bls_public_key:
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-			constraints_relay_url: "https://relay.example.com".to_string(),
+		};
+
+		let app_config = InclusionGatewayConfig {
+			commitments: commitments_config,
+			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
-			constraints_bls_public_key:
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
-					.to_string(),
-			constraints_delegate_public_key:
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
-					.to_string(),
-			eth_genesis_timestamp: 1606824023,
+			genesis_timestamp: 1606824023,
+			delegation_database_path: "./test_delegations_db".to_string(),
+			execution_endpoint_url: "http://localhost:8545".to_string(),
+			execution_request_timeout_secs: 10,
+			execution_max_retries: 3,
 			constraints_receivers: vec![
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
 			],
-			execution_endpoint_url: "http://localhost:8545".to_string(),
-			execution_request_timeout_secs: 10,
-			execution_max_retries: 3,
+			delegate_public_key:
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+					.to_string(),
 		};
 
 		// Start local signer server with config

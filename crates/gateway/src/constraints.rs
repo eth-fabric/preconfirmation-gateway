@@ -3,7 +3,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
-use common::config::InclusionPreconfConfig;
+use common::config::{GatewayConfig, InclusionGatewayConfig};
 use common::slot_timer::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
 use common::types::{DatabaseContext, ProcessConstraintsResponse};
 use constraints::client::ConstraintsClient;
@@ -14,10 +14,10 @@ use tokio::sync::Mutex;
 /// Constraints task that monitors delegated slots and triggers constraint processing
 /// 2 seconds before each delegated slot begins
 pub struct ConstraintsTask {
-	config: InclusionPreconfConfig,
+	config: InclusionGatewayConfig,
 	slot_timer: SlotTimer,
 	database: DatabaseContext,
-	commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionPreconfConfig>>>,
+	commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionGatewayConfig>>>,
 	relay_url: String,
 	api_key: Option<String>,
 }
@@ -25,10 +25,10 @@ pub struct ConstraintsTask {
 impl ConstraintsTask {
 	/// Create a new constraints task
 	pub fn new(
-		config: InclusionPreconfConfig,
+		config: InclusionGatewayConfig,
 		slot_timer: SlotTimer,
 		database: DatabaseContext,
-		commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionPreconfConfig>>>,
+		commit_config: Arc<Mutex<StartCommitModuleConfig<InclusionGatewayConfig>>>,
 		relay_url: String,
 		api_key: Option<String>,
 	) -> Self {
@@ -67,7 +67,7 @@ impl ConstraintsTask {
 					}
 					Ok(false) => {
 						// Calculate time until trigger offset before target slot starts
-						let target_slot_start = self.config.eth_genesis_timestamp + (target_slot * SLOT_TIME_SECONDS);
+						let target_slot_start = self.config.genesis_timestamp() + (target_slot * SLOT_TIME_SECONDS);
 						let trigger_time = target_slot_start - CONSTRAINT_TRIGGER_OFFSET; // trigger offset before slot starts
 						let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
 
@@ -137,12 +137,12 @@ impl ConstraintsTask {
 		let proposer_public_key = delegation.message.proposer;
 
 		// Parse receiver BLS public keys from config
-		let receivers = constraints::parse_bls_public_keys(&self.config.constraints_receivers, "receiver")?;
+		let receivers = constraints::parse_bls_public_keys(self.config.constraints_receivers(), "receiver")?;
 
 		info!("Processing constraints for slot {}", slot);
 
 		// Call constraints processing function
-		let response = process_constraints::<InclusionPreconfConfig>(
+		let response = process_constraints::<InclusionGatewayConfig>(
 			slot,
 			gateway_public_key,
 			proposer_public_key,
