@@ -22,7 +22,6 @@ async fn main() -> Result<()> {
 	let config = commit_config.extra.clone();
 
 	info!("Proposer configuration:");
-	info!("  Proposer BLS key: {}", config.proposer_bls_public_key);
 	info!("  Delegate BLS key: {}", config.delegate_bls_public_key);
 	info!("  Committer address: {}", config.committer_address);
 	info!("  Relay URL: {}", config.relay_url);

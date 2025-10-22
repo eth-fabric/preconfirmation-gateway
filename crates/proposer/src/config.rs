@@ -3,9 +3,6 @@ use serde::Deserialize;
 /// Configuration for the proposer service
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProposerConfig {
-	/// Proposer's own BLS public key (consensus key)
-	pub proposer_bls_public_key: String,
-
 	/// Gateway delegate BLS public key
 	pub delegate_bls_public_key: String,
 
@@ -32,10 +29,6 @@ pub struct ProposerConfig {
 }
 
 impl common::config::ProposerConfig for ProposerConfig {
-	fn proposer_bls_public_key(&self) -> &str {
-		&self.proposer_bls_public_key
-	}
-
 	fn delegate_bls_public_key(&self) -> &str {
 		&self.delegate_bls_public_key
 	}
@@ -65,7 +58,6 @@ mod tests {
 	fn test_proposer_config_structure() {
 		// Verify the config can be deserialized from JSON
 		let json = r#"{
-			"proposer_bls_public_key": "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
 			"delegate_bls_public_key": "0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
 			"committer_address": "0x1111111111111111111111111111111111111111",
 			"relay_url": "http://localhost:3001",

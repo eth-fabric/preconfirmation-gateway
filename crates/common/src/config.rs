@@ -46,7 +46,6 @@ pub trait GatewayConfig {
 /// Proposer configuration trait
 /// Defines the interface for proposer service configuration
 pub trait ProposerConfig {
-	fn proposer_bls_public_key(&self) -> &str;
 	fn delegate_bls_public_key(&self) -> &str;
 	fn relay_url(&self) -> &str;
 	fn beacon_api_url(&self) -> &str;
@@ -173,7 +172,6 @@ impl GatewayConfig for InclusionGatewayConfig {
 /// Proposer configuration for inclusion preconfs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InclusionProposerConfig {
-	pub proposer_bls_public_key: String,
 	pub delegate_bls_public_key: String,
 	pub committer_address: String,
 	pub relay_url: String,
@@ -185,10 +183,6 @@ pub struct InclusionProposerConfig {
 }
 
 impl ProposerConfig for InclusionProposerConfig {
-	fn proposer_bls_public_key(&self) -> &str {
-		&self.proposer_bls_public_key
-	}
-
 	fn delegate_bls_public_key(&self) -> &str {
 		&self.delegate_bls_public_key
 	}

@@ -12,6 +12,13 @@ use tracing::{debug, info, warn};
 
 use crate::config::ProposerConfig;
 
+/// Get all consensus BLS public keys from the signer client
+async fn get_consensus_keys<T>(commit_config: &mut StartCommitModuleConfig<T>) -> Result<Vec<BlsPublicKey>> {
+	let response = commit_config.signer_client.get_pubkeys().await.context("Failed to get public keys from signer")?;
+
+	Ok(response.keys.iter().map(|map| map.consensus.clone()).collect())
+}
+
 /// Process proposer lookahead to find upcoming duties and sign delegations
 ///
 /// This function checks the beacon chain for proposer duties in the current and next epoch.
@@ -23,11 +30,15 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
 	current_slot: u64,
 ) -> Result<()> {
-	let config = &commit_config.extra;
+	// Get all consensus BLS public keys from the signer
+	let our_pubkeys = get_consensus_keys(commit_config).await?;
 
-	// Parse our proposer's BLS public key
-	let our_pubkey =
-		parse_bls_public_key(&config.proposer_bls_public_key).context("Failed to parse proposer BLS public key")?;
+	if our_pubkeys.is_empty() {
+		warn!("No consensus keys found in signer");
+		return Ok(());
+	}
+
+	info!("Processing lookahead for {} consensus key(s)", our_pubkeys.len());
 
 	// Calculate current and next epoch
 	let current_epoch = BeaconTiming::slot_to_epoch(current_slot);
@@ -35,14 +46,14 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 
 	// Check duties for both current and next epoch
 	for epoch in [current_epoch, next_epoch] {
-		match process_epoch_duties(beacon_client, constraints_client, commit_config, epoch, current_slot, &our_pubkey)
+		match process_epoch_duties(beacon_client, constraints_client, commit_config, epoch, current_slot, &our_pubkeys)
 			.await
 		{
 			Ok(posted_count) => {
 				if posted_count > 0 {
 					info!("Posted {} delegation(s) for epoch {}", posted_count, epoch);
 				} else {
-					debug!("No duties found for our proposer in epoch {}", epoch);
+					debug!("No duties found for our proposers in epoch {}", epoch);
 				}
 			}
 			Err(e) => {
@@ -61,7 +72,7 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
 	epoch: u64,
 	current_slot: u64,
-	our_pubkey: &BlsPublicKey,
+	our_pubkeys: &[BlsPublicKey],
 ) -> Result<usize> {
 	// Get proposer duties for this epoch
 	let duties = beacon_client.get_proposer_duties(epoch).await?;
@@ -75,19 +86,19 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 		.parse::<B256>()
 		.context("Failed to parse module_signing_id from config")?;
 
-	// Check each duty to see if it's for our proposer
+	// Check each duty to see if it's for one of our proposers
 	for duty in duties.data {
 		let duty_pubkey = duty.parse_pubkey().context("Failed to parse duty pubkey")?;
 		let duty_slot = duty.parse_slot().context("Failed to parse duty slot")?;
 
 		// Only process duties that:
-		// 1. Match our proposer key
+		// 1. Match one of our proposer keys
 		// 2. Are in the future (slot > current_slot)
-		if duty_pubkey == *our_pubkey && duty_slot > current_slot {
+		if our_pubkeys.contains(&duty_pubkey) && duty_slot > current_slot {
 			info!("Found proposer duty for slot {}", duty_slot);
 
 			// Create and sign delegation
-			let delegation = create_delegation(&commit_config.extra, duty_slot)?;
+			let delegation = create_delegation(&commit_config.extra, &duty_pubkey, duty_slot)?;
 			let signed_delegation = sign_delegation(commit_config, &delegation, &module_signing_id).await?;
 
 			// Post to relay
@@ -105,16 +116,13 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 }
 
 /// Create a delegation message from configuration
-fn create_delegation(config: &ProposerConfig, slot: u64) -> Result<Delegation> {
-	let proposer =
-		parse_bls_public_key(&config.proposer_bls_public_key).context("Failed to parse proposer BLS public key")?;
-
+fn create_delegation(config: &ProposerConfig, proposer_pubkey: &BlsPublicKey, slot: u64) -> Result<Delegation> {
 	let delegate =
 		parse_bls_public_key(&config.delegate_bls_public_key).context("Failed to parse delegate BLS public key")?;
 
 	let committer: Address = config.committer_address.parse().context("Failed to parse committer address")?;
 
-	Ok(Delegation { proposer, delegate, committer, slot, metadata: Bytes::new() })
+	Ok(Delegation { proposer: proposer_pubkey.clone(), delegate, committer, slot, metadata: Bytes::new() })
 }
 
 /// Sign a delegation message using the consensus BLS key
@@ -186,7 +194,6 @@ mod tests {
 	#[test]
 	fn test_create_delegation() {
 		let config = ProposerConfig {
-			proposer_bls_public_key: TEST_PROPOSER_KEY.to_string(),
 			delegate_bls_public_key: TEST_DELEGATE_KEY.to_string(),
 			committer_address: TEST_COMMITTER.to_string(),
 			relay_url: "http://localhost:3001".to_string(),
@@ -197,10 +204,11 @@ mod tests {
 			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
 		};
 
-		let delegation = create_delegation(&config, 12345).unwrap();
+		let proposer_key = parse_bls_public_key(TEST_PROPOSER_KEY).unwrap();
+		let delegation = create_delegation(&config, &proposer_key, 12345).unwrap();
 
 		assert_eq!(delegation.slot, 12345);
-		assert_eq!(delegation.proposer, parse_bls_public_key(TEST_PROPOSER_KEY).unwrap());
+		assert_eq!(delegation.proposer, proposer_key);
 		assert_eq!(delegation.delegate, parse_bls_public_key(TEST_DELEGATE_KEY).unwrap());
 		assert_eq!(delegation.committer, TEST_COMMITTER.parse::<Address>().unwrap());
 	}

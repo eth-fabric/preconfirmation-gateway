@@ -139,7 +139,6 @@ impl TestHarnessBuilder {
 		let committer_address = Address::random();
 
 		let proposer_config = proposer::ProposerConfig {
-			proposer_bls_public_key: format!("0x{}", hex::encode(PUBKEY)),
 			delegate_bls_public_key: delegate_placeholder.clone(),
 			committer_address: format!("{:?}", committer_address),
 			relay_url: relay_url.clone(),
