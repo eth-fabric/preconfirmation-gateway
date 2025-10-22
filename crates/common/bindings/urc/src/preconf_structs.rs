@@ -155,6 +155,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -213,6 +214,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -271,6 +273,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -329,6 +332,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -387,6 +391,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -445,6 +450,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -503,6 +509,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -561,6 +568,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -619,6 +627,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -677,6 +686,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -735,6 +745,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -793,6 +804,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -851,6 +863,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -909,6 +922,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -967,6 +981,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -1025,6 +1040,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -1083,6 +1099,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -1130,7 +1147,7 @@ pub mod PreconfStructs {
 		}
 	};
 	///Container for all the [`PreconfStructs`](self) custom errors.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum PreconfStructsErrors {
 		#[allow(missing_docs)]
 		BeaconRootNotFound(BeaconRootNotFound),
@@ -1167,7 +1184,6 @@ pub mod PreconfStructs {
 		#[allow(missing_docs)]
 		WrongTransactionHashProof(WrongTransactionHashProof),
 	}
-	#[automatically_derived]
 	impl PreconfStructsErrors {
 		/// All the selectors of this enum.
 		///
@@ -1194,6 +1210,60 @@ pub mod PreconfStructs {
 			[199u8, 203u8, 30u8, 174u8],
 			[233u8, 105u8, 123u8, 104u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(ChallengeDoesNotExist),
+			::core::stringify!(TransactionExcluded),
+			::core::stringify!(FraudProofWindowActive),
+			::core::stringify!(DelegationExpired),
+			::core::stringify!(BlockIsTooOld),
+			::core::stringify!(InvalidBlockHash),
+			::core::stringify!(InvalidParentBlockHash),
+			::core::stringify!(ChallengeAlreadyExists),
+			::core::stringify!(InvalidBlockNumber),
+			::core::stringify!(EthTransferFailed),
+			::core::stringify!(WrongChallengerAddress),
+			::core::stringify!(WrongTransactionHashProof),
+			::core::stringify!(IncorrectChallengeBond),
+			::core::stringify!(UnexpectedSigner),
+			::core::stringify!(BlockIsNotFinalized),
+			::core::stringify!(NotURC),
+			::core::stringify!(BeaconRootNotFound),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<ChallengeDoesNotExist as alloy_sol_types::SolError>::SIGNATURE,
+			<TransactionExcluded as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofWindowActive as alloy_sol_types::SolError>::SIGNATURE,
+			<DelegationExpired as alloy_sol_types::SolError>::SIGNATURE,
+			<BlockIsTooOld as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidBlockHash as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidParentBlockHash as alloy_sol_types::SolError>::SIGNATURE,
+			<ChallengeAlreadyExists as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidBlockNumber as alloy_sol_types::SolError>::SIGNATURE,
+			<EthTransferFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<WrongChallengerAddress as alloy_sol_types::SolError>::SIGNATURE,
+			<WrongTransactionHashProof as alloy_sol_types::SolError>::SIGNATURE,
+			<IncorrectChallengeBond as alloy_sol_types::SolError>::SIGNATURE,
+			<UnexpectedSigner as alloy_sol_types::SolError>::SIGNATURE,
+			<BlockIsNotFinalized as alloy_sol_types::SolError>::SIGNATURE,
+			<NotURC as alloy_sol_types::SolError>::SIGNATURE,
+			<BeaconRootNotFound as alloy_sol_types::SolError>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for PreconfStructsErrors {
@@ -1607,9 +1677,9 @@ pub mod PreconfStructs {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> PreconfStructsInstance<P, N> {
-		PreconfStructsInstance::<P, N>::new(address, provider)
+		PreconfStructsInstance::<P, N>::new(address, __provider)
 	}
 	/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -1618,9 +1688,9 @@ pub mod PreconfStructs {
 	For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 	#[inline]
 	pub fn deploy<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> impl ::core::future::Future<Output = alloy_contract::Result<PreconfStructsInstance<P, N>>> {
-		PreconfStructsInstance::<P, N>::deploy(provider)
+		PreconfStructsInstance::<P, N>::deploy(__provider)
 	}
 	/**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 	and constructor arguments, if any.
@@ -1629,9 +1699,9 @@ pub mod PreconfStructs {
 	the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 	#[inline]
 	pub fn deploy_builder<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> alloy_contract::RawCallBuilder<P, N> {
-		PreconfStructsInstance::<P, N>::deploy_builder(provider)
+		PreconfStructsInstance::<P, N>::deploy_builder(__provider)
 	}
 	/**A [`PreconfStructs`](self) instance.
 
@@ -1658,14 +1728,13 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`PreconfStructs`](self) contract instance.
 
 		See the [wrapper's documentation](`PreconfStructsInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -1673,8 +1742,8 @@ pub mod PreconfStructs {
 
 		For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 		#[inline]
-		pub async fn deploy(provider: P) -> alloy_contract::Result<PreconfStructsInstance<P, N>> {
-			let call_builder = Self::deploy_builder(provider);
+		pub async fn deploy(__provider: P) -> alloy_contract::Result<PreconfStructsInstance<P, N>> {
+			let call_builder = Self::deploy_builder(__provider);
 			let contract_address = call_builder.deploy().await?;
 			Ok(Self::new(contract_address, call_builder.provider))
 		}
@@ -1684,8 +1753,8 @@ pub mod PreconfStructs {
 		This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 		the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 		#[inline]
-		pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
-			alloy_contract::RawCallBuilder::new_raw_deploy(provider, ::core::clone::Clone::clone(&BYTECODE))
+		pub fn deploy_builder(__provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+			alloy_contract::RawCallBuilder::new_raw_deploy(__provider, ::core::clone::Clone::clone(&BYTECODE))
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -1720,7 +1789,6 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -1731,7 +1799,6 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///

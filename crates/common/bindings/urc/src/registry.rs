@@ -37,6 +37,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::FixedBytes<32>,
@@ -237,6 +238,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::FixedBytes<32>,
@@ -492,9 +494,9 @@ pub mod BLS {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> BLSInstance<P, N> {
-		BLSInstance::<P, N>::new(address, provider)
+		BLSInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`BLS`](self) instance.
 
@@ -521,14 +523,13 @@ pub mod BLS {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`BLS`](self) contract instance.
 
 		See the [wrapper's documentation](`BLSInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -563,7 +564,6 @@ pub mod BLS {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -574,7 +574,6 @@ pub mod BLS {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -633,7 +632,6 @@ pub mod IRegistry {
 				<alloy::sol_types::sol_data::Uint<8> as alloy_sol_types::SolType>::abi_encoded_size(self)
 			}
 		}
-		#[automatically_derived]
 		impl SlashingType {
 			/// The Solidity type name.
 			pub const NAME: &'static str = stringify!(@ name);
@@ -736,6 +734,7 @@ pub mod IRegistry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<80>,
 			alloy::sol_types::sol_data::Uint<32>,
@@ -1005,6 +1004,7 @@ pub mod IRegistry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Address,
 			alloy::sol_types::sol_data::Uint<80>,
@@ -1263,6 +1263,7 @@ pub mod IRegistry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			SignedRegistration,
@@ -1476,6 +1477,7 @@ pub mod IRegistry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (BLS::G1Point, BLS::G2Point, alloy::sol_types::sol_data::Uint<64>);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = (
@@ -1641,6 +1643,7 @@ pub mod IRegistry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Address,
 			alloy::sol_types::sol_data::Uint<48>,
@@ -1823,9 +1826,9 @@ pub mod IRegistry {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> IRegistryInstance<P, N> {
-		IRegistryInstance::<P, N>::new(address, provider)
+		IRegistryInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`IRegistry`](self) instance.
 
@@ -1852,14 +1855,13 @@ pub mod IRegistry {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> IRegistryInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`IRegistry`](self) contract instance.
 
 		See the [wrapper's documentation](`IRegistryInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -1894,7 +1896,6 @@ pub mod IRegistry {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> IRegistryInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -1905,7 +1906,6 @@ pub mod IRegistry {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> IRegistryInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -1955,6 +1955,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<64>,
 			alloy::sol_types::sol_data::Bytes,
@@ -2133,6 +2134,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			BLS::G1Point,
 			BLS::G1Point,
@@ -2320,6 +2322,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (Commitment, alloy::sol_types::sol_data::Bytes);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> =
@@ -2475,6 +2478,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			Delegation,
 			alloy::sol_types::sol_data::Uint<64>,
@@ -2643,9 +2647,9 @@ pub mod ISlasher {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> ISlasherInstance<P, N> {
-		ISlasherInstance::<P, N>::new(address, provider)
+		ISlasherInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`ISlasher`](self) instance.
 
@@ -2672,14 +2676,13 @@ pub mod ISlasher {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`ISlasher`](self) contract instance.
 
 		See the [wrapper's documentation](`ISlasherInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -2714,7 +2717,6 @@ pub mod ISlasher {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -2725,7 +2727,6 @@ pub mod ISlasher {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -5202,6 +5203,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5260,6 +5262,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5318,6 +5321,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5376,6 +5380,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5434,6 +5439,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5492,6 +5498,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5550,6 +5557,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5608,6 +5616,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5669,6 +5678,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5730,6 +5740,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -5788,6 +5799,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5846,6 +5858,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5904,6 +5917,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -5962,6 +5976,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6020,6 +6035,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6078,6 +6094,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6136,6 +6153,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6194,6 +6212,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6252,6 +6271,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6310,6 +6330,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6368,6 +6389,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6426,6 +6448,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6484,6 +6507,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6542,6 +6566,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6600,6 +6625,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6658,6 +6684,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6716,6 +6743,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6774,6 +6802,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6832,6 +6861,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6890,6 +6920,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -6948,6 +6979,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7006,6 +7038,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7064,6 +7097,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7122,6 +7156,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7180,6 +7215,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7238,6 +7274,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7296,6 +7333,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7354,6 +7392,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7412,6 +7451,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -7470,6 +7510,7 @@ pub mod Registry {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -8209,6 +8250,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::Config,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::Config as alloy::sol_types::SolType>::RustType,);
@@ -8270,6 +8312,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -8299,6 +8342,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -8384,6 +8428,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -8413,6 +8458,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -8498,6 +8544,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -8527,6 +8574,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -8613,6 +8661,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -8642,6 +8691,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::Config,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::Config as alloy::sol_types::SolType>::RustType,);
@@ -8732,6 +8782,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::FixedBytes<32>, alloy::sol_types::sol_data::Uint<256>);
 			#[doc(hidden)]
@@ -8763,6 +8814,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -8856,6 +8908,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -8885,6 +8938,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::OperatorData,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::OperatorData as alloy::sol_types::SolType>::RustType,);
@@ -8982,6 +9036,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				alloy::sol_types::sol_data::Array<IRegistry::SignedRegistration>,
 				alloy::sol_types::sol_data::Address,
@@ -9021,6 +9076,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::RegistrationProof,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,);
@@ -9129,6 +9185,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::FixedBytes<32>, alloy::sol_types::sol_data::Address);
 			#[doc(hidden)]
@@ -9160,6 +9217,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::SlasherCommitment,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::SlasherCommitment as alloy::sol_types::SolType>::RustType,);
@@ -9253,6 +9311,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::RegistrationProof,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,);
@@ -9282,6 +9341,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::OperatorData,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::OperatorData as alloy::sol_types::SolType>::RustType,);
@@ -9372,6 +9432,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::FixedBytes<32>, alloy::sol_types::sol_data::Address);
 			#[doc(hidden)]
@@ -9403,6 +9464,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Bool,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (bool,);
@@ -9496,6 +9558,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -9525,6 +9588,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Bool,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (bool,);
@@ -9617,6 +9681,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::FixedBytes<32>, alloy::sol_types::sol_data::Address);
 			#[doc(hidden)]
@@ -9648,6 +9713,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Bool,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (bool,);
@@ -9741,6 +9807,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				alloy::sol_types::sol_data::FixedBytes<32>,
 				alloy::sol_types::sol_data::Address,
@@ -9778,6 +9845,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -9873,6 +9941,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::FixedBytes<32>, alloy::sol_types::sol_data::Address);
 			#[doc(hidden)]
@@ -9904,6 +9973,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -10001,6 +10071,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				alloy::sol_types::sol_data::Array<IRegistry::SignedRegistration>,
 				alloy::sol_types::sol_data::Address,
@@ -10038,6 +10109,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -10146,6 +10218,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				IRegistry::RegistrationProof,
 				ISlasher::SignedDelegation,
@@ -10185,6 +10258,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -10287,6 +10361,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				alloy::sol_types::sol_data::FixedBytes<32>,
 				ISlasher::SignedCommitment,
@@ -10324,6 +10399,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -10426,6 +10502,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(IRegistry::RegistrationProof, ISlasher::SignedDelegation, ISlasher::SignedDelegation);
 			#[doc(hidden)]
@@ -10460,6 +10537,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -10553,6 +10631,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::RegistrationProof,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,);
@@ -10582,6 +10661,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -10670,6 +10750,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -10699,6 +10780,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Bool,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (bool,);
@@ -10785,6 +10867,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -10814,6 +10897,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -10899,6 +10983,7 @@ pub mod Registry {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (IRegistry::RegistrationProof,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,);
@@ -10928,6 +11013,7 @@ pub mod Registry {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -10992,7 +11078,7 @@ pub mod Registry {
 		}
 	};
 	///Container for all the [`Registry`](self) function calls.
-	#[derive(serde::Serialize, serde::Deserialize)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize)]
 	pub enum RegistryCalls {
 		#[allow(missing_docs)]
 		addCollateral(addCollateralCall),
@@ -11039,7 +11125,6 @@ pub mod Registry {
 		#[allow(missing_docs)]
 		verifyMerkleProof(verifyMerkleProofCall),
 	}
-	#[automatically_derived]
 	impl RegistryCalls {
 		/// All the selectors of this enum.
 		///
@@ -11071,6 +11156,70 @@ pub mod Registry {
 			[242u8, 61u8, 64u8, 38u8],
 			[252u8, 12u8, 229u8, 155u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(unregister),
+			::core::stringify!(getHistoricalCollateral),
+			::core::stringify!(slashEquivocation),
+			::core::stringify!(slashCommitment_0),
+			::core::stringify!(optInToSlasher),
+			::core::stringify!(getSlasherCommitment),
+			::core::stringify!(getVerifiedOperatorData),
+			::core::stringify!(verifyMerkleProof),
+			::core::stringify!(optOutOfSlasher),
+			::core::stringify!(isOptedIntoSlasher),
+			::core::stringify!(getOperatorData),
+			::core::stringify!(getRegistrationProof),
+			::core::stringify!(isSlashed_0),
+			::core::stringify!(claimSlashedCollateral),
+			::core::stringify!(slashingEvidenceAlreadyUsed),
+			::core::stringify!(getConfig),
+			::core::stringify!(slashCommitment_1),
+			::core::stringify!(register),
+			::core::stringify!(isSlashed_1),
+			::core::stringify!(claimCollateral),
+			::core::stringify!(addCollateral),
+			::core::stringify!(slashRegistration),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<unregisterCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getHistoricalCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashEquivocationCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashCommitment_0Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<optInToSlasherCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getSlasherCommitmentCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getVerifiedOperatorDataCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<verifyMerkleProofCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<optOutOfSlasherCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<isOptedIntoSlasherCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getOperatorDataCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getRegistrationProofCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<isSlashed_0Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<claimSlashedCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashingEvidenceAlreadyUsedCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<getConfigCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashCommitment_1Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<registerCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<isSlashed_1Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<claimCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<addCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashRegistrationCall as alloy_sol_types::SolCall>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for RegistryCalls {
@@ -11568,7 +11717,7 @@ pub mod Registry {
 		}
 	}
 	///Container for all the [`Registry`](self) custom errors.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum RegistryErrors {
 		#[allow(missing_docs)]
 		AlreadyOptedIn(AlreadyOptedIn),
@@ -11651,7 +11800,6 @@ pub mod Registry {
 		#[allow(missing_docs)]
 		WrongOperator(WrongOperator),
 	}
-	#[automatically_derived]
 	impl RegistryErrors {
 		/// All the selectors of this enum.
 		///
@@ -11701,6 +11849,106 @@ pub mod Registry {
 			[252u8, 159u8, 104u8, 169u8],
 			[252u8, 230u8, 152u8, 247u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(InvalidProof),
+			::core::stringify!(SlashAmountExceedsCollateral),
+			::core::stringify!(OperatorDeleted),
+			::core::stringify!(NoCollateralSlashed),
+			::core::stringify!(DifferentSlots),
+			::core::stringify!(SlashingAlreadyOccurred),
+			::core::stringify!(WrongOperator),
+			::core::stringify!(InsufficientCollateral),
+			::core::stringify!(OperatorAlreadyRegistered),
+			::core::stringify!(OperatorAlreadyUnregistered),
+			::core::stringify!(CollateralOverflow),
+			::core::stringify!(SlashWindowNotMet),
+			::core::stringify!(FraudProofWindowExpired),
+			::core::stringify!(AlreadyUnregistered),
+			::core::stringify!(DelegationsAreSame),
+			::core::stringify!(NotUnregistered),
+			::core::stringify!(NotOptedIn),
+			::core::stringify!(EthTransferFailed),
+			::core::stringify!(CollateralBelowMinimum),
+			::core::stringify!(DelegationSignatureInvalid),
+			::core::stringify!(OperatorAlreadyEquivocated),
+			::core::stringify!(FraudProofMerklePathInvalid),
+			::core::stringify!(NoCollateral),
+			::core::stringify!(NotRegisteredKey),
+			::core::stringify!(InvalidDelegation),
+			::core::stringify!(InvalidRegistrationRoot),
+			::core::stringify!(NotSlashed),
+			::core::stringify!(UnauthorizedCommitment),
+			::core::stringify!(FraudProofChallengeInvalid),
+			::core::stringify!(TimestampTooOld),
+			::core::stringify!(ECDSAInvalidSignatureS),
+			::core::stringify!(FraudProofWindowNotMet),
+			::core::stringify!(InvalidOwnerAddress),
+			::core::stringify!(AlreadyOptedIn),
+			::core::stringify!(OptInDelayNotMet),
+			::core::stringify!(SlashWindowExpired),
+			::core::stringify!(ECDSAInvalidSignature),
+			::core::stringify!(UnregistrationDelayNotMet),
+			::core::stringify!(NoCollateralToClaim),
+			::core::stringify!(ECDSAInvalidSignatureLength),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<InvalidProof as alloy_sol_types::SolError>::SIGNATURE,
+			<SlashAmountExceedsCollateral as alloy_sol_types::SolError>::SIGNATURE,
+			<OperatorDeleted as alloy_sol_types::SolError>::SIGNATURE,
+			<NoCollateralSlashed as alloy_sol_types::SolError>::SIGNATURE,
+			<DifferentSlots as alloy_sol_types::SolError>::SIGNATURE,
+			<SlashingAlreadyOccurred as alloy_sol_types::SolError>::SIGNATURE,
+			<WrongOperator as alloy_sol_types::SolError>::SIGNATURE,
+			<InsufficientCollateral as alloy_sol_types::SolError>::SIGNATURE,
+			<OperatorAlreadyRegistered as alloy_sol_types::SolError>::SIGNATURE,
+			<OperatorAlreadyUnregistered as alloy_sol_types::SolError>::SIGNATURE,
+			<CollateralOverflow as alloy_sol_types::SolError>::SIGNATURE,
+			<SlashWindowNotMet as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofWindowExpired as alloy_sol_types::SolError>::SIGNATURE,
+			<AlreadyUnregistered as alloy_sol_types::SolError>::SIGNATURE,
+			<DelegationsAreSame as alloy_sol_types::SolError>::SIGNATURE,
+			<NotUnregistered as alloy_sol_types::SolError>::SIGNATURE,
+			<NotOptedIn as alloy_sol_types::SolError>::SIGNATURE,
+			<EthTransferFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<CollateralBelowMinimum as alloy_sol_types::SolError>::SIGNATURE,
+			<DelegationSignatureInvalid as alloy_sol_types::SolError>::SIGNATURE,
+			<OperatorAlreadyEquivocated as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofMerklePathInvalid as alloy_sol_types::SolError>::SIGNATURE,
+			<NoCollateral as alloy_sol_types::SolError>::SIGNATURE,
+			<NotRegisteredKey as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidDelegation as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidRegistrationRoot as alloy_sol_types::SolError>::SIGNATURE,
+			<NotSlashed as alloy_sol_types::SolError>::SIGNATURE,
+			<UnauthorizedCommitment as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofChallengeInvalid as alloy_sol_types::SolError>::SIGNATURE,
+			<TimestampTooOld as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofWindowNotMet as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidOwnerAddress as alloy_sol_types::SolError>::SIGNATURE,
+			<AlreadyOptedIn as alloy_sol_types::SolError>::SIGNATURE,
+			<OptInDelayNotMet as alloy_sol_types::SolError>::SIGNATURE,
+			<SlashWindowExpired as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignature as alloy_sol_types::SolError>::SIGNATURE,
+			<UnregistrationDelayNotMet as alloy_sol_types::SolError>::SIGNATURE,
+			<NoCollateralToClaim as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for RegistryErrors {
@@ -12584,7 +12832,7 @@ pub mod Registry {
 		}
 	}
 	///Container for all the [`Registry`](self) events.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum RegistryEvents {
 		#[allow(missing_docs)]
 		CollateralAdded(CollateralAdded),
@@ -12601,7 +12849,6 @@ pub mod Registry {
 		#[allow(missing_docs)]
 		OperatorUnregistered(OperatorUnregistered),
 	}
-	#[automatically_derived]
 	impl RegistryEvents {
 		/// All the selectors of this enum.
 		///
@@ -12646,6 +12893,40 @@ pub mod Registry {
 				32u8,
 			],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(OperatorUnregistered),
+			::core::stringify!(CollateralClaimed),
+			::core::stringify!(OperatorSlashed),
+			::core::stringify!(OperatorRegistered),
+			::core::stringify!(OperatorOptedIn),
+			::core::stringify!(OperatorOptedOut),
+			::core::stringify!(CollateralAdded),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<OperatorUnregistered as alloy_sol_types::SolEvent>::SIGNATURE,
+			<CollateralClaimed as alloy_sol_types::SolEvent>::SIGNATURE,
+			<OperatorSlashed as alloy_sol_types::SolEvent>::SIGNATURE,
+			<OperatorRegistered as alloy_sol_types::SolEvent>::SIGNATURE,
+			<OperatorOptedIn as alloy_sol_types::SolEvent>::SIGNATURE,
+			<OperatorOptedOut as alloy_sol_types::SolEvent>::SIGNATURE,
+			<CollateralAdded as alloy_sol_types::SolEvent>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 32usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 32usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolEventInterface for RegistryEvents {
@@ -12723,9 +13004,9 @@ pub mod Registry {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> RegistryInstance<P, N> {
-		RegistryInstance::<P, N>::new(address, provider)
+		RegistryInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`Registry`](self) instance.
 
@@ -12752,14 +13033,13 @@ pub mod Registry {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> RegistryInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`Registry`](self) contract instance.
 
 		See the [wrapper's documentation](`RegistryInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -12794,7 +13074,6 @@ pub mod Registry {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> RegistryInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -12979,7 +13258,6 @@ pub mod Registry {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> RegistryInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///

@@ -1,7 +1,7 @@
 use alloy::primitives::{B256, Bytes};
 use common::constants::CONSTRAINT_TYPE;
 use common::types::constraints::Constraint;
-use integration_tests::test_common::TestHarness;
+use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Integration tests for relay HTTP server
 /// These tests launch the live HTTP server and make real HTTP calls
@@ -323,6 +323,7 @@ async fn test_concurrent_constraint_posts() {
 				commit_config,
 				relay_url_clone,
 				None,
+				&SIGNING_ID,
 			)
 			.await
 		});

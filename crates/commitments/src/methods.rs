@@ -1,9 +1,10 @@
+use common::config::GatewayConfig;
 use jsonrpsee::server::RpcModule;
 
 use super::handlers;
 use crate::CommitmentsServerState;
 
-pub fn setup_commitment_methods<T: Send + Sync + 'static>(
+pub fn setup_commitment_methods<T: GatewayConfig + Send + Sync + 'static>(
 	rpc_context: CommitmentsServerState<T>,
 ) -> eyre::Result<RpcModule<CommitmentsServerState<T>>> {
 	let mut module = RpcModule::new(rpc_context);

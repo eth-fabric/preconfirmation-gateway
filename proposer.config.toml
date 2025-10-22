@@ -1,0 +1,49 @@
+# Proposer Configuration
+# This file contains configuration settings for the preconfirmation proposer service
+
+# Chain configuration
+chain = "Hoodi"
+
+# PBS (Proposer-Builder Separation) configuration
+[pbs]
+port = 18550
+with_signer = true
+
+# Relays configuration
+[[relays]]
+url = "https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"
+
+# Metrics configuration
+[metrics]
+enabled = true
+
+# Signer configuration
+[signer]
+port = 20000
+
+[signer.local.loader]
+format = "lighthouse"
+keys_path = "./tests/data/keystores/keys"
+secrets_path = "./tests/data/keystores/secrets"
+
+[signer.local.store]
+proxy_dir = "./tests/data/keystores/proxies"
+
+# Proposer Module configuration
+[[modules]]
+id = "proposer-module"
+module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111113"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Proposer service configuration
+proposer_bls_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+delegate_bls_public_key = "0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754"
+committer_address = "0x1111111111111111111111111111111111111111"
+relay_url = "http://localhost:3001"
+relay_api_key = ""
+beacon_api_url = "https://ethereum-beacon-api.publicnode.com"
+beacon_genesis_timestamp = 1606824023
+poll_interval_seconds = 60
+

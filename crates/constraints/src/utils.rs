@@ -13,6 +13,7 @@ pub async fn create_signed_constraints<T>(
 	message: &ConstraintsMessage,
 	commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
 	bls_public_key: BlsPublicKey,
+	module_signing_id: &B256,
 ) -> Result<SignedConstraints> {
 	debug!("Creating signed constraints with proper BLS signing");
 
@@ -22,7 +23,7 @@ pub async fn create_signed_constraints<T>(
 	// 2. Call the proxy_bls signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
-		signer::call_proxy_bls_signer(&mut *commit_config, message_hash, bls_public_key).await?
+		signer::call_proxy_bls_signer(&mut *commit_config, message_hash, bls_public_key, module_signing_id).await?
 	};
 	debug!("Received response from proxy_bls: {:?}", response);
 

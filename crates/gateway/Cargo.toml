@@ -15,6 +15,7 @@ tempfile = "3.8"
 hex = "0.4"
 commit-boost = { workspace = true }
 cb-common = { workspace = true }
+alloy = { workspace = true }
 
 # Workspace dependencies
 common = { path = "../common" }

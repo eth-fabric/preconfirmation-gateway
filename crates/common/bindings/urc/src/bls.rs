@@ -95,6 +95,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -153,6 +154,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -211,6 +213,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -269,6 +272,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -327,6 +331,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -385,6 +390,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -443,6 +449,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -490,7 +497,7 @@ pub mod BLS {
 		}
 	};
 	///Container for all the [`BLS`](self) custom errors.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum BLSErrors {
 		#[allow(missing_docs)]
 		G1AddFailed(G1AddFailed),
@@ -507,7 +514,6 @@ pub mod BLS {
 		#[allow(missing_docs)]
 		PairingFailed(PairingFailed),
 	}
-	#[automatically_derived]
 	impl BLSErrors {
 		/// All the selectors of this enum.
 		///
@@ -524,6 +530,40 @@ pub mod BLS {
 			[214u8, 204u8, 118u8, 235u8],
 			[227u8, 220u8, 84u8, 37u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(MapFpToG1Failed),
+			::core::stringify!(PairingFailed),
+			::core::stringify!(G1MSMFailed),
+			::core::stringify!(MapFp2ToG2Failed),
+			::core::stringify!(G2AddFailed),
+			::core::stringify!(G1AddFailed),
+			::core::stringify!(G2MSMFailed),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<MapFpToG1Failed as alloy_sol_types::SolError>::SIGNATURE,
+			<PairingFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<G1MSMFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<MapFp2ToG2Failed as alloy_sol_types::SolError>::SIGNATURE,
+			<G2AddFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<G1AddFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<G2MSMFailed as alloy_sol_types::SolError>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for BLSErrors {
@@ -707,9 +747,9 @@ pub mod BLS {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> BLSInstance<P, N> {
-		BLSInstance::<P, N>::new(address, provider)
+		BLSInstance::<P, N>::new(address, __provider)
 	}
 	/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -718,9 +758,9 @@ pub mod BLS {
 	For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 	#[inline]
 	pub fn deploy<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> impl ::core::future::Future<Output = alloy_contract::Result<BLSInstance<P, N>>> {
-		BLSInstance::<P, N>::deploy(provider)
+		BLSInstance::<P, N>::deploy(__provider)
 	}
 	/**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 	and constructor arguments, if any.
@@ -729,9 +769,9 @@ pub mod BLS {
 	the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 	#[inline]
 	pub fn deploy_builder<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> alloy_contract::RawCallBuilder<P, N> {
-		BLSInstance::<P, N>::deploy_builder(provider)
+		BLSInstance::<P, N>::deploy_builder(__provider)
 	}
 	/**A [`BLS`](self) instance.
 
@@ -758,14 +798,13 @@ pub mod BLS {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`BLS`](self) contract instance.
 
 		See the [wrapper's documentation](`BLSInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -773,8 +812,8 @@ pub mod BLS {
 
 		For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 		#[inline]
-		pub async fn deploy(provider: P) -> alloy_contract::Result<BLSInstance<P, N>> {
-			let call_builder = Self::deploy_builder(provider);
+		pub async fn deploy(__provider: P) -> alloy_contract::Result<BLSInstance<P, N>> {
+			let call_builder = Self::deploy_builder(__provider);
 			let contract_address = call_builder.deploy().await?;
 			Ok(Self::new(contract_address, call_builder.provider))
 		}
@@ -784,8 +823,8 @@ pub mod BLS {
 		This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 		the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 		#[inline]
-		pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
-			alloy_contract::RawCallBuilder::new_raw_deploy(provider, ::core::clone::Clone::clone(&BYTECODE))
+		pub fn deploy_builder(__provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+			alloy_contract::RawCallBuilder::new_raw_deploy(__provider, ::core::clone::Clone::clone(&BYTECODE))
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -820,7 +859,6 @@ pub mod BLS {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -831,7 +869,6 @@ pub mod BLS {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///

@@ -37,6 +37,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::FixedBytes<32>,
@@ -237,6 +238,7 @@ pub mod BLS {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::FixedBytes<32>,
@@ -492,9 +494,9 @@ pub mod BLS {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> BLSInstance<P, N> {
-		BLSInstance::<P, N>::new(address, provider)
+		BLSInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`BLS`](self) instance.
 
@@ -521,14 +523,13 @@ pub mod BLS {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`BLS`](self) contract instance.
 
 		See the [wrapper's documentation](`BLSInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -563,7 +564,6 @@ pub mod BLS {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -574,7 +574,6 @@ pub mod BLS {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BLSInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -624,6 +623,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<64>,
 			alloy::sol_types::sol_data::Bytes,
@@ -802,6 +802,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			BLS::G1Point,
 			BLS::G1Point,
@@ -989,6 +990,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (Commitment, alloy::sol_types::sol_data::Bytes);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> =
@@ -1144,6 +1146,7 @@ pub mod ISlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			Delegation,
 			alloy::sol_types::sol_data::Uint<64>,
@@ -1312,9 +1315,9 @@ pub mod ISlasher {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> ISlasherInstance<P, N> {
-		ISlasherInstance::<P, N>::new(address, provider)
+		ISlasherInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`ISlasher`](self) instance.
 
@@ -1341,14 +1344,13 @@ pub mod ISlasher {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`ISlasher`](self) contract instance.
 
 		See the [wrapper's documentation](`ISlasherInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -1383,7 +1385,6 @@ pub mod ISlasher {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -1394,7 +1395,6 @@ pub mod ISlasher {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> ISlasherInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -1448,6 +1448,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::FixedBytes<32>,
@@ -1685,6 +1686,7 @@ pub mod PreconfStructs {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<256>,
 			alloy::sol_types::sol_data::Bytes,
@@ -1943,9 +1945,9 @@ pub mod PreconfStructs {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> PreconfStructsInstance<P, N> {
-		PreconfStructsInstance::<P, N>::new(address, provider)
+		PreconfStructsInstance::<P, N>::new(address, __provider)
 	}
 	/**A [`PreconfStructs`](self) instance.
 
@@ -1972,14 +1974,13 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`PreconfStructs`](self) contract instance.
 
 		See the [wrapper's documentation](`PreconfStructsInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -2014,7 +2015,6 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -2025,7 +2025,6 @@ pub mod PreconfStructs {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> PreconfStructsInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///
@@ -3073,6 +3072,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3131,6 +3131,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3189,6 +3190,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3247,6 +3249,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3305,6 +3308,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3363,6 +3367,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3421,6 +3426,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3482,6 +3488,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -3543,6 +3550,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -3601,6 +3609,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3659,6 +3668,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3717,6 +3727,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3775,6 +3786,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3833,6 +3845,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3891,6 +3904,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -3949,6 +3963,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4007,6 +4022,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4065,6 +4081,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4123,6 +4140,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4181,6 +4199,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4239,6 +4258,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4297,6 +4317,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4355,6 +4376,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4413,6 +4435,7 @@ pub mod InclusionPreconfSlasher {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -4475,6 +4498,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>, alloy::sol_types::sol_data::Address);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> =
@@ -4543,6 +4567,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -4572,6 +4597,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Address,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::Address,);
@@ -4657,6 +4683,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -4686,6 +4713,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -4771,6 +4799,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -4800,6 +4829,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -4885,6 +4915,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -4914,6 +4945,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -4999,6 +5031,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5028,6 +5061,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5113,6 +5147,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5142,6 +5177,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5227,6 +5263,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5256,6 +5293,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5341,6 +5379,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5370,6 +5409,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5455,6 +5495,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5484,6 +5525,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5572,6 +5614,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Bytes,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::Bytes,);
@@ -5601,6 +5644,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (PreconfStructs::BlockHeaderData,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (<PreconfStructs::BlockHeaderData as alloy::sol_types::SolType>::RustType,);
@@ -5686,6 +5730,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -5715,6 +5760,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5803,6 +5849,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5832,6 +5879,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5920,6 +5968,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -5949,6 +5998,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -6039,6 +6089,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -6068,6 +6119,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Address, alloy::sol_types::sol_data::Uint<256>);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> =
@@ -6163,6 +6215,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (ISlasher::SignedCommitment, ISlasher::SignedDelegation);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (
@@ -6195,6 +6248,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
@@ -6286,6 +6340,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(ISlasher::Delegation, ISlasher::SignedCommitment, PreconfStructs::InclusionProof);
 			#[doc(hidden)]
@@ -6320,6 +6375,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -6419,6 +6475,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
 				ISlasher::Delegation,
 				ISlasher::Commitment,
@@ -6466,6 +6523,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
@@ -6563,6 +6621,7 @@ pub mod InclusionPreconfSlasher {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = ();
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = ();
@@ -6592,6 +6651,7 @@ pub mod InclusionPreconfSlasher {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Address,);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (alloy::sol_types::private::Address,);
@@ -6657,7 +6717,7 @@ pub mod InclusionPreconfSlasher {
 		}
 	};
 	///Container for all the [`InclusionPreconfSlasher`](self) function calls.
-	#[derive(serde::Serialize, serde::Deserialize)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize)]
 	pub enum InclusionPreconfSlasherCalls {
 		#[allow(missing_docs)]
 		BEACON_ROOTS_CONTRACT(BEACON_ROOTS_CONTRACTCall),
@@ -6696,7 +6756,6 @@ pub mod InclusionPreconfSlasher {
 		#[allow(missing_docs)]
 		urc(urcCall),
 	}
-	#[automatically_derived]
 	impl InclusionPreconfSlasherCalls {
 		/// All the selectors of this enum.
 		///
@@ -6724,6 +6783,62 @@ pub mod InclusionPreconfSlasher {
 			[244u8, 94u8, 129u8, 24u8],
 			[245u8, 190u8, 234u8, 140u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(_getCurrentSlot),
+			::core::stringify!(SLOT_TIME),
+			::core::stringify!(SLASH_AMOUNT_WEI),
+			::core::stringify!(_decodeBlockHeaderRLP),
+			::core::stringify!(urc),
+			::core::stringify!(createChallenge),
+			::core::stringify!(JUSTIFICATION_DELAY),
+			::core::stringify!(BEACON_ROOTS_CONTRACT),
+			::core::stringify!(proveChallengeFraudulent),
+			::core::stringify!(CHALLENGE_BOND),
+			::core::stringify!(ETH2_GENESIS_TIMESTAMP),
+			::core::stringify!(_getSlotFromTimestamp),
+			::core::stringify!(slash),
+			::core::stringify!(challenges),
+			::core::stringify!(EIP4788_WINDOW),
+			::core::stringify!(CHALLENGE_WINDOW),
+			::core::stringify!(BLOCKHASH_EVM_LOOKBACK),
+			::core::stringify!(_getTimestampFromSlot),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<_getCurrentSlotCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<SLOT_TIMECall as alloy_sol_types::SolCall>::SIGNATURE,
+			<SLASH_AMOUNT_WEICall as alloy_sol_types::SolCall>::SIGNATURE,
+			<_decodeBlockHeaderRLPCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<urcCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<createChallengeCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<JUSTIFICATION_DELAYCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<BEACON_ROOTS_CONTRACTCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<proveChallengeFraudulentCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<CHALLENGE_BONDCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<ETH2_GENESIS_TIMESTAMPCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<_getSlotFromTimestampCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<challengesCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<EIP4788_WINDOWCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<CHALLENGE_WINDOWCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<BLOCKHASH_EVM_LOOKBACKCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<_getTimestampFromSlotCall as alloy_sol_types::SolCall>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for InclusionPreconfSlasherCalls {
@@ -7145,7 +7260,7 @@ pub mod InclusionPreconfSlasher {
 		}
 	}
 	///Container for all the [`InclusionPreconfSlasher`](self) custom errors.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum InclusionPreconfSlasherErrors {
 		#[allow(missing_docs)]
 		BeaconRootNotFound(BeaconRootNotFound),
@@ -7196,7 +7311,6 @@ pub mod InclusionPreconfSlasher {
 		#[allow(missing_docs)]
 		WrongTransactionHashProof(WrongTransactionHashProof),
 	}
-	#[automatically_derived]
 	impl InclusionPreconfSlasherErrors {
 		/// All the selectors of this enum.
 		///
@@ -7230,6 +7344,74 @@ pub mod InclusionPreconfSlasher {
 			[246u8, 69u8, 238u8, 223u8],
 			[252u8, 230u8, 152u8, 247u8],
 		];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(ChallengeDoesNotExist),
+			::core::stringify!(TransactionExcluded),
+			::core::stringify!(FraudProofWindowActive),
+			::core::stringify!(DelegationExpired),
+			::core::stringify!(BlockIsTooOld),
+			::core::stringify!(InvalidBlockHash),
+			::core::stringify!(InvalidParentBlockHash),
+			::core::stringify!(ChallengeAlreadyExists),
+			::core::stringify!(InvalidSignatureLength),
+			::core::stringify!(InvalidBlockNumber),
+			::core::stringify!(EthTransferFailed),
+			::core::stringify!(WrongChallengerAddress),
+			::core::stringify!(WrongTransactionHashProof),
+			::core::stringify!(IncorrectChallengeBond),
+			::core::stringify!(UnexpectedSigner),
+			::core::stringify!(BlockIsNotFinalized),
+			::core::stringify!(InvalidFieldCount),
+			::core::stringify!(NotURC),
+			::core::stringify!(NoSignature),
+			::core::stringify!(ECDSAInvalidSignatureS),
+			::core::stringify!(UnsupportedTxType),
+			::core::stringify!(BeaconRootNotFound),
+			::core::stringify!(ECDSAInvalidSignature),
+			::core::stringify!(ECDSAInvalidSignatureLength),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<ChallengeDoesNotExist as alloy_sol_types::SolError>::SIGNATURE,
+			<TransactionExcluded as alloy_sol_types::SolError>::SIGNATURE,
+			<FraudProofWindowActive as alloy_sol_types::SolError>::SIGNATURE,
+			<DelegationExpired as alloy_sol_types::SolError>::SIGNATURE,
+			<BlockIsTooOld as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidBlockHash as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidParentBlockHash as alloy_sol_types::SolError>::SIGNATURE,
+			<ChallengeAlreadyExists as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidSignatureLength as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidBlockNumber as alloy_sol_types::SolError>::SIGNATURE,
+			<EthTransferFailed as alloy_sol_types::SolError>::SIGNATURE,
+			<WrongChallengerAddress as alloy_sol_types::SolError>::SIGNATURE,
+			<WrongTransactionHashProof as alloy_sol_types::SolError>::SIGNATURE,
+			<IncorrectChallengeBond as alloy_sol_types::SolError>::SIGNATURE,
+			<UnexpectedSigner as alloy_sol_types::SolError>::SIGNATURE,
+			<BlockIsNotFinalized as alloy_sol_types::SolError>::SIGNATURE,
+			<InvalidFieldCount as alloy_sol_types::SolError>::SIGNATURE,
+			<NotURC as alloy_sol_types::SolError>::SIGNATURE,
+			<NoSignature as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::SIGNATURE,
+			<UnsupportedTxType as alloy_sol_types::SolError>::SIGNATURE,
+			<BeaconRootNotFound as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignature as alloy_sol_types::SolError>::SIGNATURE,
+			<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for InclusionPreconfSlasherErrors {
@@ -7797,9 +7979,9 @@ pub mod InclusionPreconfSlasher {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> InclusionPreconfSlasherInstance<P, N> {
-		InclusionPreconfSlasherInstance::<P, N>::new(address, provider)
+		InclusionPreconfSlasherInstance::<P, N>::new(address, __provider)
 	}
 	/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -7808,11 +7990,11 @@ pub mod InclusionPreconfSlasher {
 	For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 	#[inline]
 	pub fn deploy<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 		_slashAmountWei: alloy::sol_types::private::primitives::aliases::U256,
 		_urc: alloy::sol_types::private::Address,
 	) -> impl ::core::future::Future<Output = alloy_contract::Result<InclusionPreconfSlasherInstance<P, N>>> {
-		InclusionPreconfSlasherInstance::<P, N>::deploy(provider, _slashAmountWei, _urc)
+		InclusionPreconfSlasherInstance::<P, N>::deploy(__provider, _slashAmountWei, _urc)
 	}
 	/**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 	and constructor arguments, if any.
@@ -7821,11 +8003,11 @@ pub mod InclusionPreconfSlasher {
 	the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 	#[inline]
 	pub fn deploy_builder<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 		_slashAmountWei: alloy::sol_types::private::primitives::aliases::U256,
 		_urc: alloy::sol_types::private::Address,
 	) -> alloy_contract::RawCallBuilder<P, N> {
-		InclusionPreconfSlasherInstance::<P, N>::deploy_builder(provider, _slashAmountWei, _urc)
+		InclusionPreconfSlasherInstance::<P, N>::deploy_builder(__provider, _slashAmountWei, _urc)
 	}
 	/**A [`InclusionPreconfSlasher`](self) instance.
 
@@ -7852,7 +8034,6 @@ pub mod InclusionPreconfSlasher {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>
 		InclusionPreconfSlasherInstance<P, N>
 	{
@@ -7860,8 +8041,8 @@ pub mod InclusionPreconfSlasher {
 
 		See the [wrapper's documentation](`InclusionPreconfSlasherInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -7870,11 +8051,11 @@ pub mod InclusionPreconfSlasher {
 		For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 		#[inline]
 		pub async fn deploy(
-			provider: P,
+			__provider: P,
 			_slashAmountWei: alloy::sol_types::private::primitives::aliases::U256,
 			_urc: alloy::sol_types::private::Address,
 		) -> alloy_contract::Result<InclusionPreconfSlasherInstance<P, N>> {
-			let call_builder = Self::deploy_builder(provider, _slashAmountWei, _urc);
+			let call_builder = Self::deploy_builder(__provider, _slashAmountWei, _urc);
 			let contract_address = call_builder.deploy().await?;
 			Ok(Self::new(contract_address, call_builder.provider))
 		}
@@ -7885,12 +8066,12 @@ pub mod InclusionPreconfSlasher {
 		the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 		#[inline]
 		pub fn deploy_builder(
-			provider: P,
+			__provider: P,
 			_slashAmountWei: alloy::sol_types::private::primitives::aliases::U256,
 			_urc: alloy::sol_types::private::Address,
 		) -> alloy_contract::RawCallBuilder<P, N> {
 			alloy_contract::RawCallBuilder::new_raw_deploy(
-				provider,
+				__provider,
 				[
 					&BYTECODE[..],
 					&alloy_sol_types::SolConstructor::abi_encode(&constructorCall { _slashAmountWei, _urc })[..],
@@ -7932,7 +8113,6 @@ pub mod InclusionPreconfSlasher {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>
 		InclusionPreconfSlasherInstance<P, N>
 	{
@@ -8045,7 +8225,6 @@ pub mod InclusionPreconfSlasher {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>
 		InclusionPreconfSlasherInstance<P, N>
 	{

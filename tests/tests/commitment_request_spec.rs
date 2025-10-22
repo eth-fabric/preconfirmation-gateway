@@ -1,6 +1,6 @@
 use alloy::primitives::Address;
 use common::constants::COMMITMENT_TYPE;
-use integration_tests::test_common::TestHarness;
+use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Tests for the commitmentRequest workflow
 /// These tests do NOT launch services - they test the business logic directly
@@ -37,6 +37,7 @@ async fn test_valid_commitment_request() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -68,6 +69,7 @@ async fn test_commitment_request_stores_in_database() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -117,6 +119,7 @@ async fn test_commitment_request_with_different_slasher_addresses() {
 		&request1,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -126,6 +129,7 @@ async fn test_commitment_request_with_different_slasher_addresses() {
 		&request2,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -155,6 +159,7 @@ async fn test_commitment_request_signature_is_valid() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -342,6 +347,7 @@ async fn test_commitment_request_duplicate_request() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -349,6 +355,7 @@ async fn test_commitment_request_duplicate_request() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();

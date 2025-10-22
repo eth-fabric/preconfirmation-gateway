@@ -1,7 +1,8 @@
-use alloy::primitives::{Address, Bytes};
+use alloy::primitives::{Address, Bytes, B256};
 use cb_common::types::BlsPublicKey;
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::beacon::{BeaconApiClient, HttpClient};
+use common::config::ProposerConfig as ProposerConfigTrait;
 use common::signer::call_bls_signer;
 use common::types::beacon::BeaconTiming;
 use common::types::constraints::{Delegation, SignedDelegation};
@@ -67,6 +68,13 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 
 	let mut posted_count = 0;
 
+	// Parse module_signing_id from config
+	let module_signing_id = commit_config
+		.extra
+		.module_signing_id()
+		.parse::<B256>()
+		.context("Failed to parse module_signing_id from config")?;
+
 	// Check each duty to see if it's for our proposer
 	for duty in duties.data {
 		let duty_pubkey = duty.parse_pubkey().context("Failed to parse duty pubkey")?;
@@ -80,7 +88,7 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 
 			// Create and sign delegation
 			let delegation = create_delegation(&commit_config.extra, duty_slot)?;
-			let signed_delegation = sign_delegation(commit_config, &delegation).await?;
+			let signed_delegation = sign_delegation(commit_config, &delegation, &module_signing_id).await?;
 
 			// Post to relay
 			constraints_client
@@ -113,12 +121,13 @@ fn create_delegation(config: &ProposerConfig, slot: u64) -> Result<Delegation> {
 async fn sign_delegation(
 	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
 	delegation: &Delegation,
+	module_signing_id: &B256,
 ) -> Result<SignedDelegation> {
 	// Get the delegation message hash
 	let message_hash = delegation.to_message_hash().context("Failed to compute delegation message hash")?;
 
 	// Sign using the consensus BLS signer
-	let bls_response = call_bls_signer(commit_config, message_hash, delegation.proposer.clone())
+	let bls_response = call_bls_signer(commit_config, message_hash, delegation.proposer.clone(), module_signing_id)
 		.await
 		.context("Failed to sign delegation with BLS signer")?;
 
@@ -185,6 +194,7 @@ mod tests {
 			beacon_api_url: "https://test.com".to_string(),
 			beacon_genesis_timestamp: 1606824023,
 			poll_interval_seconds: 60,
+			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
 		};
 
 		let delegation = create_delegation(&config, 12345).unwrap();

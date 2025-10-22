@@ -10,13 +10,12 @@ use commit_boost::prelude::{
 use eyre::{Result, WrapErr};
 use tracing::{debug, error, info};
 
-use crate::constants::SIGNING_ID;
-
 /// Calls the proxy_ecdsa signer to sign a hash
 pub async fn call_proxy_ecdsa_signer<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
 	message_hash: B256,
 	committer: Address,
+	module_signing_id: &B256,
 ) -> Result<EcdsaSignResponse> {
 	debug!("Calling proxy_ecdsa signer for message hash: {:?}", message_hash);
 
@@ -34,7 +33,7 @@ pub async fn call_proxy_ecdsa_signer<T>(
 		&committer,
 		&message_hash,
 		&proxy_response_ecdsa.signature,
-		&SIGNING_ID,
+		module_signing_id,
 		proxy_response_ecdsa.nonce,
 	) {
 		Ok(_) => info!("Signature verified successfully"),
@@ -49,6 +48,7 @@ pub async fn call_proxy_bls_signer<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
 	message_hash: B256,
 	bls_public_key: BlsPublicKey,
+	module_signing_id: &B256,
 ) -> Result<BlsSignResponse> {
 	debug!("Calling proxy_bls signer for message hash: {:?}", message_hash);
 
@@ -66,7 +66,7 @@ pub async fn call_proxy_bls_signer<T>(
 		&bls_public_key,
 		&message_hash,
 		&proxy_response_bls.signature,
-		&SIGNING_ID,
+		module_signing_id,
 		proxy_response_bls.nonce,
 	) {
 		true => info!("Signature verified successfully"),
@@ -81,6 +81,7 @@ pub async fn call_bls_signer<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
 	message_hash: B256,
 	bls_public_key: BlsPublicKey,
+	module_signing_id: &B256,
 ) -> Result<BlsSignResponse> {
 	debug!("Calling BLS signer for message hash: {:?} with consensus key", message_hash);
 
@@ -99,7 +100,7 @@ pub async fn call_bls_signer<T>(
 		&bls_public_key,
 		&message_hash,
 		&bls_response.signature,
-		&SIGNING_ID,
+		module_signing_id,
 		bls_response.nonce,
 	) {
 		true => info!("Consensus signature verified successfully"),

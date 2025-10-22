@@ -160,6 +160,7 @@ mod tests {
 			delegate_public_key:
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
+			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
 		};
 		let slot_timer = SlotTimer::new(1606824023); // Mainnet genesis
 											   // Create a mock database context for testing

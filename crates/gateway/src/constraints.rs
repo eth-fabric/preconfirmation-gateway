@@ -2,6 +2,7 @@ use eyre::Result;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
+use alloy::primitives::B256;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
 use common::config::{GatewayConfig, InclusionGatewayConfig};
 use common::slot_timer::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
@@ -139,6 +140,13 @@ impl ConstraintsTask {
 		// Parse receiver BLS public keys from config
 		let receivers = constraints::parse_bls_public_keys(self.config.constraints_receivers(), "receiver")?;
 
+		// Parse module_signing_id from config
+		let module_signing_id = self
+			.config
+			.module_signing_id()
+			.parse::<B256>()
+			.map_err(|e| eyre::eyre!("Failed to parse module_signing_id from config: {}", e))?;
+
 		info!("Processing constraints for slot {}", slot);
 
 		// Call constraints processing function
@@ -151,6 +159,7 @@ impl ConstraintsTask {
 			self.commit_config.clone(),
 			self.relay_url.clone(),
 			self.api_key.clone(),
+			&module_signing_id,
 		)
 		.await?;
 
@@ -182,6 +191,7 @@ pub async fn process_constraints<T>(
 	commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
 	relay_url: String,
 	api_key: Option<String>,
+	module_signing_id: &B256,
 ) -> Result<ProcessConstraintsResponse> {
 	info!("Processing constraints for slot {} with gateway public key", slot);
 
@@ -211,7 +221,8 @@ pub async fn process_constraints<T>(
 	)?;
 
 	// 3. Sign the constraints message with the provided gateway public key
-	let signed_constraints = create_signed_constraints(&constraints_message, commit_config, gateway_public_key).await?;
+	let signed_constraints =
+		create_signed_constraints(&constraints_message, commit_config, gateway_public_key, module_signing_id).await?;
 
 	// 4. Send to relay using the client
 	let client = ConstraintsClient::new(relay_url, api_key);

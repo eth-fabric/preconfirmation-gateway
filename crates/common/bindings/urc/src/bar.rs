@@ -85,6 +85,7 @@ pub mod Bar {
 		use alloy::sol_types as alloy_sol_types;
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::Array<alloy::sol_types::sol_data::FixedBytes<32>>,);
 			#[doc(hidden)]
@@ -115,6 +116,7 @@ pub mod Bar {
 		}
 		{
 			#[doc(hidden)]
+			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> =
 				(alloy::sol_types::sol_data::Array<alloy::sol_types::sol_data::FixedBytes<32>>,);
 			#[doc(hidden)]
@@ -189,12 +191,11 @@ pub mod Bar {
 		}
 	};
 	///Container for all the [`Bar`](self) function calls.
-	#[derive(serde::Serialize, serde::Deserialize)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize)]
 	pub enum BarCalls {
 		#[allow(missing_docs)]
 		build(buildCall),
 	}
-	#[automatically_derived]
 	impl BarCalls {
 		/// All the selectors of this enum.
 		///
@@ -203,6 +204,24 @@ pub mod Bar {
 		///
 		/// Prefer using `SolInterface` methods instead.
 		pub const SELECTORS: &'static [[u8; 4usize]] = &[[187u8, 165u8, 100u8, 39u8]];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[::core::stringify!(build)];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[<buildCall as alloy_sol_types::SolCall>::SIGNATURE];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for BarCalls {
@@ -277,9 +296,9 @@ pub mod Bar {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> BarInstance<P, N> {
-		BarInstance::<P, N>::new(address, provider)
+		BarInstance::<P, N>::new(address, __provider)
 	}
 	/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -288,9 +307,9 @@ pub mod Bar {
 	For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 	#[inline]
 	pub fn deploy<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> impl ::core::future::Future<Output = alloy_contract::Result<BarInstance<P, N>>> {
-		BarInstance::<P, N>::deploy(provider)
+		BarInstance::<P, N>::deploy(__provider)
 	}
 	/**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 	and constructor arguments, if any.
@@ -299,9 +318,9 @@ pub mod Bar {
 	the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 	#[inline]
 	pub fn deploy_builder<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> alloy_contract::RawCallBuilder<P, N> {
-		BarInstance::<P, N>::deploy_builder(provider)
+		BarInstance::<P, N>::deploy_builder(__provider)
 	}
 	/**A [`Bar`](self) instance.
 
@@ -328,14 +347,13 @@ pub mod Bar {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BarInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`Bar`](self) contract instance.
 
 		See the [wrapper's documentation](`BarInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -343,8 +361,8 @@ pub mod Bar {
 
 		For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 		#[inline]
-		pub async fn deploy(provider: P) -> alloy_contract::Result<BarInstance<P, N>> {
-			let call_builder = Self::deploy_builder(provider);
+		pub async fn deploy(__provider: P) -> alloy_contract::Result<BarInstance<P, N>> {
+			let call_builder = Self::deploy_builder(__provider);
 			let contract_address = call_builder.deploy().await?;
 			Ok(Self::new(contract_address, call_builder.provider))
 		}
@@ -354,8 +372,8 @@ pub mod Bar {
 		This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 		the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 		#[inline]
-		pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
-			alloy_contract::RawCallBuilder::new_raw_deploy(provider, ::core::clone::Clone::clone(&BYTECODE))
+		pub fn deploy_builder(__provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+			alloy_contract::RawCallBuilder::new_raw_deploy(__provider, ::core::clone::Clone::clone(&BYTECODE))
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -390,7 +408,6 @@ pub mod Bar {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BarInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -408,7 +425,6 @@ pub mod Bar {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> BarInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///

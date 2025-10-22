@@ -1,12 +1,11 @@
 use alloy::consensus::TxEnvelope;
 use alloy::network::TransactionBuilder;
-use alloy::primitives::{Address, B256, Bytes, Signature, keccak256};
+use alloy::primitives::{Address, B256, Bytes, keccak256};
 use alloy::rlp::Decodable;
 use alloy_consensus::SignableTransaction;
 use alloy_consensus::transaction::SignerRecoverable;
 use commit_boost::prelude::StartCommitModuleConfig;
 use eyre::{Result, WrapErr};
-use std::hash::Hash;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
@@ -378,6 +377,7 @@ pub async fn create_signed_commitment<T>(
 	request: &CommitmentRequest,
 	commit_config: Arc<Mutex<StartCommitModuleConfig<T>>>,
 	committer_address: Address,
+	module_signing_id: &B256,
 ) -> Result<SignedCommitment> {
 	debug!("Creating signed commitment with proper ECDSA signing");
 
@@ -404,7 +404,7 @@ pub async fn create_signed_commitment<T>(
 	// 5. Call the proxy_ecdsa signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
-		signer::call_proxy_ecdsa_signer(&mut *commit_config, message_hash, committer_address).await?
+		signer::call_proxy_ecdsa_signer(&mut *commit_config, message_hash, committer_address, module_signing_id).await?
 	};
 	debug!("Received response from proxy_ecdsa: {:?}", response);
 
@@ -423,7 +423,7 @@ pub async fn create_signed_commitment<T>(
 /// Validates a signature against a commitment
 pub fn verify_commitment_signature(
 	commitment: &Commitment,
-	signature: &Signature,
+	signature: &alloy::primitives::Signature,
 	expected_signer: &Address,
 ) -> Result<bool> {
 	debug!("Verifying commitment signature");

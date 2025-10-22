@@ -71,6 +71,7 @@ pub mod MerkleTreeLib {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -129,6 +130,7 @@ pub mod MerkleTreeLib {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -187,6 +189,7 @@ pub mod MerkleTreeLib {
 	const _: () = {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
+		#[allow(dead_code)]
 		type UnderlyingSolTuple<'a> = ();
 		#[doc(hidden)]
 		type UnderlyingRustTuple<'a> = ();
@@ -234,7 +237,7 @@ pub mod MerkleTreeLib {
 		}
 	};
 	///Container for all the [`MerkleTreeLib`](self) custom errors.
-	#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
+	#[derive(Clone, serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Hash)]
 	pub enum MerkleTreeLibErrors {
 		#[allow(missing_docs)]
 		MerkleTreeInvalidLeafIndices(MerkleTreeInvalidLeafIndices),
@@ -243,7 +246,6 @@ pub mod MerkleTreeLib {
 		#[allow(missing_docs)]
 		MerkleTreeOutOfBoundsAccess(MerkleTreeOutOfBoundsAccess),
 	}
-	#[automatically_derived]
 	impl MerkleTreeLibErrors {
 		/// All the selectors of this enum.
 		///
@@ -253,6 +255,32 @@ pub mod MerkleTreeLib {
 		/// Prefer using `SolInterface` methods instead.
 		pub const SELECTORS: &'static [[u8; 4usize]] =
 			&[[122u8, 133u8, 106u8, 56u8], [231u8, 23u8, 29u8, 196u8], [233u8, 114u8, 153u8, 118u8]];
+		/// The names of the variants in the same order as `SELECTORS`.
+		pub const VARIANT_NAMES: &'static [&'static str] = &[
+			::core::stringify!(MerkleTreeOutOfBoundsAccess),
+			::core::stringify!(MerkleTreeLeavesEmpty),
+			::core::stringify!(MerkleTreeInvalidLeafIndices),
+		];
+		/// The signatures in the same order as `SELECTORS`.
+		pub const SIGNATURES: &'static [&'static str] = &[
+			<MerkleTreeOutOfBoundsAccess as alloy_sol_types::SolError>::SIGNATURE,
+			<MerkleTreeLeavesEmpty as alloy_sol_types::SolError>::SIGNATURE,
+			<MerkleTreeInvalidLeafIndices as alloy_sol_types::SolError>::SIGNATURE,
+		];
+		/// Returns the signature for the given selector, if known.
+		#[inline]
+		pub fn signature_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			match Self::SELECTORS.binary_search(&selector) {
+				::core::result::Result::Ok(idx) => ::core::option::Option::Some(Self::SIGNATURES[idx]),
+				::core::result::Result::Err(_) => ::core::option::Option::None,
+			}
+		}
+		/// Returns the enum variant name for the given selector, if known.
+		#[inline]
+		pub fn name_by_selector(selector: [u8; 4usize]) -> ::core::option::Option<&'static str> {
+			let sig = Self::signature_by_selector(selector)?;
+			sig.split_once('(').map(|(name, _)| name)
+		}
 	}
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for MerkleTreeLibErrors {
@@ -383,9 +411,9 @@ pub mod MerkleTreeLib {
 	#[inline]
 	pub const fn new<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
 		address: alloy_sol_types::private::Address,
-		provider: P,
+		__provider: P,
 	) -> MerkleTreeLibInstance<P, N> {
-		MerkleTreeLibInstance::<P, N>::new(address, provider)
+		MerkleTreeLibInstance::<P, N>::new(address, __provider)
 	}
 	/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -394,9 +422,9 @@ pub mod MerkleTreeLib {
 	For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 	#[inline]
 	pub fn deploy<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> impl ::core::future::Future<Output = alloy_contract::Result<MerkleTreeLibInstance<P, N>>> {
-		MerkleTreeLibInstance::<P, N>::deploy(provider)
+		MerkleTreeLibInstance::<P, N>::deploy(__provider)
 	}
 	/**Creates a `RawCallBuilder` for deploying this contract using the given `provider`
 	and constructor arguments, if any.
@@ -405,9 +433,9 @@ pub mod MerkleTreeLib {
 	the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 	#[inline]
 	pub fn deploy_builder<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network>(
-		provider: P,
+		__provider: P,
 	) -> alloy_contract::RawCallBuilder<P, N> {
-		MerkleTreeLibInstance::<P, N>::deploy_builder(provider)
+		MerkleTreeLibInstance::<P, N>::deploy_builder(__provider)
 	}
 	/**A [`MerkleTreeLib`](self) instance.
 
@@ -434,14 +462,13 @@ pub mod MerkleTreeLib {
 		}
 	}
 	/// Instantiation and getters/setters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> MerkleTreeLibInstance<P, N> {
 		/**Creates a new wrapper around an on-chain [`MerkleTreeLib`](self) contract instance.
 
 		See the [wrapper's documentation](`MerkleTreeLibInstance`) for more details.*/
 		#[inline]
-		pub const fn new(address: alloy_sol_types::private::Address, provider: P) -> Self {
-			Self { address, provider, _network: ::core::marker::PhantomData }
+		pub const fn new(address: alloy_sol_types::private::Address, __provider: P) -> Self {
+			Self { address, provider: __provider, _network: ::core::marker::PhantomData }
 		}
 		/**Deploys this contract using the given `provider` and constructor arguments, if any.
 
@@ -449,8 +476,8 @@ pub mod MerkleTreeLib {
 
 		For more fine-grained control over the deployment process, use [`deploy_builder`] instead.*/
 		#[inline]
-		pub async fn deploy(provider: P) -> alloy_contract::Result<MerkleTreeLibInstance<P, N>> {
-			let call_builder = Self::deploy_builder(provider);
+		pub async fn deploy(__provider: P) -> alloy_contract::Result<MerkleTreeLibInstance<P, N>> {
+			let call_builder = Self::deploy_builder(__provider);
 			let contract_address = call_builder.deploy().await?;
 			Ok(Self::new(contract_address, call_builder.provider))
 		}
@@ -460,8 +487,8 @@ pub mod MerkleTreeLib {
 		This is a simple wrapper around creating a `RawCallBuilder` with the data set to
 		the bytecode concatenated with the constructor's ABI-encoded arguments.*/
 		#[inline]
-		pub fn deploy_builder(provider: P) -> alloy_contract::RawCallBuilder<P, N> {
-			alloy_contract::RawCallBuilder::new_raw_deploy(provider, ::core::clone::Clone::clone(&BYTECODE))
+		pub fn deploy_builder(__provider: P) -> alloy_contract::RawCallBuilder<P, N> {
+			alloy_contract::RawCallBuilder::new_raw_deploy(__provider, ::core::clone::Clone::clone(&BYTECODE))
 		}
 		/// Returns a reference to the address.
 		#[inline]
@@ -496,7 +523,6 @@ pub mod MerkleTreeLib {
 		}
 	}
 	/// Function calls.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> MerkleTreeLibInstance<P, N> {
 		/// Creates a new call builder using this contract instance's provider and address.
 		///
@@ -507,7 +533,6 @@ pub mod MerkleTreeLib {
 		}
 	}
 	/// Event filters.
-	#[automatically_derived]
 	impl<P: alloy_contract::private::Provider<N>, N: alloy_contract::private::Network> MerkleTreeLibInstance<P, N> {
 		/// Creates a new event filter using this contract instance's provider and address.
 		///

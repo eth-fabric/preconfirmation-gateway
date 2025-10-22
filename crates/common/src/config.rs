@@ -40,6 +40,7 @@ pub trait GatewayConfig {
 	fn execution_request_timeout_secs(&self) -> u64;
 	fn execution_max_retries(&self) -> u32;
 	fn constraints_receivers(&self) -> &[String];
+	fn module_signing_id(&self) -> &str;
 }
 
 /// Proposer configuration trait
@@ -50,6 +51,7 @@ pub trait ProposerConfig {
 	fn relay_url(&self) -> &str;
 	fn beacon_api_url(&self) -> &str;
 	fn genesis_timestamp(&self) -> u64;
+	fn module_signing_id(&self) -> &str;
 }
 
 /// Relay configuration trait
@@ -119,6 +121,9 @@ pub struct InclusionGatewayConfig {
 	/// Constraints receivers
 	pub constraints_receivers: Vec<String>,
 	pub delegate_public_key: String,
+
+	/// Module signing ID for this gateway instance
+	pub module_signing_id: String,
 }
 
 impl GatewayConfig for InclusionGatewayConfig {
@@ -159,6 +164,10 @@ impl GatewayConfig for InclusionGatewayConfig {
 	fn constraints_receivers(&self) -> &[String] {
 		&self.constraints_receivers
 	}
+
+	fn module_signing_id(&self) -> &str {
+		&self.module_signing_id
+	}
 }
 
 /// Proposer configuration for inclusion preconfs
@@ -172,6 +181,7 @@ pub struct InclusionProposerConfig {
 	pub beacon_api_url: String,
 	pub beacon_genesis_timestamp: u64,
 	pub poll_interval_seconds: u64,
+	pub module_signing_id: String,
 }
 
 impl ProposerConfig for InclusionProposerConfig {
@@ -193,5 +203,9 @@ impl ProposerConfig for InclusionProposerConfig {
 
 	fn genesis_timestamp(&self) -> u64 {
 		self.beacon_genesis_timestamp
+	}
+
+	fn module_signing_id(&self) -> &str {
+		&self.module_signing_id
 	}
 }

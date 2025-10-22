@@ -147,6 +147,7 @@ impl TestHarnessBuilder {
 			beacon_api_url: "https://ethereum-beacon-api.publicnode.com".to_string(),
 			beacon_genesis_timestamp: 1606824023,
 			poll_interval_seconds: 60,
+			module_signing_id: format!("{:?}", SIGNING_ID),
 		};
 
 		// Start local signer server with ProposerConfig
@@ -268,6 +269,7 @@ impl TestHarnessBuilder {
 			execution_max_retries: 3,
 			constraints_receivers: vec![hex::encode(PUBKEY)],
 			delegate_public_key: hex::encode(PUBKEY),
+			module_signing_id: format!("{:?}", SIGNING_ID),
 		};
 
 		// Start local signer server with config
@@ -603,7 +605,8 @@ impl TestHarness {
 		// Sign using the BLS proxy signer with the specified key
 		let response = {
 			let mut config = self.context.commit_config.lock().await;
-			common::signer::call_proxy_bls_signer(&mut *config, message_hash, signer_bls_public_key).await?
+			common::signer::call_proxy_bls_signer(&mut *config, message_hash, signer_bls_public_key, &SIGNING_ID)
+				.await?
 		};
 
 		// Create the signed delegation
@@ -689,7 +692,7 @@ impl TestHarness {
 
 		// Call the proxy BLS signer to sign the slot hash
 		let bls_response =
-			common::signer::call_proxy_bls_signer(&mut *commit_config, slot_hash, bls_public_key.clone())
+			common::signer::call_proxy_bls_signer(&mut *commit_config, slot_hash, bls_public_key.clone(), &SIGNING_ID)
 				.await
 				.expect("Failed to sign slot hash with proxy BLS signer");
 
@@ -771,6 +774,7 @@ impl TestHarness {
 			self.context.commit_config.clone(),
 			relay_url,
 			None,
+			&SIGNING_ID,
 		)
 		.await
 	}
@@ -1340,6 +1344,7 @@ pub mod test_helpers {
 			delegate_public_key:
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
+			module_signing_id: format!("{:?}", SIGNING_ID),
 		};
 
 		// Start local signer server with config

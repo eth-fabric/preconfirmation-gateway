@@ -1,7 +1,7 @@
 use alloy::primitives::Bytes;
 use common::constants::CONSTRAINT_TYPE;
 use common::types::constraints::{Constraint, ConstraintsMessage, SignedConstraints};
-use integration_tests::test_common::TestHarness;
+use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Tests for relay handlers (delegations and constraints)
 /// These tests do NOT launch services - they test handler logic directly
@@ -150,7 +150,7 @@ async fn test_create_signed_constraints() {
 	let message_hash = constraints_message.to_message_hash().unwrap();
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -189,7 +189,7 @@ async fn test_constraints_signature_valid() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -228,7 +228,7 @@ async fn test_store_and_retrieve_constraints() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -273,9 +273,14 @@ async fn test_multiple_constraints_same_slot() {
 
 		let response = {
 			let mut config = harness.context.commit_config.lock().await;
-			common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
-				.await
-				.unwrap()
+			common::signer::call_proxy_bls_signer(
+				&mut *config,
+				message_hash,
+				harness.gateway_bls_one.clone(),
+				&SIGNING_ID,
+			)
+			.await
+			.unwrap()
 		};
 
 		let signed_constraints = SignedConstraints {
@@ -317,7 +322,7 @@ async fn test_constraints_with_multiple_constraint_items() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -444,7 +449,7 @@ async fn test_delegation_required_for_constraints() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -490,7 +495,7 @@ async fn test_constraint_without_delegation() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};
@@ -554,7 +559,7 @@ async fn test_constraints_fields_preserved() {
 
 	let response = {
 		let mut config = harness.context.commit_config.lock().await;
-		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone())
+		common::signer::call_proxy_bls_signer(&mut *config, message_hash, harness.gateway_bls_one.clone(), &SIGNING_ID)
 			.await
 			.unwrap()
 	};

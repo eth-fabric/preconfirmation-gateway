@@ -1,6 +1,6 @@
 use alloy::primitives::{Address, B256};
 use common::constants::COMMITMENT_TYPE;
-use integration_tests::test_common::TestHarness;
+use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Tests for the commitmentResult RPC handler
 /// These tests do NOT launch services - they test retrieval logic directly
@@ -26,6 +26,7 @@ async fn test_retrieve_commitment_by_request_hash() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -74,6 +75,7 @@ async fn test_retrieve_multiple_commitments() {
 			&request,
 			harness.context.commit_config.clone(),
 			harness.committer_one,
+			&SIGNING_ID,
 		)
 		.await
 		.unwrap();
@@ -121,6 +123,7 @@ async fn test_commitment_fields_preserved_after_storage() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -165,6 +168,7 @@ async fn test_retrieve_commitment_idempotent() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -233,6 +237,7 @@ async fn test_retrieve_after_multiple_stores() {
 			&request,
 			harness.context.commit_config.clone(),
 			harness.committer_one,
+			&SIGNING_ID,
 		)
 		.await
 		.unwrap();
@@ -258,6 +263,7 @@ async fn test_retrieve_after_multiple_stores() {
 		&request,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -299,6 +305,7 @@ async fn test_different_requests_have_different_hashes() {
 		&request1,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();
@@ -310,6 +317,7 @@ async fn test_different_requests_have_different_hashes() {
 		&request2,
 		harness.context.commit_config.clone(),
 		harness.committer_one,
+		&SIGNING_ID,
 	)
 	.await
 	.unwrap();

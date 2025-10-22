@@ -26,6 +26,35 @@ pub struct ProposerConfig {
 
 	/// How often to poll for proposer duties (in seconds)
 	pub poll_interval_seconds: u64,
+
+	/// Module signing ID for this proposer instance
+	pub module_signing_id: String,
+}
+
+impl common::config::ProposerConfig for ProposerConfig {
+	fn proposer_bls_public_key(&self) -> &str {
+		&self.proposer_bls_public_key
+	}
+
+	fn delegate_bls_public_key(&self) -> &str {
+		&self.delegate_bls_public_key
+	}
+
+	fn relay_url(&self) -> &str {
+		&self.relay_url
+	}
+
+	fn beacon_api_url(&self) -> &str {
+		&self.beacon_api_url
+	}
+
+	fn genesis_timestamp(&self) -> u64 {
+		self.beacon_genesis_timestamp
+	}
+
+	fn module_signing_id(&self) -> &str {
+		&self.module_signing_id
+	}
 }
 
 #[cfg(test)]
@@ -43,7 +72,8 @@ mod tests {
 			"relay_api_key": null,
 			"beacon_api_url": "https://ethereum-beacon-api.publicnode.com",
 			"beacon_genesis_timestamp": 1606824023,
-			"poll_interval_seconds": 60
+			"poll_interval_seconds": 60,
+			"module_signing_id": "0x1111111111111111111111111111111111111111111111111111111111111111"
 		}"#;
 
 		let config: ProposerConfig = serde_json::from_str(json).unwrap();

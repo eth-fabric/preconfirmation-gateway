@@ -1,0 +1,64 @@
+# Gateway Configuration
+# This file contains configuration settings for the preconfirmation gateway service
+
+# Chain configuration
+chain = "Hoodi"
+
+# PBS (Proposer-Builder Separation) configuration
+[pbs]
+port = 18550
+with_signer = true
+
+# Relays configuration
+[[relays]]
+url = "https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"
+
+# Metrics configuration
+[metrics]
+enabled = true
+
+# Signer configuration
+[signer]
+port = 20000
+
+[signer.local.loader]
+format = "lighthouse"
+keys_path = "./tests/data/keystores/keys"
+secrets_path = "./tests/data/keystores/secrets"
+
+[signer.local.store]
+proxy_dir = "./tests/data/keystores/proxies"
+
+# Gateway Module configuration
+[[modules]]
+id = "gateway-module"
+module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111112"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Commitments server configuration
+[modules.commitments]
+server_host = "127.0.0.1"
+server_port = 8080
+database_path = "./data/rocksdb"
+log_level = "info"
+bls_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+enable_method_tracing = true
+traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
+
+# Gateway orchestration configuration
+relay_url = "https://relay.example.com"
+constraints_api_key = ""
+genesis_timestamp = 1606824023
+delegation_database_path = "./data/delegations-rocksdb"
+
+# Execution client configuration
+execution_endpoint_url = "http://localhost:8545"
+execution_request_timeout_secs = 10
+execution_max_retries = 3
+
+# Constraints receivers configuration
+constraints_receivers = ["0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"]
+delegate_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+

@@ -6,12 +6,13 @@ use super::utils;
 use crate::CommitmentsServerState;
 use alloy::primitives::B256;
 use commit_boost::prelude::commit::request::EncryptionScheme;
+use common::config::GatewayConfig;
 use common::constants::COMMITMENT_TYPE;
 use common::types::commitments::Offering;
 use common::types::{CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo, SlotInfoResponse};
 
 #[instrument(name = "commitment_request", skip(_context, _extensions))]
-pub async fn commitment_request_handler<T>(
+pub async fn commitment_request_handler<T: GatewayConfig>(
 	params: jsonrpsee::types::Params<'_>,
 	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
@@ -58,20 +59,37 @@ pub async fn commitment_request_handler<T>(
 		}
 	};
 
+	// Parse module_signing_id from config
+	let module_signing_id = {
+		let config_guard = _context.commit_config.lock().await;
+		match config_guard.extra.module_signing_id().parse::<B256>() {
+			Ok(id) => id,
+			Err(e) => {
+				error!("Failed to parse module_signing_id from config: {}", e);
+				return Err(jsonrpsee::types::error::ErrorObject::owned(
+					-32603, // Internal error
+					"Invalid module_signing_id configuration",
+					Some(format!("{}", e)),
+				));
+			}
+		}
+	};
+
 	// Create and sign the commitment using ECDSA with commit-boost
 	let commit_config = _context.commit_config.clone();
 	let committer_address = signed_delegation.message.committer;
-	let signed_commitment = match utils::create_signed_commitment(&request, commit_config, committer_address).await {
-		Ok(commitment) => commitment,
-		Err(e) => {
-			error!("Failed to create signed commitment: {}", e);
-			return Err(jsonrpsee::types::error::ErrorObject::owned(
-				-32602, // Invalid params
-				"Failed to create signed commitment",
-				Some(format!("{}", e)),
-			));
-		}
-	};
+	let signed_commitment =
+		match utils::create_signed_commitment(&request, commit_config, committer_address, &module_signing_id).await {
+			Ok(commitment) => commitment,
+			Err(e) => {
+				error!("Failed to create signed commitment: {}", e);
+				return Err(jsonrpsee::types::error::ErrorObject::owned(
+					-32602, // Invalid params
+					"Failed to create signed commitment",
+					Some(format!("{}", e)),
+				));
+			}
+		};
 
 	// Create the constraint before storing anything to avoid race conditions
 	let constraint = match utils::create_constraint_from_commitment_request(&request, slot) {

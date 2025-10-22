@@ -134,7 +134,7 @@ async fn test_call_proxy_ecdsa_signer_with_local_signer() -> Result<()> {
 	println!("   Committer (proxy): {}", committer);
 
 	// Call the proxy_ecdsa signer function
-	let response = call_proxy_ecdsa_signer(&mut commit_config, commitment_hash, committer).await?;
+	let response = call_proxy_ecdsa_signer(&mut commit_config, commitment_hash, committer, &SIGNING_ID).await?;
 
 	// Verify the response
 	assert!(response.nonce > 0, "Nonce should be greater than 0");
