@@ -141,9 +141,45 @@ pub struct ConstraintCapabilities {
 	pub constraint_types: Vec<u64>,
 }
 
+pub struct Registration {
+	pub owner: Address,
+}
+
+impl Registration {
+	/// Generate the object root to be signed for a delegation.
+	pub fn to_message_hash(&self) -> Result<B256> {
+		let message_type = MessageType::Registration.to_uint256();
+		let encoded = (message_type, self.owner).abi_encode_params(); // Rust equivalent of abi.encode(message_type, owner) in Solidity
+		let message_hash = keccak256(encoded);
+		Ok(message_hash)
+	}
+}
+
+pub struct SignedRegistration {
+	pub pubkey: BlsPublicKey,
+	pub signature: BlsSignature,
+	pub nonce: u64,
+}
+
+impl SignedRegistration {
+	pub fn abi_encode(&self) -> Result<Bytes> {
+		// Convert the pubkeys to G1 points
+		let pubkey = convert_pubkey_to_g1_point(&self.pubkey).map_err(|e| {
+			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.pubkey.as_hex_string());
+			e
+		})?;
+		let signature = convert_signature_to_g2_point(&self.signature).map_err(|e| {
+			error!("Error converting signature {} to G2 point: {e:?}", hex::encode(self.signature.serialize()));
+			e
+		})?;
+		let encoded = (pubkey, signature, self.nonce).abi_encode_params(); // Rust equivalent of abi.encode(pubkey, signature, nonce) in Solidity
+		Ok(Bytes::from(encoded))
+	}
+}
+
 /// Converts a pubkey to its corresponding affine G1 point form for EVM
 /// precompile usage
-pub fn convert_pubkey_to_g1_point(pubkey: &BlsPublicKey) -> eyre::Result<G1Point> {
+pub fn convert_pubkey_to_g1_point(pubkey: &BlsPublicKey) -> Result<G1Point> {
 	// Convert pubkey to bytes
 	let pubkey_byes = pubkey.serialize();
 
@@ -165,7 +201,7 @@ pub fn convert_pubkey_to_g1_point(pubkey: &BlsPublicKey) -> eyre::Result<G1Point
 
 /// Converts a signature to its corresponding affine G2 point form for EVM
 /// precompile usage
-pub fn convert_signature_to_g2_point(signature: &BlsSignature) -> eyre::Result<G2Point> {
+pub fn convert_signature_to_g2_point(signature: &BlsSignature) -> Result<G2Point> {
 	// Convert signature to bytes
 	let signature_bytes = signature.serialize();
 
