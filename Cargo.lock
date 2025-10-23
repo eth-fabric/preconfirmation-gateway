@@ -4069,12 +4069,14 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "tokio",
  "tokio-test",
  "toml 0.9.7",
  "tracing",
  "tracing-subscriber",
+ "urc",
 ]
 
 [[package]]

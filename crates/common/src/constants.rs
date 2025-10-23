@@ -4,6 +4,17 @@ pub const COMMITMENT_TYPE: u64 = 1;
 /// The constraint type for inclusion constraints
 pub const CONSTRAINT_TYPE: u64 = 1;
 
+// Commit-Boost signing constants
+pub const APPLICATION_BUILDER_DOMAIN: [u8; 4] = [0, 0, 0, 1];
+pub const GENESIS_VALIDATORS_ROOT: [u8; 32] = [0; 32];
+pub const COMMIT_BOOST_DOMAIN: [u8; 4] = [109, 109, 111, 67];
+pub const COMMIT_BOOST_VERSION: &str = env!("CARGO_PKG_VERSION");
+#[cfg(feature = "git-hash")] // optional feature to provide GIT_HASH via build script
+pub const COMMIT_BOOST_COMMIT: &str = env!("GIT_HASH");
+#[cfg(not(feature = "git-hash"))]
+pub const COMMIT_BOOST_COMMIT: &str = "unknown";
+pub const SIGNER_JWT_EXPIRATION: u64 = 300; // 5 minutes
+
 /// Shared route constants for the preconfirmation gateway
 pub mod routes {
 	/// Health check endpoint

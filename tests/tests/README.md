@@ -99,3 +99,4 @@ The tests use:
 - Tests stream Forge output for visibility during deployment
 - The address parser looks for the specific pattern: `"Registry deployed to: 0x..."`
 
+

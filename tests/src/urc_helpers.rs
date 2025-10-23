@@ -1,7 +1,10 @@
 use alloy::node_bindings::AnvilInstance;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256};
+use commit_boost::prelude::Chain;
 use eyre::{Context, Result};
+use serde_json::Value;
 use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use tracing::info;
 
@@ -87,6 +90,58 @@ pub async fn deploy_urc_to_anvil(anvil: &AnvilInstance) -> Result<Address> {
 	info!("URC Registry successfully deployed at: {:?}", address);
 
 	Ok(address)
+}
+
+/// Compute the Commit-Boost signing_domain for the given chain and write it to urc/config/registry.json
+pub fn prepare_urc_registry_config_for_chain(chain: Chain) -> Result<B256> {
+	// Compute signing domain = DOMAIN_TYPE(4 bytes) || fork_data_root[0..28]
+	// ForkData = { fork_version: [u8;4], genesis_validators_root: B256 }
+	let mut domain_bytes = [0u8; 32];
+	// DOMAIN_TYPE
+	domain_bytes[..4].copy_from_slice(&common::constants::COMMIT_BOOST_DOMAIN);
+	// fork_data_root = H(tree_hash(ForkData))
+	let fork_version = chain.genesis_fork_version();
+	// SSZ tree hash for ForkData's two 32-byte chunks using SHA256
+	let mut leaf0 = [0u8; 32];
+	leaf0[..4].copy_from_slice(&fork_version);
+	let leaf1 = common::constants::GENESIS_VALIDATORS_ROOT;
+	use sha2::{Digest, Sha256};
+	let mut hasher = Sha256::new();
+	hasher.update(&leaf0);
+	hasher.update(&leaf1);
+	let fork_data_root = hasher.finalize();
+
+	domain_bytes[4..].copy_from_slice(&fork_data_root[..28]);
+	let domain = B256::from_slice(&domain_bytes);
+
+	// Resolve repo-relative path to urc/config/registry.json
+	let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+	let mut config_path = PathBuf::from(manifest_dir);
+	config_path.pop(); // tests -> repo root
+	config_path.push("urc/config/registry.json");
+
+	// Read and patch JSON
+	let contents = std::fs::read_to_string(&config_path)
+		.with_context(|| format!("Failed to read URC registry config at {}", config_path.display()))?;
+	let mut json: Value = serde_json::from_str(&contents)
+		.with_context(|| format!("Failed to parse JSON at {}", config_path.display()))?;
+
+	// Write signingDomain as 0x-prefixed hex string
+	let domain_hex = format!("0x{}", hex::encode(domain.as_slice()));
+	json["signingDomain"] = Value::String(domain_hex);
+
+	// Persist
+	let updated = serde_json::to_string_pretty(&json)?;
+	std::fs::write(&config_path, updated)
+		.with_context(|| format!("Failed to write updated JSON to {}", config_path.display()))?;
+
+	Ok(domain)
+}
+
+/// Deploy helper that first patches the signingDomain in config to match the provided chain
+pub async fn deploy_urc_to_anvil_with_chain(anvil: &AnvilInstance, chain: Chain) -> Result<Address> {
+	let _ = prepare_urc_registry_config_for_chain(chain)?;
+	deploy_urc_to_anvil(anvil).await
 }
 
 /// Extract Registry address from the deployment log line

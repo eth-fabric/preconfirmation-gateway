@@ -6,7 +6,7 @@ use alloy::signers::local::PrivateKeySigner;
 use cb_common::types::BlsPublicKey;
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::signer::call_bls_signer;
-use common::types::constraints::{Registration, SignedRegistration, URCRegisterInputs};
+use common::types::urc::{Registration, SignedRegistration, URCRegisterInputs};
 use eyre::{Context, Result};
 use tracing::info;
 

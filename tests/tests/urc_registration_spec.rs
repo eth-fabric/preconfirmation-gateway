@@ -1,104 +1,96 @@
+use alloy::network::EthereumWallet;
 use alloy::node_bindings::Anvil;
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{U256, address};
+use alloy::providers::ProviderBuilder;
+use alloy::signers::local::PrivateKeySigner;
 use eyre::Result;
-use integration_tests::test_common::TestHarnessBuilder;
-use integration_tests::urc_helpers::deploy_urc_to_anvil;
-use proposer::{send_registration_transaction, sign_registrations};
-use tracing::info;
 
 #[tokio::test]
-#[ignore] // Requires forge to be installed
-async fn test_urc_registration_end_to_end() -> Result<()> {
-	info!("Starting end-to-end URC registration test");
-
-	// 1. Start Anvil
+async fn slash_registration_happy_reverts_and_unhappy_succeeds() -> Result<()> {
+	// 1) Start Anvil and deploy URC
 	let anvil = Anvil::new().spawn();
-	info!("Anvil started at: {}", anvil.endpoint_url());
+	let urc_addr = integration_tests::urc_helpers::deploy_urc_to_anvil(&anvil)
+		.await
+		.map_err(|e| eyre::eyre!("deploy urc failed: {}", e))?;
 
-	// 2. Deploy URC using forge script
-	info!("Deploying URC contract...");
-	let urc_address = deploy_urc_to_anvil(&anvil).await?;
-	info!("URC deployed at: {:?}", urc_address);
+	// 2) Build provider with anvil key0
+	let signer: PrivateKeySigner = anvil.keys()[0].clone().into();
+	let wallet = EthereumWallet::from(signer);
+	let provider = ProviderBuilder::new().wallet(wallet.clone()).connect_http(anvil.endpoint_url());
 
-	// 3. Set up proposer test harness with signer
-	let harness = TestHarnessBuilder::default().build_proposer_harness().await?;
+	// 3) Create Registry binding
+	let registry = urc::registry::Registry::new(urc_addr, provider.clone());
 
-	// 4. Get the owner address (use first Anvil address)
-	let owner = anvil.addresses()[0];
-	info!("Using owner address: {:?}", owner);
-
-	// 5. Parse module signing ID from config
-	let mut commit_config_guard = harness.commit_config.lock().await;
-	let module_signing_id: B256 = commit_config_guard.extra.module_signing_id.parse()?;
-
-	// 6. Sign registrations for all BLS keys
-	info!("Signing registrations...");
-	let inputs = sign_registrations(&mut *commit_config_guard, owner, &module_signing_id).await?;
-
-	info!("Successfully signed {} registrations", inputs.registrations.len());
-	assert!(!inputs.registrations.is_empty(), "Should have at least one registration");
-
-	// Verify registration structure
-	for (i, reg) in inputs.registrations.iter().enumerate() {
-		info!("  Registration {}: pubkey={}, nonce={}", i + 1, reg.pubkey.as_hex_string(), reg.nonce);
-		assert!(!reg.signature.is_empty(), "Signature should not be empty");
-	}
-
-	// 7. Send registration transaction
-	info!("Sending registration transaction...");
-	let keystore_path = "./data/keystores/keys/anvil-0";
-	let password = "password";
-	let collateral = U256::from(1_000_000_000_000_000_000u64); // 1 ETH
-
-	let tx_hash = send_registration_transaction(
-		&inputs,
-		urc_address,
-		&anvil.endpoint_url().to_string(),
-		keystore_path,
-		password,
-		collateral,
+	// 4) Start local signer and get an operator BLS key
+	let mut commit_cfg = integration_tests::test_common::start_local_signer_server(
+		integration_tests::test_common::MODULE_ID,
+		integration_tests::test_common::SIGNING_ID,
+		"test-admin-secret",
+		20001,
+		(),
 	)
 	.await?;
 
-	info!("Registration transaction sent: {:?}", tx_hash);
+	let consensus_bls = cb_common::types::BlsPublicKey::deserialize(&integration_tests::test_common::PUBKEY)
+		.map_err(|e| eyre::eyre!("deserialize bls pubkey failed: {:?}", e))?;
 
-	// 8. Verify transaction was mined (tx_hash should be non-zero)
-	assert_ne!(tx_hash, B256::ZERO, "Transaction hash should not be zero");
+	// Helper to convert SignedRegistration -> binding type
+	let to_binding =
+		|r: &common::types::urc::SignedRegistration| -> eyre::Result<urc::registry::IRegistry::SignedRegistration> {
+			r.as_sol_type()
+		};
 
-	info!("✅ End-to-end URC registration test passed!");
+	// 5a) Happy path: register with owner_x; slashRegistration should revert
+	let owner_x = wallet.default_signer().address();
+	let signed_reg_x = proposer::urc_registration::sign_registration(
+		&mut commit_cfg,
+		&consensus_bls,
+		owner_x,
+		&integration_tests::test_common::SIGNING_ID,
+	)
+	.await?;
+	let regs_x = vec![signed_reg_x];
 
-	Ok(())
-}
+	let regs_binding_x = regs_x.iter().map(to_binding).collect::<eyre::Result<Vec<_>>>()?;
+	registry
+		.register(regs_binding_x.clone(), owner_x, integration_tests::test_common::SIGNING_ID)
+		.value(U256::from(1_000_000_000_000_000_000u128))
+		.send()
+		.await?
+		.watch()
+		.await?;
 
-#[tokio::test]
-#[ignore] // Requires forge to be installed
-async fn test_sign_single_registration() -> Result<()> {
-	info!("Testing single registration signing");
+	let proof_ok = registry
+		.getRegistrationProof(
+			regs_binding_x.clone(),
+			owner_x,
+			U256::from(0u64),
+			integration_tests::test_common::SIGNING_ID,
+		)
+		.call()
+		.await?;
 
-	// Set up proposer test harness
-	let harness = TestHarnessBuilder::default().build_proposer_harness().await?;
+	// Should revert because signature is valid for owner_x
+	assert!(registry.slashRegistration(proof_ok).call().await.is_err());
 
-	// Create test owner address
-	let owner = Address::repeat_byte(0x42);
-	let mut commit_config_guard = harness.commit_config.lock().await;
-	let module_signing_id: B256 = commit_config_guard.extra.module_signing_id.parse()?;
+	// 5b) Unhappy path: register with owner_y != owner_x; slashRegistration should succeed
+	let owner_y = address!("0000000000000000000000000000000000001337");
+	registry
+		.register(regs_binding_x.clone(), owner_y, integration_tests::test_common::SIGNING_ID)
+		.value(U256::from(1_000_000_000_000_000_000u128))
+		.send()
+		.await?
+		.watch()
+		.await?;
 
-	// Sign registrations
-	let inputs = sign_registrations(&mut *commit_config_guard, owner, &module_signing_id).await?;
+	let proof_bad = registry
+		.getRegistrationProof(regs_binding_x, owner_y, U256::from(0u64), integration_tests::test_common::SIGNING_ID)
+		.call()
+		.await?;
 
-	// Verify
-	assert!(!inputs.registrations.is_empty(), "Should have registrations");
-	assert_eq!(inputs.owner, owner, "Owner should match");
-	assert_eq!(inputs.signing_id, module_signing_id, "Signing ID should match");
-
-	// Verify each registration has required fields
-	for reg in &inputs.registrations {
-		assert!(!reg.pubkey.as_hex_string().is_empty(), "Pubkey should be set");
-		assert!(!reg.signature.is_empty(), "Signature should be set");
-		assert_ne!(reg.nonce, 0, "Nonce should be non-zero");
-	}
-
-	info!("Single registration signing test passed!");
+	let slashed = registry.slashRegistration(proof_bad).call().await?;
+	assert!(slashed > U256::ZERO);
+	println!("slashed: {}", slashed);
 
 	Ok(())
 }

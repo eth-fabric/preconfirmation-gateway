@@ -1,18 +1,15 @@
 use alloy::primitives::{Address, B256, Bytes};
-use alloy::sol_types::{SolCall, SolValue};
+use alloy::sol_types::SolValue;
 use alloy_primitives::keccak256;
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use blst::*;
-use commit_boost::prelude::{BlsPublicKey, BlsSignature};
-use urc::i_registry::BLS::{G1Point, G2Point};
-use urc::i_registry::IRegistry::SignedRegistration as SolSignedRegistration;
-use urc::i_registry::IRegistry::registerCall as SolRegisterCall;
-use urc::i_registry::ISlasher::Delegation as SolDelegation;
+use ::urc::registry::BLS::G1Point;
+use commit_boost::prelude::BlsPublicKey;
+use urc::registry::ISlasher::Delegation as SolDelegation;
 
-use super::MessageType;
+use super::{MessageType, convert_pubkey_to_g1_point};
 
 /// A constraint with its type and payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +63,7 @@ pub struct SignedDelegation {
 	pub message: Delegation,
 	pub nonce: u64,
 	pub signing_id: B256,
-	pub signature: BlsSignature,
+	pub signature: commit_boost::prelude::BlsSignature,
 }
 
 /// A constraints message containing multiple constraints
@@ -134,7 +131,7 @@ pub struct SignedConstraints {
 	pub message: ConstraintsMessage,
 	pub nonce: u64,
 	pub signing_id: B256,
-	pub signature: BlsSignature,
+	pub signature: commit_boost::prelude::BlsSignature,
 }
 
 /// Constraint capabilities response
@@ -143,131 +140,7 @@ pub struct ConstraintCapabilities {
 	pub constraint_types: Vec<u64>,
 }
 
-pub struct Registration {
-	pub owner: Address,
-}
-
-impl Registration {
-	/// Generate the object root to be signed for a delegation.
-	pub fn to_message_hash(&self) -> Result<B256> {
-		let message_type = MessageType::Registration.to_uint256();
-		let encoded = (message_type, self.owner).abi_encode_params(); // Rust equivalent of abi.encode(message_type, owner) in Solidity
-		let message_hash = keccak256(encoded);
-		Ok(message_hash)
-	}
-}
-
-pub struct SignedRegistration {
-	pub pubkey: BlsPublicKey,
-	pub signature: BlsSignature,
-	pub nonce: u64,
-}
-
-impl SignedRegistration {
-	pub fn as_sol_type(&self) -> Result<SolSignedRegistration> {
-		// Convert the pubkeys to G1 points
-		let pubkey = convert_pubkey_to_g1_point(&self.pubkey).map_err(|e| {
-			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.pubkey.as_hex_string());
-			e
-		})?;
-		let signature = convert_signature_to_g2_point(&self.signature).map_err(|e| {
-			error!("Error converting signature {} to G2 point: {e:?}", hex::encode(self.signature.serialize()));
-			e
-		})?;
-		let registration = SolSignedRegistration { pubkey, signature, nonce: self.nonce };
-		Ok(registration)
-	}
-}
-
-/// Container for URC register() call parameters
-pub struct URCRegisterInputs {
-	pub registrations: Vec<SignedRegistration>,
-	pub owner: Address,
-	pub signing_id: B256,
-}
-
-impl URCRegisterInputs {
-	/// ABI encode for URC register() call
-	/// Signature: register(SignedRegistration[] calldata registrations, address owner, bytes32 signingId)
-	pub fn abi_encode_with_selector(&self) -> Result<Bytes> {
-		// Encode each SignedRegistration using the existing abi_encode method
-		let sol_registrations = self.registrations.iter().map(|r| r.as_sol_type()).collect::<Result<Vec<_>, _>>()?;
-
-		let register_call =
-			SolRegisterCall { registrations: sol_registrations, owner: self.owner, signingId: self.signing_id };
-
-		// Encodes with the register() selector
-		let encoded = register_call.abi_encode();
-		Ok(Bytes::from(encoded))
-	}
-}
-
-/// Converts a pubkey to its corresponding affine G1 point form for EVM
-/// precompile usage
-pub fn convert_pubkey_to_g1_point(pubkey: &BlsPublicKey) -> Result<G1Point> {
-	// Convert pubkey to bytes
-	let pubkey_byes = pubkey.serialize();
-
-	// Uncompress the bytes to an affine point
-	let mut pubkey_affine = blst_p1_affine::default();
-	let uncompress_result = unsafe { blst_p1_uncompress(&mut pubkey_affine, pubkey_byes.as_ptr()) };
-	match uncompress_result {
-		BLST_ERROR::BLST_SUCCESS => Ok(()),
-		_ => Err(eyre::eyre!("Error converting pubkey to affine point: {uncompress_result:?}")),
-	}?;
-
-	// Convert the coordinates to big-endian byte arrays
-	let (x_a, x_b) = convert_fp_to_uint256_pair(&pubkey_affine.x);
-	let (y_a, y_b) = convert_fp_to_uint256_pair(&pubkey_affine.y);
-
-	// Return the G1Point
-	Ok(G1Point { x_a, x_b, y_a, y_b })
-}
-
-/// Converts a signature to its corresponding affine G2 point form for EVM
-/// precompile usage
-pub fn convert_signature_to_g2_point(signature: &BlsSignature) -> Result<G2Point> {
-	// Convert signature to bytes
-	let signature_bytes = signature.serialize();
-
-	// Uncompress the bytes to an affine point
-	let mut signature_affine = blst_p2_affine::default();
-	let uncompress_result = unsafe { blst_p2_uncompress(&mut signature_affine, signature_bytes.as_ptr()) };
-	match uncompress_result {
-		BLST_ERROR::BLST_SUCCESS => Ok(()),
-		_ => Err(eyre::eyre!("Error converting signature to affine point: {uncompress_result:?}")),
-	}?;
-
-	// Convert the coordinates to big-endian byte arrays
-	let (x_c0_a, x_c0_b) = convert_fp_to_uint256_pair(&signature_affine.x.fp[0]);
-	let (x_c1_a, x_c1_b) = convert_fp_to_uint256_pair(&signature_affine.x.fp[1]);
-	let (y_c0_a, y_c0_b) = convert_fp_to_uint256_pair(&signature_affine.y.fp[0]);
-	let (y_c1_a, y_c1_b) = convert_fp_to_uint256_pair(&signature_affine.y.fp[1]);
-
-	// Return the G2Point
-	Ok(G2Point { x_c0_a, x_c0_b, x_c1_a, x_c1_b, y_c0_a, y_c0_b, y_c1_a, y_c1_b })
-}
-
-/// Converts a blst_fp to a pair of B256, as used in G1Point
-pub fn convert_fp_to_uint256_pair(fp: &blst_fp) -> (B256, B256) {
-	let mut fp_bytes = [0u8; 48];
-	unsafe {
-		blst_bendian_from_fp(fp_bytes.as_mut_ptr(), fp);
-	}
-
-	// The first one is the high 16 bytes, padded on the left with zeros
-	let mut high_bytes = [0u8; 32];
-	high_bytes[16..].copy_from_slice(&fp_bytes[0..16]);
-	let high = B256::from(high_bytes);
-
-	// The second one is the low 32 bytes
-	let mut low_bytes = [0u8; 32];
-	low_bytes.copy_from_slice(&fp_bytes[16..48]);
-	let low = B256::from(low_bytes);
-
-	// Return the pair
-	(high, low)
-}
+// URC-related types and conversion helpers moved to `types::urc` and `types::mod`
 
 #[cfg(test)]
 mod tests {
