@@ -147,6 +147,9 @@ impl TestHarnessBuilder {
 			beacon_genesis_timestamp: 1606824023,
 			poll_interval_seconds: 60,
 			module_signing_id: format!("{:?}", SIGNING_ID),
+			urc_owner: "0x1111111111111111111111111111111111111111".to_string(),
+			execution_rpc_url: "http://localhost:8545".to_string(),
+			registration_collateral_wei: "1000000000000000000".to_string(),
 		};
 
 		// Start local signer server with ProposerConfig

@@ -1921,9 +1921,9 @@ pub mod IRegistry {
 
 ```solidity
 library ISlasher {
-	struct Commitment { uint64 commitmentType; bytes payload; address slasher; }
+	struct Commitment { uint64 commitmentType; bytes payload; bytes32 requestHash; address slasher; }
 	struct Delegation { BLS.G1Point proposer; BLS.G1Point delegate; address committer; uint64 slot; bytes metadata; }
-	struct SignedCommitment { Commitment commitment; bytes signature; }
+	struct SignedCommitment { Commitment commitment; uint64 nonce; bytes32 signingId; bytes signature; }
 	struct SignedDelegation { Delegation delegation; uint64 nonce; bytes32 signingId; BLS.G2Point signature; }
 }
 ```*/
@@ -1939,7 +1939,7 @@ pub mod ISlasher {
 	use alloy::sol_types as alloy_sol_types;
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**```solidity
-	struct Commitment { uint64 commitmentType; bytes payload; address slasher; }
+	struct Commitment { uint64 commitmentType; bytes payload; bytes32 requestHash; address slasher; }
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
@@ -1948,6 +1948,8 @@ pub mod ISlasher {
 		pub commitmentType: u64,
 		#[allow(missing_docs)]
 		pub payload: alloy::sol_types::private::Bytes,
+		#[allow(missing_docs)]
+		pub requestHash: alloy::sol_types::private::FixedBytes<32>,
 		#[allow(missing_docs)]
 		pub slasher: alloy::sol_types::private::Address,
 	}
@@ -1959,10 +1961,16 @@ pub mod ISlasher {
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<64>,
 			alloy::sol_types::sol_data::Bytes,
+			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::Address,
 		);
 		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = (u64, alloy::sol_types::private::Bytes, alloy::sol_types::private::Address);
+		type UnderlyingRustTuple<'a> = (
+			u64,
+			alloy::sol_types::private::Bytes,
+			alloy::sol_types::private::FixedBytes<32>,
+			alloy::sol_types::private::Address,
+		);
 		#[cfg(test)]
 		#[allow(dead_code, unreachable_patterns)]
 		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
@@ -1976,14 +1984,14 @@ pub mod ISlasher {
 		#[doc(hidden)]
 		impl ::core::convert::From<Commitment> for UnderlyingRustTuple<'_> {
 			fn from(value: Commitment) -> Self {
-				(value.commitmentType, value.payload, value.slasher)
+				(value.commitmentType, value.payload, value.requestHash, value.slasher)
 			}
 		}
 		#[automatically_derived]
 		#[doc(hidden)]
 		impl ::core::convert::From<UnderlyingRustTuple<'_>> for Commitment {
 			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { commitmentType: tuple.0, payload: tuple.1, slasher: tuple.2 }
+				Self { commitmentType: tuple.0, payload: tuple.1, requestHash: tuple.2, slasher: tuple.3 }
 			}
 		}
 		#[automatically_derived]
@@ -1997,6 +2005,9 @@ pub mod ISlasher {
 				(
 					<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(&self.commitmentType),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.payload),
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(
+						&self.requestHash,
+					),
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(&self.slasher),
 				)
 			}
@@ -2050,7 +2061,7 @@ pub mod ISlasher {
 			#[inline]
 			fn eip712_root_type() -> alloy_sol_types::private::Cow<'static, str> {
 				alloy_sol_types::private::Cow::Borrowed(
-					"Commitment(uint64 commitmentType,bytes payload,address slasher)",
+					"Commitment(uint64 commitmentType,bytes payload,bytes32 requestHash,address slasher)",
 				)
 			}
 			#[inline]
@@ -2069,6 +2080,10 @@ pub mod ISlasher {
 					)
 					.0,
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::eip712_data_word(&self.payload).0,
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::eip712_data_word(
+						&self.requestHash,
+					)
+					.0,
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::eip712_data_word(&self.slasher)
 						.0,
 				]
@@ -2084,6 +2099,8 @@ pub mod ISlasher {
 						&rust.commitmentType,
 					) + <alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.payload,
+				) + <alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::topic_preimage_length(
+					&rust.requestHash,
 				) + <alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.slasher,
 				)
@@ -2097,6 +2114,10 @@ pub mod ISlasher {
 				);
 				<alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::encode_topic_preimage(
 					&rust.payload,
+					out,
+				);
+				<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::encode_topic_preimage(
+					&rust.requestHash,
 					out,
 				);
 				<alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -2308,13 +2329,17 @@ pub mod ISlasher {
 	};
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**```solidity
-	struct SignedCommitment { Commitment commitment; bytes signature; }
+	struct SignedCommitment { Commitment commitment; uint64 nonce; bytes32 signingId; bytes signature; }
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct SignedCommitment {
 		#[allow(missing_docs)]
 		pub commitment: <Commitment as alloy::sol_types::SolType>::RustType,
+		#[allow(missing_docs)]
+		pub nonce: u64,
+		#[allow(missing_docs)]
+		pub signingId: alloy::sol_types::private::FixedBytes<32>,
 		#[allow(missing_docs)]
 		pub signature: alloy::sol_types::private::Bytes,
 	}
@@ -2323,10 +2348,19 @@ pub mod ISlasher {
 		use alloy::sol_types as alloy_sol_types;
 		#[doc(hidden)]
 		#[allow(dead_code)]
-		type UnderlyingSolTuple<'a> = (Commitment, alloy::sol_types::sol_data::Bytes);
+		type UnderlyingSolTuple<'a> = (
+			Commitment,
+			alloy::sol_types::sol_data::Uint<64>,
+			alloy::sol_types::sol_data::FixedBytes<32>,
+			alloy::sol_types::sol_data::Bytes,
+		);
 		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> =
-			(<Commitment as alloy::sol_types::SolType>::RustType, alloy::sol_types::private::Bytes);
+		type UnderlyingRustTuple<'a> = (
+			<Commitment as alloy::sol_types::SolType>::RustType,
+			u64,
+			alloy::sol_types::private::FixedBytes<32>,
+			alloy::sol_types::private::Bytes,
+		);
 		#[cfg(test)]
 		#[allow(dead_code, unreachable_patterns)]
 		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
@@ -2340,14 +2374,14 @@ pub mod ISlasher {
 		#[doc(hidden)]
 		impl ::core::convert::From<SignedCommitment> for UnderlyingRustTuple<'_> {
 			fn from(value: SignedCommitment) -> Self {
-				(value.commitment, value.signature)
+				(value.commitment, value.nonce, value.signingId, value.signature)
 			}
 		}
 		#[automatically_derived]
 		#[doc(hidden)]
 		impl ::core::convert::From<UnderlyingRustTuple<'_>> for SignedCommitment {
 			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { commitment: tuple.0, signature: tuple.1 }
+				Self { commitment: tuple.0, nonce: tuple.1, signingId: tuple.2, signature: tuple.3 }
 			}
 		}
 		#[automatically_derived]
@@ -2360,6 +2394,8 @@ pub mod ISlasher {
 			fn stv_to_tokens(&self) -> <Self as alloy_sol_types::SolType>::Token<'_> {
 				(
 					<Commitment as alloy_sol_types::SolType>::tokenize(&self.commitment),
+					<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(&self.nonce),
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(&self.signingId),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.signature),
 				)
 			}
@@ -2412,7 +2448,9 @@ pub mod ISlasher {
 			const NAME: &'static str = "SignedCommitment";
 			#[inline]
 			fn eip712_root_type() -> alloy_sol_types::private::Cow<'static, str> {
-				alloy_sol_types::private::Cow::Borrowed("SignedCommitment(Commitment commitment,bytes signature)")
+				alloy_sol_types::private::Cow::Borrowed(
+					"SignedCommitment(Commitment commitment,uint64 nonce,bytes32 signingId,bytes signature)",
+				)
 			}
 			#[inline]
 			fn eip712_components() -> alloy_sol_types::private::Vec<alloy_sol_types::private::Cow<'static, str>> {
@@ -2425,6 +2463,11 @@ pub mod ISlasher {
 			fn eip712_encode_data(&self) -> alloy_sol_types::private::Vec<u8> {
 				[
 					<Commitment as alloy_sol_types::SolType>::eip712_data_word(&self.commitment).0,
+					<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::eip712_data_word(&self.nonce).0,
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::eip712_data_word(
+						&self.signingId,
+					)
+					.0,
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::eip712_data_word(&self.signature)
 						.0,
 				]
@@ -2437,14 +2480,26 @@ pub mod ISlasher {
 			fn topic_preimage_length(rust: &Self::RustType) -> usize {
 				0usize
 					+ <Commitment as alloy_sol_types::EventTopic>::topic_preimage_length(&rust.commitment)
-					+ <alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::topic_preimage_length(
-						&rust.signature,
-					)
+					+ <alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::EventTopic>::topic_preimage_length(
+						&rust.nonce,
+					) + <alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::topic_preimage_length(
+					&rust.signingId,
+				) + <alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::topic_preimage_length(
+					&rust.signature,
+				)
 			}
 			#[inline]
 			fn encode_topic_preimage(rust: &Self::RustType, out: &mut alloy_sol_types::private::Vec<u8>) {
 				out.reserve(<Self as alloy_sol_types::EventTopic>::topic_preimage_length(rust));
 				<Commitment as alloy_sol_types::EventTopic>::encode_topic_preimage(&rust.commitment, out);
+				<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::EventTopic>::encode_topic_preimage(
+					&rust.nonce,
+					out,
+				);
+				<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::encode_topic_preimage(
+					&rust.signingId,
+					out,
+				);
 				<alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::encode_topic_preimage(
 					&rust.signature,
 					out,
@@ -2804,6 +2859,7 @@ library ISlasher {
 	struct Commitment {
 		uint64 commitmentType;
 		bytes payload;
+		bytes32 requestHash;
 		address slasher;
 	}
 	struct Delegation {
@@ -2815,6 +2871,8 @@ library ISlasher {
 	}
 	struct SignedCommitment {
 		Commitment commitment;
+		uint64 nonce;
+		bytes32 signingId;
 		bytes signature;
 	}
 	struct SignedDelegation {
@@ -2833,9 +2891,6 @@ interface Registry {
 	error DelegationSignatureInvalid();
 	error DelegationsAreSame();
 	error DifferentSlots();
-	error ECDSAInvalidSignature();
-	error ECDSAInvalidSignatureLength(uint256 length);
-	error ECDSAInvalidSignatureS(bytes32 s);
 	error EthTransferFailed();
 	error FraudProofChallengeInvalid();
 	error FraudProofMerklePathInvalid();
@@ -2892,8 +2947,8 @@ interface Registry {
 	function optInToSlasher(bytes32 registrationRoot, address slasher, address committer) external;
 	function optOutOfSlasher(bytes32 registrationRoot, address slasher) external;
 	function register(IRegistry.SignedRegistration[] memory registrations, address owner, bytes32 signingId) external payable returns (bytes32 registrationRoot);
-	function slashCommitment(IRegistry.RegistrationProof memory proof, ISlasher.SignedDelegation memory delegation, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
 	function slashCommitment(bytes32 registrationRoot, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
+	function slashCommitment(IRegistry.RegistrationProof memory proof, ISlasher.SignedDelegation memory delegation, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
 	function slashEquivocation(IRegistry.RegistrationProof memory proof, ISlasher.SignedDelegation memory delegationOne, ISlasher.SignedDelegation memory delegationTwo) external returns (uint256 slashAmountWei);
 	function slashRegistration(IRegistry.RegistrationProof memory proof) external returns (uint256 slashedCollateralWei);
 	function slashingEvidenceAlreadyUsed(bytes32 slashingDigest) external view returns (bool);
@@ -3778,6 +3833,79 @@ interface Registry {
 	"name": "slashCommitment",
 	"inputs": [
 	  {
+		"name": "registrationRoot",
+		"type": "bytes32",
+		"internalType": "bytes32"
+	  },
+	  {
+		"name": "commitment",
+		"type": "tuple",
+		"internalType": "struct ISlasher.SignedCommitment",
+		"components": [
+		  {
+			"name": "commitment",
+			"type": "tuple",
+			"internalType": "struct ISlasher.Commitment",
+			"components": [
+			  {
+				"name": "commitmentType",
+				"type": "uint64",
+				"internalType": "uint64"
+			  },
+			  {
+				"name": "payload",
+				"type": "bytes",
+				"internalType": "bytes"
+			  },
+			  {
+				"name": "requestHash",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			  },
+			  {
+				"name": "slasher",
+				"type": "address",
+				"internalType": "address"
+			  }
+			]
+		  },
+		  {
+			"name": "nonce",
+			"type": "uint64",
+			"internalType": "uint64"
+		  },
+		  {
+			"name": "signingId",
+			"type": "bytes32",
+			"internalType": "bytes32"
+		  },
+		  {
+			"name": "signature",
+			"type": "bytes",
+			"internalType": "bytes"
+		  }
+		]
+	  },
+	  {
+		"name": "evidence",
+		"type": "bytes",
+		"internalType": "bytes"
+	  }
+	],
+	"outputs": [
+	  {
+		"name": "slashAmountWei",
+		"type": "uint256",
+		"internalType": "uint256"
+	  }
+	],
+	"stateMutability": "nonpayable"
+  },
+  {
+	"type": "function",
+	"name": "slashCommitment",
+	"inputs": [
+	  {
 		"name": "proof",
 		"type": "tuple",
 		"internalType": "struct IRegistry.RegistrationProof",
@@ -4046,6 +4174,11 @@ interface Registry {
 				"internalType": "bytes"
 			  },
 			  {
+				"name": "requestHash",
+				"type": "bytes32",
+				"internalType": "bytes32"
+			  },
+			  {
 				"name": "slasher",
 				"type": "address",
 				"internalType": "address"
@@ -4053,62 +4186,14 @@ interface Registry {
 			]
 		  },
 		  {
-			"name": "signature",
-			"type": "bytes",
-			"internalType": "bytes"
-		  }
-		]
-	  },
-	  {
-		"name": "evidence",
-		"type": "bytes",
-		"internalType": "bytes"
-	  }
-	],
-	"outputs": [
-	  {
-		"name": "slashAmountWei",
-		"type": "uint256",
-		"internalType": "uint256"
-	  }
-	],
-	"stateMutability": "nonpayable"
-  },
-  {
-	"type": "function",
-	"name": "slashCommitment",
-	"inputs": [
-	  {
-		"name": "registrationRoot",
-		"type": "bytes32",
-		"internalType": "bytes32"
-	  },
-	  {
-		"name": "commitment",
-		"type": "tuple",
-		"internalType": "struct ISlasher.SignedCommitment",
-		"components": [
+			"name": "nonce",
+			"type": "uint64",
+			"internalType": "uint64"
+		  },
 		  {
-			"name": "commitment",
-			"type": "tuple",
-			"internalType": "struct ISlasher.Commitment",
-			"components": [
-			  {
-				"name": "commitmentType",
-				"type": "uint64",
-				"internalType": "uint64"
-			  },
-			  {
-				"name": "payload",
-				"type": "bytes",
-				"internalType": "bytes"
-			  },
-			  {
-				"name": "slasher",
-				"type": "address",
-				"internalType": "address"
-			  }
-			]
+			"name": "signingId",
+			"type": "bytes32",
+			"internalType": "bytes32"
 		  },
 		  {
 			"name": "signature",
@@ -5004,33 +5089,6 @@ interface Registry {
   },
   {
 	"type": "error",
-	"name": "ECDSAInvalidSignature",
-	"inputs": []
-  },
-  {
-	"type": "error",
-	"name": "ECDSAInvalidSignatureLength",
-	"inputs": [
-	  {
-		"name": "length",
-		"type": "uint256",
-		"internalType": "uint256"
-	  }
-	]
-  },
-  {
-	"type": "error",
-	"name": "ECDSAInvalidSignatureS",
-	"inputs": [
-	  {
-		"name": "s",
-		"type": "bytes32",
-		"internalType": "bytes32"
-	  }
-	]
-  },
-  {
-	"type": "error",
 	"name": "EthTransferFailed",
 	"inputs": []
   },
@@ -5597,189 +5655,6 @@ pub mod Registry {
 			#[inline]
 			fn tokenize(&self) -> Self::Token<'_> {
 				()
-			}
-			#[inline]
-			fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
-				<Self::Parameters<'_> as alloy_sol_types::SolType>::abi_decode_sequence_validate(data).map(Self::new)
-			}
-		}
-	};
-	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	/**Custom error with signature `ECDSAInvalidSignature()` and selector `0xf645eedf`.
-	```solidity
-	error ECDSAInvalidSignature();
-	```*/
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
-	#[derive(Clone)]
-	pub struct ECDSAInvalidSignature;
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields, clippy::style)]
-	const _: () = {
-		use alloy::sol_types as alloy_sol_types;
-		#[doc(hidden)]
-		#[allow(dead_code)]
-		type UnderlyingSolTuple<'a> = ();
-		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = ();
-		#[cfg(test)]
-		#[allow(dead_code, unreachable_patterns)]
-		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
-			match _t {
-				alloy_sol_types::private::AssertTypeEq::<<UnderlyingSolTuple as alloy_sol_types::SolType>::RustType>(
-					_,
-				) => {}
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<ECDSAInvalidSignature> for UnderlyingRustTuple<'_> {
-			fn from(value: ECDSAInvalidSignature) -> Self {
-				()
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<UnderlyingRustTuple<'_>> for ECDSAInvalidSignature {
-			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self
-			}
-		}
-		#[automatically_derived]
-		impl alloy_sol_types::SolError for ECDSAInvalidSignature {
-			type Parameters<'a> = UnderlyingSolTuple<'a>;
-			type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "ECDSAInvalidSignature()";
-			const SELECTOR: [u8; 4] = [246u8, 69u8, 238u8, 223u8];
-			#[inline]
-			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
-				tuple.into()
-			}
-			#[inline]
-			fn tokenize(&self) -> Self::Token<'_> {
-				()
-			}
-			#[inline]
-			fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
-				<Self::Parameters<'_> as alloy_sol_types::SolType>::abi_decode_sequence_validate(data).map(Self::new)
-			}
-		}
-	};
-	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	/**Custom error with signature `ECDSAInvalidSignatureLength(uint256)` and selector `0xfce698f7`.
-	```solidity
-	error ECDSAInvalidSignatureLength(uint256 length);
-	```*/
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
-	#[derive(Clone)]
-	pub struct ECDSAInvalidSignatureLength {
-		#[allow(missing_docs)]
-		pub length: alloy::sol_types::private::primitives::aliases::U256,
-	}
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields, clippy::style)]
-	const _: () = {
-		use alloy::sol_types as alloy_sol_types;
-		#[doc(hidden)]
-		#[allow(dead_code)]
-		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
-		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::primitives::aliases::U256,);
-		#[cfg(test)]
-		#[allow(dead_code, unreachable_patterns)]
-		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
-			match _t {
-				alloy_sol_types::private::AssertTypeEq::<<UnderlyingSolTuple as alloy_sol_types::SolType>::RustType>(
-					_,
-				) => {}
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<ECDSAInvalidSignatureLength> for UnderlyingRustTuple<'_> {
-			fn from(value: ECDSAInvalidSignatureLength) -> Self {
-				(value.length,)
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<UnderlyingRustTuple<'_>> for ECDSAInvalidSignatureLength {
-			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { length: tuple.0 }
-			}
-		}
-		#[automatically_derived]
-		impl alloy_sol_types::SolError for ECDSAInvalidSignatureLength {
-			type Parameters<'a> = UnderlyingSolTuple<'a>;
-			type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "ECDSAInvalidSignatureLength(uint256)";
-			const SELECTOR: [u8; 4] = [252u8, 230u8, 152u8, 247u8];
-			#[inline]
-			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
-				tuple.into()
-			}
-			#[inline]
-			fn tokenize(&self) -> Self::Token<'_> {
-				(<alloy::sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(&self.length),)
-			}
-			#[inline]
-			fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
-				<Self::Parameters<'_> as alloy_sol_types::SolType>::abi_decode_sequence_validate(data).map(Self::new)
-			}
-		}
-	};
-	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	/**Custom error with signature `ECDSAInvalidSignatureS(bytes32)` and selector `0xd78bce0c`.
-	```solidity
-	error ECDSAInvalidSignatureS(bytes32 s);
-	```*/
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
-	#[derive(Clone)]
-	pub struct ECDSAInvalidSignatureS {
-		#[allow(missing_docs)]
-		pub s: alloy::sol_types::private::FixedBytes<32>,
-	}
-	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields, clippy::style)]
-	const _: () = {
-		use alloy::sol_types as alloy_sol_types;
-		#[doc(hidden)]
-		#[allow(dead_code)]
-		type UnderlyingSolTuple<'a> = (alloy::sol_types::sol_data::FixedBytes<32>,);
-		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = (alloy::sol_types::private::FixedBytes<32>,);
-		#[cfg(test)]
-		#[allow(dead_code, unreachable_patterns)]
-		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
-			match _t {
-				alloy_sol_types::private::AssertTypeEq::<<UnderlyingSolTuple as alloy_sol_types::SolType>::RustType>(
-					_,
-				) => {}
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<ECDSAInvalidSignatureS> for UnderlyingRustTuple<'_> {
-			fn from(value: ECDSAInvalidSignatureS) -> Self {
-				(value.s,)
-			}
-		}
-		#[automatically_derived]
-		#[doc(hidden)]
-		impl ::core::convert::From<UnderlyingRustTuple<'_>> for ECDSAInvalidSignatureS {
-			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { s: tuple.0 }
-			}
-		}
-		#[automatically_derived]
-		impl alloy_sol_types::SolError for ECDSAInvalidSignatureS {
-			type Parameters<'a> = UnderlyingSolTuple<'a>;
-			type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "ECDSAInvalidSignatureS(bytes32)";
-			const SELECTOR: [u8; 4] = [215u8, 139u8, 206u8, 12u8];
-			#[inline]
-			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
-				tuple.into()
-			}
-			#[inline]
-			fn tokenize(&self) -> Self::Token<'_> {
-				(<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(&self.s),)
 			}
 			#[inline]
 			fn abi_decode_raw_validate(data: &[u8]) -> alloy_sol_types::Result<Self> {
@@ -10189,24 +10064,22 @@ pub mod Registry {
 		}
 	};
 	#[derive(serde::Serialize, serde::Deserialize)]
-	/**Function with signature `slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,address),bytes),bytes)` and selector `0x55b65be6`.
+	/**Function with signature `slashCommitment(bytes32,((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)` and selector `0x20766026`.
 	```solidity
-	function slashCommitment(IRegistry.RegistrationProof memory proof, ISlasher.SignedDelegation memory delegation, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
+	function slashCommitment(bytes32 registrationRoot, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashCommitment_0Call {
 		#[allow(missing_docs)]
-		pub proof: <IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
-		#[allow(missing_docs)]
-		pub delegation: <ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
+		pub registrationRoot: alloy::sol_types::private::FixedBytes<32>,
 		#[allow(missing_docs)]
 		pub commitment: <ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 		#[allow(missing_docs)]
 		pub evidence: alloy::sol_types::private::Bytes,
 	}
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	///Container type for the return parameters of the [`slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,address),bytes),bytes)`](slashCommitment_0Call) function.
+	///Container type for the return parameters of the [`slashCommitment(bytes32,((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)`](slashCommitment_0Call) function.
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashCommitment_0Return {
@@ -10220,15 +10093,13 @@ pub mod Registry {
 			#[doc(hidden)]
 			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
-				IRegistry::RegistrationProof,
-				ISlasher::SignedDelegation,
+				alloy::sol_types::sol_data::FixedBytes<32>,
 				ISlasher::SignedCommitment,
 				alloy::sol_types::sol_data::Bytes,
 			);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (
-				<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
-				<ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
+				alloy::sol_types::private::FixedBytes<32>,
 				<ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 				alloy::sol_types::private::Bytes,
 			);
@@ -10245,14 +10116,14 @@ pub mod Registry {
 			#[doc(hidden)]
 			impl ::core::convert::From<slashCommitment_0Call> for UnderlyingRustTuple<'_> {
 				fn from(value: slashCommitment_0Call) -> Self {
-					(value.proof, value.delegation, value.commitment, value.evidence)
+					(value.registrationRoot, value.commitment, value.evidence)
 				}
 			}
 			#[automatically_derived]
 			#[doc(hidden)]
 			impl ::core::convert::From<UnderlyingRustTuple<'_>> for slashCommitment_0Call {
 				fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-					Self { proof: tuple.0, delegation: tuple.1, commitment: tuple.2, evidence: tuple.3 }
+					Self { registrationRoot: tuple.0, commitment: tuple.1, evidence: tuple.2 }
 				}
 			}
 		}
@@ -10289,8 +10160,7 @@ pub mod Registry {
 		#[automatically_derived]
 		impl alloy_sol_types::SolCall for slashCommitment_0Call {
 			type Parameters<'a> = (
-				IRegistry::RegistrationProof,
-				ISlasher::SignedDelegation,
+				alloy::sol_types::sol_data::FixedBytes<32>,
 				ISlasher::SignedCommitment,
 				alloy::sol_types::sol_data::Bytes,
 			);
@@ -10298,8 +10168,9 @@ pub mod Registry {
 			type Return = alloy::sol_types::private::primitives::aliases::U256;
 			type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,address),bytes),bytes)";
-			const SELECTOR: [u8; 4] = [85u8, 182u8, 91u8, 230u8];
+			const SIGNATURE: &'static str =
+				"slashCommitment(bytes32,((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)";
+			const SELECTOR: [u8; 4] = [32u8, 118u8, 96u8, 38u8];
 			#[inline]
 			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
 				tuple.into()
@@ -10307,8 +10178,9 @@ pub mod Registry {
 			#[inline]
 			fn tokenize(&self) -> Self::Token<'_> {
 				(
-					<IRegistry::RegistrationProof as alloy_sol_types::SolType>::tokenize(&self.proof),
-					<ISlasher::SignedDelegation as alloy_sol_types::SolType>::tokenize(&self.delegation),
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(
+						&self.registrationRoot,
+					),
 					<ISlasher::SignedCommitment as alloy_sol_types::SolType>::tokenize(&self.commitment),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.evidence),
 				)
@@ -10334,22 +10206,24 @@ pub mod Registry {
 		}
 	};
 	#[derive(serde::Serialize, serde::Deserialize)]
-	/**Function with signature `slashCommitment(bytes32,((uint64,bytes,address),bytes),bytes)` and selector `0xd5074b44`.
+	/**Function with signature `slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)` and selector `0x455bc5a7`.
 	```solidity
-	function slashCommitment(bytes32 registrationRoot, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
+	function slashCommitment(IRegistry.RegistrationProof memory proof, ISlasher.SignedDelegation memory delegation, ISlasher.SignedCommitment memory commitment, bytes memory evidence) external returns (uint256 slashAmountWei);
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashCommitment_1Call {
 		#[allow(missing_docs)]
-		pub registrationRoot: alloy::sol_types::private::FixedBytes<32>,
+		pub proof: <IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
+		#[allow(missing_docs)]
+		pub delegation: <ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
 		#[allow(missing_docs)]
 		pub commitment: <ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 		#[allow(missing_docs)]
 		pub evidence: alloy::sol_types::private::Bytes,
 	}
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	///Container type for the return parameters of the [`slashCommitment(bytes32,((uint64,bytes,address),bytes),bytes)`](slashCommitment_1Call) function.
+	///Container type for the return parameters of the [`slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)`](slashCommitment_1Call) function.
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashCommitment_1Return {
@@ -10363,13 +10237,15 @@ pub mod Registry {
 			#[doc(hidden)]
 			#[allow(dead_code)]
 			type UnderlyingSolTuple<'a> = (
-				alloy::sol_types::sol_data::FixedBytes<32>,
+				IRegistry::RegistrationProof,
+				ISlasher::SignedDelegation,
 				ISlasher::SignedCommitment,
 				alloy::sol_types::sol_data::Bytes,
 			);
 			#[doc(hidden)]
 			type UnderlyingRustTuple<'a> = (
-				alloy::sol_types::private::FixedBytes<32>,
+				<IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
+				<ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
 				<ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 				alloy::sol_types::private::Bytes,
 			);
@@ -10386,14 +10262,14 @@ pub mod Registry {
 			#[doc(hidden)]
 			impl ::core::convert::From<slashCommitment_1Call> for UnderlyingRustTuple<'_> {
 				fn from(value: slashCommitment_1Call) -> Self {
-					(value.registrationRoot, value.commitment, value.evidence)
+					(value.proof, value.delegation, value.commitment, value.evidence)
 				}
 			}
 			#[automatically_derived]
 			#[doc(hidden)]
 			impl ::core::convert::From<UnderlyingRustTuple<'_>> for slashCommitment_1Call {
 				fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-					Self { registrationRoot: tuple.0, commitment: tuple.1, evidence: tuple.2 }
+					Self { proof: tuple.0, delegation: tuple.1, commitment: tuple.2, evidence: tuple.3 }
 				}
 			}
 		}
@@ -10430,7 +10306,8 @@ pub mod Registry {
 		#[automatically_derived]
 		impl alloy_sol_types::SolCall for slashCommitment_1Call {
 			type Parameters<'a> = (
-				alloy::sol_types::sol_data::FixedBytes<32>,
+				IRegistry::RegistrationProof,
+				ISlasher::SignedDelegation,
 				ISlasher::SignedCommitment,
 				alloy::sol_types::sol_data::Bytes,
 			);
@@ -10438,8 +10315,8 @@ pub mod Registry {
 			type Return = alloy::sol_types::private::primitives::aliases::U256;
 			type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "slashCommitment(bytes32,((uint64,bytes,address),bytes),bytes)";
-			const SELECTOR: [u8; 4] = [213u8, 7u8, 75u8, 68u8];
+			const SIGNATURE: &'static str = "slashCommitment((bytes32,((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32),uint64),bytes32[],bytes32),(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),uint64,bytes32,(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)),((uint64,bytes,bytes32,address),uint64,bytes32,bytes),bytes)";
+			const SELECTOR: [u8; 4] = [69u8, 91u8, 197u8, 167u8];
 			#[inline]
 			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
 				tuple.into()
@@ -10447,9 +10324,8 @@ pub mod Registry {
 			#[inline]
 			fn tokenize(&self) -> Self::Token<'_> {
 				(
-					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(
-						&self.registrationRoot,
-					),
+					<IRegistry::RegistrationProof as alloy_sol_types::SolType>::tokenize(&self.proof),
+					<ISlasher::SignedDelegation as alloy_sol_types::SolType>::tokenize(&self.delegation),
 					<ISlasher::SignedCommitment as alloy_sol_types::SolType>::tokenize(&self.commitment),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.evidence),
 				)
@@ -11134,9 +11010,10 @@ pub mod Registry {
 		/// Prefer using `SolInterface` methods instead.
 		pub const SELECTORS: &'static [[u8; 4usize]] = &[
 			[26u8, 9u8, 25u8, 220u8],
+			[32u8, 118u8, 96u8, 38u8],
 			[36u8, 56u8, 123u8, 180u8],
+			[69u8, 91u8, 197u8, 167u8],
 			[73u8, 154u8, 226u8, 242u8],
-			[85u8, 182u8, 91u8, 230u8],
 			[88u8, 15u8, 140u8, 137u8],
 			[90u8, 24u8, 177u8, 146u8],
 			[102u8, 241u8, 187u8, 41u8],
@@ -11149,7 +11026,6 @@ pub mod Registry {
 			[159u8, 30u8, 44u8, 132u8],
 			[192u8, 46u8, 205u8, 140u8],
 			[195u8, 249u8, 9u8, 212u8],
-			[213u8, 7u8, 75u8, 68u8],
 			[220u8, 228u8, 54u8, 149u8],
 			[223u8, 45u8, 211u8, 172u8],
 			[227u8, 252u8, 2u8, 141u8],
@@ -11159,9 +11035,10 @@ pub mod Registry {
 		/// The names of the variants in the same order as `SELECTORS`.
 		pub const VARIANT_NAMES: &'static [&'static str] = &[
 			::core::stringify!(unregister),
-			::core::stringify!(getHistoricalCollateral),
-			::core::stringify!(slashEquivocation),
 			::core::stringify!(slashCommitment_0),
+			::core::stringify!(getHistoricalCollateral),
+			::core::stringify!(slashCommitment_1),
+			::core::stringify!(slashEquivocation),
 			::core::stringify!(optInToSlasher),
 			::core::stringify!(getSlasherCommitment),
 			::core::stringify!(getVerifiedOperatorData),
@@ -11174,7 +11051,6 @@ pub mod Registry {
 			::core::stringify!(claimSlashedCollateral),
 			::core::stringify!(slashingEvidenceAlreadyUsed),
 			::core::stringify!(getConfig),
-			::core::stringify!(slashCommitment_1),
 			::core::stringify!(register),
 			::core::stringify!(isSlashed_1),
 			::core::stringify!(claimCollateral),
@@ -11184,9 +11060,10 @@ pub mod Registry {
 		/// The signatures in the same order as `SELECTORS`.
 		pub const SIGNATURES: &'static [&'static str] = &[
 			<unregisterCall as alloy_sol_types::SolCall>::SIGNATURE,
-			<getHistoricalCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
-			<slashEquivocationCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<slashCommitment_0Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<getHistoricalCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashCommitment_1Call as alloy_sol_types::SolCall>::SIGNATURE,
+			<slashEquivocationCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<optInToSlasherCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<getSlasherCommitmentCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<getVerifiedOperatorDataCall as alloy_sol_types::SolCall>::SIGNATURE,
@@ -11199,7 +11076,6 @@ pub mod Registry {
 			<claimSlashedCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<slashingEvidenceAlreadyUsedCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<getConfigCall as alloy_sol_types::SolCall>::SIGNATURE,
-			<slashCommitment_1Call as alloy_sol_types::SolCall>::SIGNATURE,
 			<registerCall as alloy_sol_types::SolCall>::SIGNATURE,
 			<isSlashed_1Call as alloy_sol_types::SolCall>::SIGNATURE,
 			<claimCollateralCall as alloy_sol_types::SolCall>::SIGNATURE,
@@ -11275,6 +11151,13 @@ pub mod Registry {
 					unregister
 				},
 				{
+					fn slashCommitment_0(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
+						<slashCommitment_0Call as alloy_sol_types::SolCall>::abi_decode_raw(data)
+							.map(RegistryCalls::slashCommitment_0)
+					}
+					slashCommitment_0
+				},
+				{
 					fn getHistoricalCollateral(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
 						<getHistoricalCollateralCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
 							.map(RegistryCalls::getHistoricalCollateral)
@@ -11282,18 +11165,18 @@ pub mod Registry {
 					getHistoricalCollateral
 				},
 				{
+					fn slashCommitment_1(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
+						<slashCommitment_1Call as alloy_sol_types::SolCall>::abi_decode_raw(data)
+							.map(RegistryCalls::slashCommitment_1)
+					}
+					slashCommitment_1
+				},
+				{
 					fn slashEquivocation(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
 						<slashEquivocationCall as alloy_sol_types::SolCall>::abi_decode_raw(data)
 							.map(RegistryCalls::slashEquivocation)
 					}
 					slashEquivocation
-				},
-				{
-					fn slashCommitment_0(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
-						<slashCommitment_0Call as alloy_sol_types::SolCall>::abi_decode_raw(data)
-							.map(RegistryCalls::slashCommitment_0)
-					}
-					slashCommitment_0
 				},
 				{
 					fn optInToSlasher(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
@@ -11379,13 +11262,6 @@ pub mod Registry {
 					getConfig
 				},
 				{
-					fn slashCommitment_1(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
-						<slashCommitment_1Call as alloy_sol_types::SolCall>::abi_decode_raw(data)
-							.map(RegistryCalls::slashCommitment_1)
-					}
-					slashCommitment_1
-				},
-				{
 					fn register(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
 						<registerCall as alloy_sol_types::SolCall>::abi_decode_raw(data).map(RegistryCalls::register)
 					}
@@ -11440,6 +11316,13 @@ pub mod Registry {
 					unregister
 				},
 				{
+					fn slashCommitment_0(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
+						<slashCommitment_0Call as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
+							.map(RegistryCalls::slashCommitment_0)
+					}
+					slashCommitment_0
+				},
+				{
 					fn getHistoricalCollateral(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
 						<getHistoricalCollateralCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
 							.map(RegistryCalls::getHistoricalCollateral)
@@ -11447,18 +11330,18 @@ pub mod Registry {
 					getHistoricalCollateral
 				},
 				{
+					fn slashCommitment_1(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
+						<slashCommitment_1Call as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
+							.map(RegistryCalls::slashCommitment_1)
+					}
+					slashCommitment_1
+				},
+				{
 					fn slashEquivocation(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
 						<slashEquivocationCall as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
 							.map(RegistryCalls::slashEquivocation)
 					}
 					slashEquivocation
-				},
-				{
-					fn slashCommitment_0(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
-						<slashCommitment_0Call as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
-							.map(RegistryCalls::slashCommitment_0)
-					}
-					slashCommitment_0
 				},
 				{
 					fn optInToSlasher(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
@@ -11543,13 +11426,6 @@ pub mod Registry {
 							.map(RegistryCalls::getConfig)
 					}
 					getConfig
-				},
-				{
-					fn slashCommitment_1(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
-						<slashCommitment_1Call as alloy_sol_types::SolCall>::abi_decode_raw_validate(data)
-							.map(RegistryCalls::slashCommitment_1)
-					}
-					slashCommitment_1
 				},
 				{
 					fn register(data: &[u8]) -> alloy_sol_types::Result<RegistryCalls> {
@@ -11734,12 +11610,6 @@ pub mod Registry {
 		#[allow(missing_docs)]
 		DifferentSlots(DifferentSlots),
 		#[allow(missing_docs)]
-		ECDSAInvalidSignature(ECDSAInvalidSignature),
-		#[allow(missing_docs)]
-		ECDSAInvalidSignatureLength(ECDSAInvalidSignatureLength),
-		#[allow(missing_docs)]
-		ECDSAInvalidSignatureS(ECDSAInvalidSignatureS),
-		#[allow(missing_docs)]
 		EthTransferFailed(EthTransferFailed),
 		#[allow(missing_docs)]
 		FraudProofChallengeInvalid(FraudProofChallengeInvalid),
@@ -11838,16 +11708,13 @@ pub mod Registry {
 			[180u8, 165u8, 130u8, 195u8],
 			[198u8, 83u8, 232u8, 127u8],
 			[212u8, 15u8, 199u8, 75u8],
-			[215u8, 139u8, 206u8, 12u8],
 			[216u8, 167u8, 20u8, 33u8],
 			[217u8, 36u8, 229u8, 244u8],
 			[220u8, 222u8, 171u8, 163u8],
 			[229u8, 188u8, 68u8, 109u8],
 			[235u8, 64u8, 29u8, 130u8],
-			[246u8, 69u8, 238u8, 223u8],
 			[251u8, 15u8, 36u8, 68u8],
 			[252u8, 159u8, 104u8, 169u8],
-			[252u8, 230u8, 152u8, 247u8],
 		];
 		/// The names of the variants in the same order as `SELECTORS`.
 		pub const VARIANT_NAMES: &'static [&'static str] = &[
@@ -11881,16 +11748,13 @@ pub mod Registry {
 			::core::stringify!(UnauthorizedCommitment),
 			::core::stringify!(FraudProofChallengeInvalid),
 			::core::stringify!(TimestampTooOld),
-			::core::stringify!(ECDSAInvalidSignatureS),
 			::core::stringify!(FraudProofWindowNotMet),
 			::core::stringify!(InvalidOwnerAddress),
 			::core::stringify!(AlreadyOptedIn),
 			::core::stringify!(OptInDelayNotMet),
 			::core::stringify!(SlashWindowExpired),
-			::core::stringify!(ECDSAInvalidSignature),
 			::core::stringify!(UnregistrationDelayNotMet),
 			::core::stringify!(NoCollateralToClaim),
-			::core::stringify!(ECDSAInvalidSignatureLength),
 		];
 		/// The signatures in the same order as `SELECTORS`.
 		pub const SIGNATURES: &'static [&'static str] = &[
@@ -11924,16 +11788,13 @@ pub mod Registry {
 			<UnauthorizedCommitment as alloy_sol_types::SolError>::SIGNATURE,
 			<FraudProofChallengeInvalid as alloy_sol_types::SolError>::SIGNATURE,
 			<TimestampTooOld as alloy_sol_types::SolError>::SIGNATURE,
-			<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::SIGNATURE,
 			<FraudProofWindowNotMet as alloy_sol_types::SolError>::SIGNATURE,
 			<InvalidOwnerAddress as alloy_sol_types::SolError>::SIGNATURE,
 			<AlreadyOptedIn as alloy_sol_types::SolError>::SIGNATURE,
 			<OptInDelayNotMet as alloy_sol_types::SolError>::SIGNATURE,
 			<SlashWindowExpired as alloy_sol_types::SolError>::SIGNATURE,
-			<ECDSAInvalidSignature as alloy_sol_types::SolError>::SIGNATURE,
 			<UnregistrationDelayNotMet as alloy_sol_types::SolError>::SIGNATURE,
 			<NoCollateralToClaim as alloy_sol_types::SolError>::SIGNATURE,
-			<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::SIGNATURE,
 		];
 		/// Returns the signature for the given selector, if known.
 		#[inline]
@@ -11954,7 +11815,7 @@ pub mod Registry {
 	impl alloy_sol_types::SolInterface for RegistryErrors {
 		const NAME: &'static str = "RegistryErrors";
 		const MIN_DATA_LENGTH: usize = 0usize;
-		const COUNT: usize = 40usize;
+		const COUNT: usize = 37usize;
 		#[inline]
 		fn selector(&self) -> [u8; 4] {
 			match self {
@@ -11967,11 +11828,6 @@ pub mod Registry {
 				}
 				Self::DelegationsAreSame(_) => <DelegationsAreSame as alloy_sol_types::SolError>::SELECTOR,
 				Self::DifferentSlots(_) => <DifferentSlots as alloy_sol_types::SolError>::SELECTOR,
-				Self::ECDSAInvalidSignature(_) => <ECDSAInvalidSignature as alloy_sol_types::SolError>::SELECTOR,
-				Self::ECDSAInvalidSignatureLength(_) => {
-					<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::SELECTOR
-				}
-				Self::ECDSAInvalidSignatureS(_) => <ECDSAInvalidSignatureS as alloy_sol_types::SolError>::SELECTOR,
 				Self::EthTransferFailed(_) => <EthTransferFailed as alloy_sol_types::SolError>::SELECTOR,
 				Self::FraudProofChallengeInvalid(_) => {
 					<FraudProofChallengeInvalid as alloy_sol_types::SolError>::SELECTOR
@@ -12239,13 +12095,6 @@ pub mod Registry {
 					TimestampTooOld
 				},
 				{
-					fn ECDSAInvalidSignatureS(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::abi_decode_raw(data)
-							.map(RegistryErrors::ECDSAInvalidSignatureS)
-					}
-					ECDSAInvalidSignatureS
-				},
-				{
 					fn FraudProofWindowNotMet(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
 						<FraudProofWindowNotMet as alloy_sol_types::SolError>::abi_decode_raw(data)
 							.map(RegistryErrors::FraudProofWindowNotMet)
@@ -12281,13 +12130,6 @@ pub mod Registry {
 					SlashWindowExpired
 				},
 				{
-					fn ECDSAInvalidSignature(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignature as alloy_sol_types::SolError>::abi_decode_raw(data)
-							.map(RegistryErrors::ECDSAInvalidSignature)
-					}
-					ECDSAInvalidSignature
-				},
-				{
 					fn UnregistrationDelayNotMet(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
 						<UnregistrationDelayNotMet as alloy_sol_types::SolError>::abi_decode_raw(data)
 							.map(RegistryErrors::UnregistrationDelayNotMet)
@@ -12300,13 +12142,6 @@ pub mod Registry {
 							.map(RegistryErrors::NoCollateralToClaim)
 					}
 					NoCollateralToClaim
-				},
-				{
-					fn ECDSAInvalidSignatureLength(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::abi_decode_raw(data)
-							.map(RegistryErrors::ECDSAInvalidSignatureLength)
-					}
-					ECDSAInvalidSignatureLength
 				},
 			];
 			let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
@@ -12532,13 +12367,6 @@ pub mod Registry {
 					TimestampTooOld
 				},
 				{
-					fn ECDSAInvalidSignatureS(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::abi_decode_raw_validate(data)
-							.map(RegistryErrors::ECDSAInvalidSignatureS)
-					}
-					ECDSAInvalidSignatureS
-				},
-				{
 					fn FraudProofWindowNotMet(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
 						<FraudProofWindowNotMet as alloy_sol_types::SolError>::abi_decode_raw_validate(data)
 							.map(RegistryErrors::FraudProofWindowNotMet)
@@ -12574,13 +12402,6 @@ pub mod Registry {
 					SlashWindowExpired
 				},
 				{
-					fn ECDSAInvalidSignature(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignature as alloy_sol_types::SolError>::abi_decode_raw_validate(data)
-							.map(RegistryErrors::ECDSAInvalidSignature)
-					}
-					ECDSAInvalidSignature
-				},
-				{
 					fn UnregistrationDelayNotMet(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
 						<UnregistrationDelayNotMet as alloy_sol_types::SolError>::abi_decode_raw_validate(data)
 							.map(RegistryErrors::UnregistrationDelayNotMet)
@@ -12593,13 +12414,6 @@ pub mod Registry {
 							.map(RegistryErrors::NoCollateralToClaim)
 					}
 					NoCollateralToClaim
-				},
-				{
-					fn ECDSAInvalidSignatureLength(data: &[u8]) -> alloy_sol_types::Result<RegistryErrors> {
-						<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::abi_decode_raw_validate(data)
-							.map(RegistryErrors::ECDSAInvalidSignatureLength)
-					}
-					ECDSAInvalidSignatureLength
 				},
 			];
 			let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
@@ -12630,15 +12444,6 @@ pub mod Registry {
 					<DelegationsAreSame as alloy_sol_types::SolError>::abi_encoded_size(inner)
 				}
 				Self::DifferentSlots(inner) => <DifferentSlots as alloy_sol_types::SolError>::abi_encoded_size(inner),
-				Self::ECDSAInvalidSignature(inner) => {
-					<ECDSAInvalidSignature as alloy_sol_types::SolError>::abi_encoded_size(inner)
-				}
-				Self::ECDSAInvalidSignatureLength(inner) => {
-					<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::abi_encoded_size(inner)
-				}
-				Self::ECDSAInvalidSignatureS(inner) => {
-					<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::abi_encoded_size(inner)
-				}
 				Self::EthTransferFailed(inner) => {
 					<EthTransferFailed as alloy_sol_types::SolError>::abi_encoded_size(inner)
 				}
@@ -12738,15 +12543,6 @@ pub mod Registry {
 				}
 				Self::DifferentSlots(inner) => {
 					<DifferentSlots as alloy_sol_types::SolError>::abi_encode_raw(inner, out)
-				}
-				Self::ECDSAInvalidSignature(inner) => {
-					<ECDSAInvalidSignature as alloy_sol_types::SolError>::abi_encode_raw(inner, out)
-				}
-				Self::ECDSAInvalidSignatureLength(inner) => {
-					<ECDSAInvalidSignatureLength as alloy_sol_types::SolError>::abi_encode_raw(inner, out)
-				}
-				Self::ECDSAInvalidSignatureS(inner) => {
-					<ECDSAInvalidSignatureS as alloy_sol_types::SolError>::abi_encode_raw(inner, out)
 				}
 				Self::EthTransferFailed(inner) => {
 					<EthTransferFailed as alloy_sol_types::SolError>::abi_encode_raw(inner, out)
@@ -13203,21 +12999,21 @@ pub mod Registry {
 		///Creates a new call builder for the [`slashCommitment_0`] function.
 		pub fn slashCommitment_0(
 			&self,
-			proof: <IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
-			delegation: <ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
+			registrationRoot: alloy::sol_types::private::FixedBytes<32>,
 			commitment: <ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 			evidence: alloy::sol_types::private::Bytes,
 		) -> alloy_contract::SolCallBuilder<&P, slashCommitment_0Call, N> {
-			self.call_builder(&slashCommitment_0Call { proof, delegation, commitment, evidence })
+			self.call_builder(&slashCommitment_0Call { registrationRoot, commitment, evidence })
 		}
 		///Creates a new call builder for the [`slashCommitment_1`] function.
 		pub fn slashCommitment_1(
 			&self,
-			registrationRoot: alloy::sol_types::private::FixedBytes<32>,
+			proof: <IRegistry::RegistrationProof as alloy::sol_types::SolType>::RustType,
+			delegation: <ISlasher::SignedDelegation as alloy::sol_types::SolType>::RustType,
 			commitment: <ISlasher::SignedCommitment as alloy::sol_types::SolType>::RustType,
 			evidence: alloy::sol_types::private::Bytes,
 		) -> alloy_contract::SolCallBuilder<&P, slashCommitment_1Call, N> {
-			self.call_builder(&slashCommitment_1Call { registrationRoot, commitment, evidence })
+			self.call_builder(&slashCommitment_1Call { proof, delegation, commitment, evidence })
 		}
 		///Creates a new call builder for the [`slashEquivocation`] function.
 		pub fn slashEquivocation(

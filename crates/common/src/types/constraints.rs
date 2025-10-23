@@ -1,5 +1,5 @@
 use alloy::primitives::{Address, B256, Bytes};
-use alloy::sol_types::SolValue;
+use alloy::sol_types::{SolCall, SolValue};
 use alloy_primitives::keccak256;
 use eyre::Result;
 use serde::{Deserialize, Serialize};
@@ -8,6 +8,8 @@ use tracing::error;
 use blst::*;
 use commit_boost::prelude::{BlsPublicKey, BlsSignature};
 use urc::i_registry::BLS::{G1Point, G2Point};
+use urc::i_registry::IRegistry::SignedRegistration as SolSignedRegistration;
+use urc::i_registry::IRegistry::registerCall as SolRegisterCall;
 use urc::i_registry::ISlasher::Delegation as SolDelegation;
 
 use super::MessageType;
@@ -162,7 +164,7 @@ pub struct SignedRegistration {
 }
 
 impl SignedRegistration {
-	pub fn abi_encode(&self) -> Result<Bytes> {
+	pub fn as_sol_type(&self) -> Result<SolSignedRegistration> {
 		// Convert the pubkeys to G1 points
 		let pubkey = convert_pubkey_to_g1_point(&self.pubkey).map_err(|e| {
 			error!("Error converting proposer pubkey {} to G1 point: {e:?}", self.pubkey.as_hex_string());
@@ -172,7 +174,30 @@ impl SignedRegistration {
 			error!("Error converting signature {} to G2 point: {e:?}", hex::encode(self.signature.serialize()));
 			e
 		})?;
-		let encoded = (pubkey, signature, self.nonce).abi_encode_params(); // Rust equivalent of abi.encode(pubkey, signature, nonce) in Solidity
+		let registration = SolSignedRegistration { pubkey, signature, nonce: self.nonce };
+		Ok(registration)
+	}
+}
+
+/// Container for URC register() call parameters
+pub struct URCRegisterInputs {
+	pub registrations: Vec<SignedRegistration>,
+	pub owner: Address,
+	pub signing_id: B256,
+}
+
+impl URCRegisterInputs {
+	/// ABI encode for URC register() call
+	/// Signature: register(SignedRegistration[] calldata registrations, address owner, bytes32 signingId)
+	pub fn abi_encode_with_selector(&self) -> Result<Bytes> {
+		// Encode each SignedRegistration using the existing abi_encode method
+		let sol_registrations = self.registrations.iter().map(|r| r.as_sol_type()).collect::<Result<Vec<_>, _>>()?;
+
+		let register_call =
+			SolRegisterCall { registrations: sol_registrations, owner: self.owner, signingId: self.signing_id };
+
+		// Encodes with the register() selector
+		let encoded = register_call.abi_encode();
 		Ok(Bytes::from(encoded))
 	}
 }

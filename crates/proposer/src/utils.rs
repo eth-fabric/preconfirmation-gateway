@@ -13,7 +13,7 @@ use tracing::{debug, info, warn};
 use crate::config::ProposerConfig;
 
 /// Get all consensus BLS public keys from the signer client
-async fn get_consensus_keys<T>(commit_config: &mut StartCommitModuleConfig<T>) -> Result<Vec<BlsPublicKey>> {
+pub async fn get_consensus_keys<T>(commit_config: &mut StartCommitModuleConfig<T>) -> Result<Vec<BlsPublicKey>> {
 	let response = commit_config.signer_client.get_pubkeys().await.context("Failed to get public keys from signer")?;
 
 	Ok(response.keys.iter().map(|map| map.consensus.clone()).collect())
@@ -202,6 +202,9 @@ mod tests {
 			beacon_genesis_timestamp: 1606824023,
 			poll_interval_seconds: 60,
 			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+			urc_owner: "0x1111111111111111111111111111111111111111".to_string(),
+			execution_rpc_url: "http://localhost:8545".to_string(),
+			registration_collateral_wei: "1000000000000000000".to_string(),
 		};
 
 		let proposer_key = parse_bls_public_key(TEST_PROPOSER_KEY).unwrap();

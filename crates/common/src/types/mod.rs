@@ -12,7 +12,7 @@ pub use beacon::{
 pub use commitments::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo};
 pub use constraints::{
 	Constraint, ConstraintCapabilities, ConstraintsMessage, Delegation, Registration, SignedConstraints,
-	SignedDelegation, SignedRegistration,
+	SignedDelegation, SignedRegistration, URCRegisterInputs,
 };
 pub use database::DatabaseContext;
 pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};

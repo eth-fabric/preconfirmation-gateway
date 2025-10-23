@@ -9,6 +9,7 @@ pub mod r#bls_utils;
 pub mod r#bytes_utils;
 pub mod r#dummy_slasher;
 pub mod r#ecdsa;
+pub mod r#ecdsa_utils;
 pub mod r#enumerable_set;
 pub mod r#foo;
 pub mod r#i_reentrant_contract;

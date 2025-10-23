@@ -323,6 +323,7 @@ interface ISlasher {
 	struct Commitment {
 		uint64 commitmentType;
 		bytes payload;
+		bytes32 requestHash;
 		address slasher;
 	}
 	struct Delegation {
@@ -436,6 +437,11 @@ interface ISlasher {
 			"internalType": "bytes"
 		  },
 		  {
+			"name": "requestHash",
+			"type": "bytes32",
+			"internalType": "bytes32"
+		  },
+		  {
 			"name": "slasher",
 			"type": "address",
 			"internalType": "address"
@@ -501,7 +507,7 @@ pub mod ISlasher {
     );
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**```solidity
-	struct Commitment { uint64 commitmentType; bytes payload; address slasher; }
+	struct Commitment { uint64 commitmentType; bytes payload; bytes32 requestHash; address slasher; }
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
@@ -510,6 +516,8 @@ pub mod ISlasher {
 		pub commitmentType: u64,
 		#[allow(missing_docs)]
 		pub payload: alloy::sol_types::private::Bytes,
+		#[allow(missing_docs)]
+		pub requestHash: alloy::sol_types::private::FixedBytes<32>,
 		#[allow(missing_docs)]
 		pub slasher: alloy::sol_types::private::Address,
 	}
@@ -521,10 +529,16 @@ pub mod ISlasher {
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<64>,
 			alloy::sol_types::sol_data::Bytes,
+			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::Address,
 		);
 		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = (u64, alloy::sol_types::private::Bytes, alloy::sol_types::private::Address);
+		type UnderlyingRustTuple<'a> = (
+			u64,
+			alloy::sol_types::private::Bytes,
+			alloy::sol_types::private::FixedBytes<32>,
+			alloy::sol_types::private::Address,
+		);
 		#[cfg(test)]
 		#[allow(dead_code, unreachable_patterns)]
 		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
@@ -538,14 +552,14 @@ pub mod ISlasher {
 		#[doc(hidden)]
 		impl ::core::convert::From<Commitment> for UnderlyingRustTuple<'_> {
 			fn from(value: Commitment) -> Self {
-				(value.commitmentType, value.payload, value.slasher)
+				(value.commitmentType, value.payload, value.requestHash, value.slasher)
 			}
 		}
 		#[automatically_derived]
 		#[doc(hidden)]
 		impl ::core::convert::From<UnderlyingRustTuple<'_>> for Commitment {
 			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { commitmentType: tuple.0, payload: tuple.1, slasher: tuple.2 }
+				Self { commitmentType: tuple.0, payload: tuple.1, requestHash: tuple.2, slasher: tuple.3 }
 			}
 		}
 		#[automatically_derived]
@@ -559,6 +573,9 @@ pub mod ISlasher {
 				(
 					<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(&self.commitmentType),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.payload),
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(
+						&self.requestHash,
+					),
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(&self.slasher),
 				)
 			}
@@ -612,7 +629,7 @@ pub mod ISlasher {
 			#[inline]
 			fn eip712_root_type() -> alloy_sol_types::private::Cow<'static, str> {
 				alloy_sol_types::private::Cow::Borrowed(
-					"Commitment(uint64 commitmentType,bytes payload,address slasher)",
+					"Commitment(uint64 commitmentType,bytes payload,bytes32 requestHash,address slasher)",
 				)
 			}
 			#[inline]
@@ -631,6 +648,10 @@ pub mod ISlasher {
 					)
 					.0,
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::eip712_data_word(&self.payload).0,
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::eip712_data_word(
+						&self.requestHash,
+					)
+					.0,
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::eip712_data_word(&self.slasher)
 						.0,
 				]
@@ -646,6 +667,8 @@ pub mod ISlasher {
 						&rust.commitmentType,
 					) + <alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.payload,
+				) + <alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::topic_preimage_length(
+					&rust.requestHash,
 				) + <alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.slasher,
 				)
@@ -659,6 +682,10 @@ pub mod ISlasher {
 				);
 				<alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::encode_topic_preimage(
 					&rust.payload,
+					out,
+				);
+				<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::encode_topic_preimage(
+					&rust.requestHash,
 					out,
 				);
 				<alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -869,7 +896,7 @@ pub mod ISlasher {
 		}
 	};
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	/**Function with signature `slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)` and selector `0xb4dc07a7`.
+	/**Function with signature `slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)` and selector `0xc239ef42`.
 	```solidity
 	function slash(Delegation memory delegation, Commitment memory commitment, address committer, bytes memory evidence, address challenger) external returns (uint256 slashAmountWei);
 	```*/
@@ -888,7 +915,7 @@ pub mod ISlasher {
 		pub challenger: alloy::sol_types::private::Address,
 	}
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	///Container type for the return parameters of the [`slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)`](slashCall) function.
+	///Container type for the return parameters of the [`slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)`](slashCall) function.
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashReturn {
@@ -989,8 +1016,8 @@ pub mod ISlasher {
 			type Return = alloy::sol_types::private::primitives::aliases::U256;
 			type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)";
-			const SELECTOR: [u8; 4] = [180u8, 220u8, 7u8, 167u8];
+			const SIGNATURE: &'static str = "slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)";
+			const SELECTOR: [u8; 4] = [194u8, 57u8, 239u8, 66u8];
 			#[inline]
 			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
 				tuple.into()
@@ -1038,7 +1065,7 @@ pub mod ISlasher {
 		/// No guarantees are made about the order of the selectors.
 		///
 		/// Prefer using `SolInterface` methods instead.
-		pub const SELECTORS: &'static [[u8; 4usize]] = &[[180u8, 220u8, 7u8, 167u8]];
+		pub const SELECTORS: &'static [[u8; 4usize]] = &[[194u8, 57u8, 239u8, 66u8]];
 		/// The names of the variants in the same order as `SELECTORS`.
 		pub const VARIANT_NAMES: &'static [&'static str] = &[::core::stringify!(slash)];
 		/// The signatures in the same order as `SELECTORS`.
@@ -1061,7 +1088,7 @@ pub mod ISlasher {
 	#[automatically_derived]
 	impl alloy_sol_types::SolInterface for ISlasherCalls {
 		const NAME: &'static str = "ISlasherCalls";
-		const MIN_DATA_LENGTH: usize = 640usize;
+		const MIN_DATA_LENGTH: usize = 672usize;
 		const COUNT: usize = 1usize;
 		#[inline]
 		fn selector(&self) -> [u8; 4] {

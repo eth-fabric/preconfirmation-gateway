@@ -46,3 +46,8 @@ beacon_api_url = "https://ethereum-beacon-api.publicnode.com"
 beacon_genesis_timestamp = 1606824023
 poll_interval_seconds = 60
 
+# URC Registration Configuration
+urc_owner = "0xBB771250f7CA20123AA4c4175a49fdD8774838F3"
+execution_rpc_url = "http://localhost:8545"
+registration_collateral_wei = "1000000000000000000"
+

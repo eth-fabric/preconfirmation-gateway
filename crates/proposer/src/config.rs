@@ -26,6 +26,15 @@ pub struct ProposerConfig {
 
 	/// Module signing ID for this proposer instance
 	pub module_signing_id: String,
+
+	/// URC owner address for registration
+	pub urc_owner: String,
+
+	/// Execution RPC endpoint for sending transactions
+	pub execution_rpc_url: String,
+
+	/// Collateral amount to send with registration (in wei)
+	pub registration_collateral_wei: String,
 }
 
 impl common::config::ProposerConfig for ProposerConfig {
@@ -65,7 +74,10 @@ mod tests {
 			"beacon_api_url": "https://ethereum-beacon-api.publicnode.com",
 			"beacon_genesis_timestamp": 1606824023,
 			"poll_interval_seconds": 60,
-			"module_signing_id": "0x1111111111111111111111111111111111111111111111111111111111111111"
+			"module_signing_id": "0x1111111111111111111111111111111111111111111111111111111111111111",
+			"urc_owner": "0x2222222222222222222222222222222222222222",
+			"execution_rpc_url": "http://localhost:8545",
+			"registration_collateral_wei": "1000000000000000000"
 		}"#;
 
 		let config: ProposerConfig = serde_json::from_str(json).unwrap();

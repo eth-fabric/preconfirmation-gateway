@@ -42,22 +42,22 @@ pub mod MerkleTree {
 	/// The creation / init bytecode of the contract.
     ///
     /// ```text
-    ///0x60556032600b8282823980515f1a607314602657634e487b7160e01b5f525f60045260245ffd5b305f52607381538281f3fe730000000000000000000000000000000000000000301460806040525f80fdfea2646970667358221220decd13491f576ba4f21297b752cfd8a752b1bf4c2cb7ebd64e0b0f8d71acb55364736f6c63430008190033
+    ///0x60556032600b8282823980515f1a607314602657634e487b7160e01b5f525f60045260245ffd5b305f52607381538281f3fe730000000000000000000000000000000000000000301460806040525f80fdfea264697066735822122054a90be8410e1d59cb2e4525afad2dcc82832c9a21177040b9b31d802f487f9164736f6c63430008190033
     /// ```
     #[rustfmt::skip]
     #[allow(clippy::all)]
     pub static BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
-        b"`U`2`\x0B\x82\x82\x829\x80Q_\x1A`s\x14`&WcNH{q`\xE0\x1B_R_`\x04R`$_\xFD[0_R`s\x81S\x82\x81\xF3\xFEs\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R_\x80\xFD\xFE\xA2dipfsX\"\x12 \xDE\xCD\x13I\x1FWk\xA4\xF2\x12\x97\xB7R\xCF\xD8\xA7R\xB1\xBFL,\xB7\xEB\xD6N\x0B\x0F\x8Dq\xAC\xB5SdsolcC\0\x08\x19\x003",
+        b"`U`2`\x0B\x82\x82\x829\x80Q_\x1A`s\x14`&WcNH{q`\xE0\x1B_R_`\x04R`$_\xFD[0_R`s\x81S\x82\x81\xF3\xFEs\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R_\x80\xFD\xFE\xA2dipfsX\"\x12 T\xA9\x0B\xE8A\x0E\x1DY\xCB.E%\xAF\xAD-\xCC\x82\x83,\x9A!\x17p@\xB9\xB3\x1D\x80/H\x7F\x91dsolcC\0\x08\x19\x003",
     );
 	/// The runtime bytecode of the contract, as deployed on the network.
     ///
     /// ```text
-    ///0x730000000000000000000000000000000000000000301460806040525f80fdfea2646970667358221220decd13491f576ba4f21297b752cfd8a752b1bf4c2cb7ebd64e0b0f8d71acb55364736f6c63430008190033
+    ///0x730000000000000000000000000000000000000000301460806040525f80fdfea264697066735822122054a90be8410e1d59cb2e4525afad2dcc82832c9a21177040b9b31d802f487f9164736f6c63430008190033
     /// ```
     #[rustfmt::skip]
     #[allow(clippy::all)]
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
-        b"s\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R_\x80\xFD\xFE\xA2dipfsX\"\x12 \xDE\xCD\x13I\x1FWk\xA4\xF2\x12\x97\xB7R\xCF\xD8\xA7R\xB1\xBFL,\xB7\xEB\xD6N\x0B\x0F\x8Dq\xAC\xB5SdsolcC\0\x08\x19\x003",
+        b"s\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x000\x14`\x80`@R_\x80\xFD\xFE\xA2dipfsX\"\x12 T\xA9\x0B\xE8A\x0E\x1DY\xCB.E%\xAF\xAD-\xCC\x82\x83,\x9A!\x17p@\xB9\xB3\x1D\x80/H\x7F\x91dsolcC\0\x08\x19\x003",
     );
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**Custom error with signature `EmptyLeaves()` and selector `0xd0a523b8`.

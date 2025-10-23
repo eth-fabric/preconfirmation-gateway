@@ -311,7 +311,7 @@ pub mod BLS {
 
 ```solidity
 library ISlasher {
-	struct Commitment { uint64 commitmentType; bytes payload; address slasher; }
+	struct Commitment { uint64 commitmentType; bytes payload; bytes32 requestHash; address slasher; }
 	struct Delegation { BLS.G1Point proposer; BLS.G1Point delegate; address committer; uint64 slot; bytes metadata; }
 }
 ```*/
@@ -327,7 +327,7 @@ pub mod ISlasher {
 	use alloy::sol_types as alloy_sol_types;
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**```solidity
-	struct Commitment { uint64 commitmentType; bytes payload; address slasher; }
+	struct Commitment { uint64 commitmentType; bytes payload; bytes32 requestHash; address slasher; }
 	```*/
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
@@ -336,6 +336,8 @@ pub mod ISlasher {
 		pub commitmentType: u64,
 		#[allow(missing_docs)]
 		pub payload: alloy::sol_types::private::Bytes,
+		#[allow(missing_docs)]
+		pub requestHash: alloy::sol_types::private::FixedBytes<32>,
 		#[allow(missing_docs)]
 		pub slasher: alloy::sol_types::private::Address,
 	}
@@ -347,10 +349,16 @@ pub mod ISlasher {
 		type UnderlyingSolTuple<'a> = (
 			alloy::sol_types::sol_data::Uint<64>,
 			alloy::sol_types::sol_data::Bytes,
+			alloy::sol_types::sol_data::FixedBytes<32>,
 			alloy::sol_types::sol_data::Address,
 		);
 		#[doc(hidden)]
-		type UnderlyingRustTuple<'a> = (u64, alloy::sol_types::private::Bytes, alloy::sol_types::private::Address);
+		type UnderlyingRustTuple<'a> = (
+			u64,
+			alloy::sol_types::private::Bytes,
+			alloy::sol_types::private::FixedBytes<32>,
+			alloy::sol_types::private::Address,
+		);
 		#[cfg(test)]
 		#[allow(dead_code, unreachable_patterns)]
 		fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
@@ -364,14 +372,14 @@ pub mod ISlasher {
 		#[doc(hidden)]
 		impl ::core::convert::From<Commitment> for UnderlyingRustTuple<'_> {
 			fn from(value: Commitment) -> Self {
-				(value.commitmentType, value.payload, value.slasher)
+				(value.commitmentType, value.payload, value.requestHash, value.slasher)
 			}
 		}
 		#[automatically_derived]
 		#[doc(hidden)]
 		impl ::core::convert::From<UnderlyingRustTuple<'_>> for Commitment {
 			fn from(tuple: UnderlyingRustTuple<'_>) -> Self {
-				Self { commitmentType: tuple.0, payload: tuple.1, slasher: tuple.2 }
+				Self { commitmentType: tuple.0, payload: tuple.1, requestHash: tuple.2, slasher: tuple.3 }
 			}
 		}
 		#[automatically_derived]
@@ -385,6 +393,9 @@ pub mod ISlasher {
 				(
 					<alloy::sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(&self.commitmentType),
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(&self.payload),
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::tokenize(
+						&self.requestHash,
+					),
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::tokenize(&self.slasher),
 				)
 			}
@@ -438,7 +449,7 @@ pub mod ISlasher {
 			#[inline]
 			fn eip712_root_type() -> alloy_sol_types::private::Cow<'static, str> {
 				alloy_sol_types::private::Cow::Borrowed(
-					"Commitment(uint64 commitmentType,bytes payload,address slasher)",
+					"Commitment(uint64 commitmentType,bytes payload,bytes32 requestHash,address slasher)",
 				)
 			}
 			#[inline]
@@ -457,6 +468,10 @@ pub mod ISlasher {
 					)
 					.0,
 					<alloy::sol_types::sol_data::Bytes as alloy_sol_types::SolType>::eip712_data_word(&self.payload).0,
+					<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::SolType>::eip712_data_word(
+						&self.requestHash,
+					)
+					.0,
 					<alloy::sol_types::sol_data::Address as alloy_sol_types::SolType>::eip712_data_word(&self.slasher)
 						.0,
 				]
@@ -472,6 +487,8 @@ pub mod ISlasher {
 						&rust.commitmentType,
 					) + <alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.payload,
+				) + <alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::topic_preimage_length(
+					&rust.requestHash,
 				) + <alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::topic_preimage_length(
 					&rust.slasher,
 				)
@@ -485,6 +502,10 @@ pub mod ISlasher {
 				);
 				<alloy::sol_types::sol_data::Bytes as alloy_sol_types::EventTopic>::encode_topic_preimage(
 					&rust.payload,
+					out,
+				);
+				<alloy::sol_types::sol_data::FixedBytes<32> as alloy_sol_types::EventTopic>::encode_topic_preimage(
+					&rust.requestHash,
 					out,
 				);
 				<alloy::sol_types::sol_data::Address as alloy_sol_types::EventTopic>::encode_topic_preimage(
@@ -808,6 +829,7 @@ library ISlasher {
 	struct Commitment {
 		uint64 commitmentType;
 		bytes payload;
+		bytes32 requestHash;
 		address slasher;
 	}
 	struct Delegation {
@@ -937,6 +959,11 @@ interface DummySlasher {
 			"internalType": "bytes"
 		  },
 		  {
+			"name": "requestHash",
+			"type": "bytes32",
+			"internalType": "bytes32"
+		  },
+		  {
 			"name": "slasher",
 			"type": "address",
 			"internalType": "address"
@@ -983,22 +1010,22 @@ pub mod DummySlasher {
 	/// The creation / init bytecode of the contract.
     ///
     /// ```text
-    ///0x6080604052670de0b6b3a76400005f553480156019575f80fd5b506101ba806100275f395ff3fe608060405234801561000f575f80fd5b5060043610610034575f3560e01c80634968f6c514610038578063b4dc07a714610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b6100406100603660046100cc565b50505f54949350505050565b80356001600160a01b0381168114610082575f80fd5b919050565b5f8083601f840112610097575f80fd5b50813567ffffffffffffffff8111156100ae575f80fd5b6020830191508360208285010111156100c5575f80fd5b9250929050565b5f805f805f8060a087890312156100e1575f80fd5b863567ffffffffffffffff808211156100f8575f80fd5b90880190610160828b03121561010c575f80fd5b90965060208801359080821115610121575f80fd5b908801906060828b031215610134575f80fd5b81965061014360408a0161006c565b95506060890135915080821115610158575f80fd5b5061016589828a01610087565b909450925061017890506080880161006c565b9050929550929550929556fea2646970667358221220861de82227f94043ec5cd21663b47b4eae87678e5336eb7fe73a7e6304ebee4b64736f6c63430008190033
+    ///0x6080604052670de0b6b3a76400005f553480156019575f80fd5b506101ba806100275f395ff3fe608060405234801561000f575f80fd5b5060043610610034575f3560e01c80634968f6c514610038578063c239ef4214610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b6100406100603660046100cc565b50505f54949350505050565b80356001600160a01b0381168114610082575f80fd5b919050565b5f8083601f840112610097575f80fd5b50813567ffffffffffffffff8111156100ae575f80fd5b6020830191508360208285010111156100c5575f80fd5b9250929050565b5f805f805f8060a087890312156100e1575f80fd5b863567ffffffffffffffff808211156100f8575f80fd5b90880190610160828b03121561010c575f80fd5b90965060208801359080821115610121575f80fd5b908801906080828b031215610134575f80fd5b81965061014360408a0161006c565b95506060890135915080821115610158575f80fd5b5061016589828a01610087565b909450925061017890506080880161006c565b9050929550929550929556fea26469706673582212201e32f9b1df90018e1bfbb86a9e3f00848040f488c64e2986d84b7f68a539e21864736f6c63430008190033
     /// ```
     #[rustfmt::skip]
     #[allow(clippy::all)]
     pub static BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
-        b"`\x80`@Rg\r\xE0\xB6\xB3\xA7d\0\0_U4\x80\x15`\x19W_\x80\xFD[Pa\x01\xBA\x80a\0'_9_\xF3\xFE`\x80`@R4\x80\x15a\0\x0FW_\x80\xFD[P`\x046\x10a\x004W_5`\xE0\x1C\x80cIh\xF6\xC5\x14a\08W\x80c\xB4\xDC\x07\xA7\x14a\0RW[_\x80\xFD[a\0@_T\x81V[`@Q\x90\x81R` \x01`@Q\x80\x91\x03\x90\xF3[a\0@a\0`6`\x04a\0\xCCV[PP_T\x94\x93PPPPV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\0\x82W_\x80\xFD[\x91\x90PV[_\x80\x83`\x1F\x84\x01\x12a\0\x97W_\x80\xFD[P\x815g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\0\xAEW_\x80\xFD[` \x83\x01\x91P\x83` \x82\x85\x01\x01\x11\x15a\0\xC5W_\x80\xFD[\x92P\x92\x90PV[_\x80_\x80_\x80`\xA0\x87\x89\x03\x12\x15a\0\xE1W_\x80\xFD[\x865g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\0\xF8W_\x80\xFD[\x90\x88\x01\x90a\x01`\x82\x8B\x03\x12\x15a\x01\x0CW_\x80\xFD[\x90\x96P` \x88\x015\x90\x80\x82\x11\x15a\x01!W_\x80\xFD[\x90\x88\x01\x90``\x82\x8B\x03\x12\x15a\x014W_\x80\xFD[\x81\x96Pa\x01C`@\x8A\x01a\0lV[\x95P``\x89\x015\x91P\x80\x82\x11\x15a\x01XW_\x80\xFD[Pa\x01e\x89\x82\x8A\x01a\0\x87V[\x90\x94P\x92Pa\x01x\x90P`\x80\x88\x01a\0lV[\x90P\x92\x95P\x92\x95P\x92\x95V\xFE\xA2dipfsX\"\x12 \x86\x1D\xE8\"'\xF9@C\xEC\\\xD2\x16c\xB4{N\xAE\x87g\x8ES6\xEB\x7F\xE7:~c\x04\xEB\xEEKdsolcC\0\x08\x19\x003",
+        b"`\x80`@Rg\r\xE0\xB6\xB3\xA7d\0\0_U4\x80\x15`\x19W_\x80\xFD[Pa\x01\xBA\x80a\0'_9_\xF3\xFE`\x80`@R4\x80\x15a\0\x0FW_\x80\xFD[P`\x046\x10a\x004W_5`\xE0\x1C\x80cIh\xF6\xC5\x14a\08W\x80c\xC29\xEFB\x14a\0RW[_\x80\xFD[a\0@_T\x81V[`@Q\x90\x81R` \x01`@Q\x80\x91\x03\x90\xF3[a\0@a\0`6`\x04a\0\xCCV[PP_T\x94\x93PPPPV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\0\x82W_\x80\xFD[\x91\x90PV[_\x80\x83`\x1F\x84\x01\x12a\0\x97W_\x80\xFD[P\x815g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\0\xAEW_\x80\xFD[` \x83\x01\x91P\x83` \x82\x85\x01\x01\x11\x15a\0\xC5W_\x80\xFD[\x92P\x92\x90PV[_\x80_\x80_\x80`\xA0\x87\x89\x03\x12\x15a\0\xE1W_\x80\xFD[\x865g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\0\xF8W_\x80\xFD[\x90\x88\x01\x90a\x01`\x82\x8B\x03\x12\x15a\x01\x0CW_\x80\xFD[\x90\x96P` \x88\x015\x90\x80\x82\x11\x15a\x01!W_\x80\xFD[\x90\x88\x01\x90`\x80\x82\x8B\x03\x12\x15a\x014W_\x80\xFD[\x81\x96Pa\x01C`@\x8A\x01a\0lV[\x95P``\x89\x015\x91P\x80\x82\x11\x15a\x01XW_\x80\xFD[Pa\x01e\x89\x82\x8A\x01a\0\x87V[\x90\x94P\x92Pa\x01x\x90P`\x80\x88\x01a\0lV[\x90P\x92\x95P\x92\x95P\x92\x95V\xFE\xA2dipfsX\"\x12 \x1E2\xF9\xB1\xDF\x90\x01\x8E\x1B\xFB\xB8j\x9E?\0\x84\x80@\xF4\x88\xC6N)\x86\xD8K\x7Fh\xA59\xE2\x18dsolcC\0\x08\x19\x003",
     );
 	/// The runtime bytecode of the contract, as deployed on the network.
     ///
     /// ```text
-    ///0x608060405234801561000f575f80fd5b5060043610610034575f3560e01c80634968f6c514610038578063b4dc07a714610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b6100406100603660046100cc565b50505f54949350505050565b80356001600160a01b0381168114610082575f80fd5b919050565b5f8083601f840112610097575f80fd5b50813567ffffffffffffffff8111156100ae575f80fd5b6020830191508360208285010111156100c5575f80fd5b9250929050565b5f805f805f8060a087890312156100e1575f80fd5b863567ffffffffffffffff808211156100f8575f80fd5b90880190610160828b03121561010c575f80fd5b90965060208801359080821115610121575f80fd5b908801906060828b031215610134575f80fd5b81965061014360408a0161006c565b95506060890135915080821115610158575f80fd5b5061016589828a01610087565b909450925061017890506080880161006c565b9050929550929550929556fea2646970667358221220861de82227f94043ec5cd21663b47b4eae87678e5336eb7fe73a7e6304ebee4b64736f6c63430008190033
+    ///0x608060405234801561000f575f80fd5b5060043610610034575f3560e01c80634968f6c514610038578063c239ef4214610052575b5f80fd5b6100405f5481565b60405190815260200160405180910390f35b6100406100603660046100cc565b50505f54949350505050565b80356001600160a01b0381168114610082575f80fd5b919050565b5f8083601f840112610097575f80fd5b50813567ffffffffffffffff8111156100ae575f80fd5b6020830191508360208285010111156100c5575f80fd5b9250929050565b5f805f805f8060a087890312156100e1575f80fd5b863567ffffffffffffffff808211156100f8575f80fd5b90880190610160828b03121561010c575f80fd5b90965060208801359080821115610121575f80fd5b908801906080828b031215610134575f80fd5b81965061014360408a0161006c565b95506060890135915080821115610158575f80fd5b5061016589828a01610087565b909450925061017890506080880161006c565b9050929550929550929556fea26469706673582212201e32f9b1df90018e1bfbb86a9e3f00848040f488c64e2986d84b7f68a539e21864736f6c63430008190033
     /// ```
     #[rustfmt::skip]
     #[allow(clippy::all)]
     pub static DEPLOYED_BYTECODE: alloy_sol_types::private::Bytes = alloy_sol_types::private::Bytes::from_static(
-        b"`\x80`@R4\x80\x15a\0\x0FW_\x80\xFD[P`\x046\x10a\x004W_5`\xE0\x1C\x80cIh\xF6\xC5\x14a\08W\x80c\xB4\xDC\x07\xA7\x14a\0RW[_\x80\xFD[a\0@_T\x81V[`@Q\x90\x81R` \x01`@Q\x80\x91\x03\x90\xF3[a\0@a\0`6`\x04a\0\xCCV[PP_T\x94\x93PPPPV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\0\x82W_\x80\xFD[\x91\x90PV[_\x80\x83`\x1F\x84\x01\x12a\0\x97W_\x80\xFD[P\x815g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\0\xAEW_\x80\xFD[` \x83\x01\x91P\x83` \x82\x85\x01\x01\x11\x15a\0\xC5W_\x80\xFD[\x92P\x92\x90PV[_\x80_\x80_\x80`\xA0\x87\x89\x03\x12\x15a\0\xE1W_\x80\xFD[\x865g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\0\xF8W_\x80\xFD[\x90\x88\x01\x90a\x01`\x82\x8B\x03\x12\x15a\x01\x0CW_\x80\xFD[\x90\x96P` \x88\x015\x90\x80\x82\x11\x15a\x01!W_\x80\xFD[\x90\x88\x01\x90``\x82\x8B\x03\x12\x15a\x014W_\x80\xFD[\x81\x96Pa\x01C`@\x8A\x01a\0lV[\x95P``\x89\x015\x91P\x80\x82\x11\x15a\x01XW_\x80\xFD[Pa\x01e\x89\x82\x8A\x01a\0\x87V[\x90\x94P\x92Pa\x01x\x90P`\x80\x88\x01a\0lV[\x90P\x92\x95P\x92\x95P\x92\x95V\xFE\xA2dipfsX\"\x12 \x86\x1D\xE8\"'\xF9@C\xEC\\\xD2\x16c\xB4{N\xAE\x87g\x8ES6\xEB\x7F\xE7:~c\x04\xEB\xEEKdsolcC\0\x08\x19\x003",
+        b"`\x80`@R4\x80\x15a\0\x0FW_\x80\xFD[P`\x046\x10a\x004W_5`\xE0\x1C\x80cIh\xF6\xC5\x14a\08W\x80c\xC29\xEFB\x14a\0RW[_\x80\xFD[a\0@_T\x81V[`@Q\x90\x81R` \x01`@Q\x80\x91\x03\x90\xF3[a\0@a\0`6`\x04a\0\xCCV[PP_T\x94\x93PPPPV[\x805`\x01`\x01`\xA0\x1B\x03\x81\x16\x81\x14a\0\x82W_\x80\xFD[\x91\x90PV[_\x80\x83`\x1F\x84\x01\x12a\0\x97W_\x80\xFD[P\x815g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x81\x11\x15a\0\xAEW_\x80\xFD[` \x83\x01\x91P\x83` \x82\x85\x01\x01\x11\x15a\0\xC5W_\x80\xFD[\x92P\x92\x90PV[_\x80_\x80_\x80`\xA0\x87\x89\x03\x12\x15a\0\xE1W_\x80\xFD[\x865g\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x80\x82\x11\x15a\0\xF8W_\x80\xFD[\x90\x88\x01\x90a\x01`\x82\x8B\x03\x12\x15a\x01\x0CW_\x80\xFD[\x90\x96P` \x88\x015\x90\x80\x82\x11\x15a\x01!W_\x80\xFD[\x90\x88\x01\x90`\x80\x82\x8B\x03\x12\x15a\x014W_\x80\xFD[\x81\x96Pa\x01C`@\x8A\x01a\0lV[\x95P``\x89\x015\x91P\x80\x82\x11\x15a\x01XW_\x80\xFD[Pa\x01e\x89\x82\x8A\x01a\0\x87V[\x90\x94P\x92Pa\x01x\x90P`\x80\x88\x01a\0lV[\x90P\x92\x95P\x92\x95P\x92\x95V\xFE\xA2dipfsX\"\x12 \x1E2\xF9\xB1\xDF\x90\x01\x8E\x1B\xFB\xB8j\x9E?\0\x84\x80@\xF4\x88\xC6N)\x86\xD8K\x7Fh\xA59\xE2\x18dsolcC\0\x08\x19\x003",
     );
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
 	/**Function with signature `SLASH_AMOUNT_WEI()` and selector `0x4968f6c5`.
@@ -1117,7 +1144,7 @@ pub mod DummySlasher {
 		}
 	};
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	/**Function with signature `slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)` and selector `0xb4dc07a7`.
+	/**Function with signature `slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)` and selector `0xc239ef42`.
 	```solidity
 	function slash(ISlasher.Delegation memory delegation, ISlasher.Commitment memory commitment, address committer, bytes memory evidence, address challenger) external returns (uint256 slashAmountWei);
 	```*/
@@ -1136,7 +1163,7 @@ pub mod DummySlasher {
 		pub challenger: alloy::sol_types::private::Address,
 	}
 	#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq, Eq, Hash)]
-	///Container type for the return parameters of the [`slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)`](slashCall) function.
+	///Container type for the return parameters of the [`slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)`](slashCall) function.
 	#[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
 	#[derive(Clone)]
 	pub struct slashReturn {
@@ -1237,8 +1264,8 @@ pub mod DummySlasher {
 			type Return = alloy::sol_types::private::primitives::aliases::U256;
 			type ReturnTuple<'a> = (alloy::sol_types::sol_data::Uint<256>,);
 			type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
-			const SIGNATURE: &'static str = "slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,address),address,bytes,address)";
-			const SELECTOR: [u8; 4] = [180u8, 220u8, 7u8, 167u8];
+			const SIGNATURE: &'static str = "slash(((bytes32,bytes32,bytes32,bytes32),(bytes32,bytes32,bytes32,bytes32),address,uint64,bytes),(uint64,bytes,bytes32,address),address,bytes,address)";
+			const SELECTOR: [u8; 4] = [194u8, 57u8, 239u8, 66u8];
 			#[inline]
 			fn new<'a>(tuple: <Self::Parameters<'a> as alloy_sol_types::SolType>::RustType) -> Self {
 				tuple.into()
@@ -1288,7 +1315,7 @@ pub mod DummySlasher {
 		/// No guarantees are made about the order of the selectors.
 		///
 		/// Prefer using `SolInterface` methods instead.
-		pub const SELECTORS: &'static [[u8; 4usize]] = &[[73u8, 104u8, 246u8, 197u8], [180u8, 220u8, 7u8, 167u8]];
+		pub const SELECTORS: &'static [[u8; 4usize]] = &[[73u8, 104u8, 246u8, 197u8], [194u8, 57u8, 239u8, 66u8]];
 		/// The names of the variants in the same order as `SELECTORS`.
 		pub const VARIANT_NAMES: &'static [&'static str] =
 			&[::core::stringify!(SLASH_AMOUNT_WEI), ::core::stringify!(slash)];
