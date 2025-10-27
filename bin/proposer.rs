@@ -9,7 +9,9 @@ use common::slot_timer::SlotTimer;
 use constraints::ConstraintsClient;
 use eyre::{Context, Result};
 use proposer::{
-	ProposerConfig, process_lookahead, send_opt_in_to_slasher_transaction, send_registration_transaction,
+	ProposerConfig, get_slasher_commitment, process_lookahead, send_add_collateral_transaction,
+	send_claim_collateral_transaction, send_claim_slashed_collateral_transaction, send_opt_in_to_slasher_transaction,
+	send_opt_out_of_slasher_transaction, send_registration_transaction, send_unregister_transaction,
 	sign_registrations,
 };
 use tokio::time::{Duration, interval};
@@ -77,6 +79,124 @@ enum Commands {
 		#[arg(long)]
 		skip_precheck: bool,
 	},
+
+	/// Opt-out of a given slasher
+	OptOutOfSlasher {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root to operate on
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Slasher address
+		#[arg(long)]
+		slasher: Address,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+	},
+
+	/// Unregister an operator by registration root
+	Unregister {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+	},
+
+	/// Add collateral (in wei) to an existing operator
+	AddCollateral {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Amount of ETH in wei to add as collateral
+		#[arg(long)]
+		amount_wei: U256,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+	},
+
+	/// Get the slasher commitment for a registration+slasher
+	GetSlasherCommitment {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Slasher address
+		#[arg(long)]
+		slasher: Address,
+	},
+
+	/// Claim collateral after unregister and unregistrationDelay elapsed
+	ClaimCollateral {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+	},
+
+	/// Claim slashed collateral after slashWindow elapsed
+	ClaimSlashedCollateral {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+	},
 }
 
 #[tokio::main]
@@ -110,6 +230,24 @@ async fn main() -> Result<()> {
 				skip_precheck,
 			)
 			.await
+		}
+		Commands::OptOutOfSlasher { urc_address, registration_root, slasher, keystore, password } => {
+			handle_opt_out_of_slasher_command(urc_address, registration_root, slasher, keystore, password).await
+		}
+		Commands::Unregister { urc_address, registration_root, keystore, password } => {
+			handle_unregister_command(urc_address, registration_root, keystore, password).await
+		}
+		Commands::AddCollateral { urc_address, registration_root, amount_wei, keystore, password } => {
+			handle_add_collateral_command(urc_address, registration_root, amount_wei, keystore, password).await
+		}
+		Commands::GetSlasherCommitment { urc_address, registration_root, slasher } => {
+			handle_get_slasher_commitment_command(urc_address, registration_root, slasher).await
+		}
+		Commands::ClaimCollateral { urc_address, registration_root, keystore, password } => {
+			handle_claim_collateral_command(urc_address, registration_root, keystore, password).await
+		}
+		Commands::ClaimSlashedCollateral { urc_address, registration_root, keystore, password } => {
+			handle_claim_slashed_collateral_command(urc_address, registration_root, keystore, password).await
 		}
 	}
 }
@@ -243,6 +381,195 @@ async fn handle_register_command(
 	info!("Owner: {:?}", owner);
 	info!("Number of keys registered: {}", inputs.registrations.len());
 
+	Ok(())
+}
+
+async fn handle_opt_out_of_slasher_command(
+	urc_address: Address,
+	registration_root: B256,
+	slasher: Address,
+	keystore_path: String,
+	password: Option<String>,
+) -> Result<()> {
+	info!("Starting URC opt-out of slasher process");
+
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	let tx_hash = send_opt_out_of_slasher_transaction(
+		urc_address,
+		registration_root,
+		slasher,
+		&execution_rpc_url,
+		&keystore_path,
+		&password,
+	)
+	.await
+	.context("Failed to send optOutOfSlasher transaction")?;
+
+	info!("✅ Opt-out successful!\nTransaction hash: {:?}", tx_hash);
+	Ok(())
+}
+
+async fn handle_unregister_command(
+	urc_address: Address,
+	registration_root: B256,
+	keystore_path: String,
+	password: Option<String>,
+) -> Result<()> {
+	info!("Starting URC unregister process");
+
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	let tx_hash =
+		send_unregister_transaction(urc_address, registration_root, &execution_rpc_url, &keystore_path, &password)
+			.await
+			.context("Failed to send unregister transaction")?;
+
+	info!("✅ Unregister successful!\nTransaction hash: {:?}", tx_hash);
+	Ok(())
+}
+
+async fn handle_add_collateral_command(
+	urc_address: Address,
+	registration_root: B256,
+	amount_wei: U256,
+	keystore_path: String,
+	password: Option<String>,
+) -> Result<()> {
+	info!("Starting URC add-collateral process");
+
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	let tx_hash = send_add_collateral_transaction(
+		urc_address,
+		registration_root,
+		amount_wei,
+		&execution_rpc_url,
+		&keystore_path,
+		&password,
+	)
+	.await
+	.context("Failed to send addCollateral transaction")?;
+
+	info!("✅ Add-collateral successful!\nTransaction hash: {:?}", tx_hash);
+	Ok(())
+}
+
+async fn handle_get_slasher_commitment_command(
+	urc_address: Address,
+	registration_root: B256,
+	slasher: Address,
+) -> Result<()> {
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let sc = get_slasher_commitment(urc_address, registration_root, slasher, &execution_rpc_url)
+		.await
+		.context("Failed to fetch slasher commitment")?;
+
+	info!(
+		"SlasherCommitment: optedInAt={}, optedOutAt={}, slashed={}, committer={:?}",
+		sc.optedInAt, sc.optedOutAt, sc.slashed, sc.committer
+	);
+	Ok(())
+}
+
+async fn handle_claim_collateral_command(
+	urc_address: Address,
+	registration_root: B256,
+	keystore_path: String,
+	password: Option<String>,
+) -> Result<()> {
+	info!("Starting URC claim-collateral process");
+
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	let tx_hash = send_claim_collateral_transaction(
+		urc_address,
+		registration_root,
+		&execution_rpc_url,
+		&keystore_path,
+		&password,
+	)
+	.await
+	.context("Failed to send claimCollateral transaction")?;
+
+	info!("✅ Claim-collateral successful!\nTransaction hash: {:?}", tx_hash);
+	Ok(())
+}
+
+async fn handle_claim_slashed_collateral_command(
+	urc_address: Address,
+	registration_root: B256,
+	keystore_path: String,
+	password: Option<String>,
+) -> Result<()> {
+	info!("Starting URC claim-slashed-collateral process");
+
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	let tx_hash = send_claim_slashed_collateral_transaction(
+		urc_address,
+		registration_root,
+		&execution_rpc_url,
+		&keystore_path,
+		&password,
+	)
+	.await
+	.context("Failed to send claimSlashedCollateral transaction")?;
+
+	info!("✅ Claim-slashed-collateral successful!\nTransaction hash: {:?}", tx_hash);
 	Ok(())
 }
 
