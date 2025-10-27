@@ -3,7 +3,7 @@ use commit_boost::prelude::*;
 use commitments::{CommitmentsServerState, server};
 use common::config::{CommitmentsConfig, GatewayConfig, InclusionGatewayConfig};
 use common::db::create_database;
-use common::execution::{ExecutionApiClient, ExecutionApiConfig};
+use common::execution::build_eth_provider;
 use common::slot_timer::SlotTimer;
 use common::types;
 use eyre::Result;
@@ -52,13 +52,7 @@ async fn main() -> Result<()> {
 	let bls_public_key = bls_pubkey_from_hex(commitments_config.bls_public_key())
 		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 
-	// Create execution client for commitments server
-	let execution_config = ExecutionApiConfig {
-		endpoint: gateway_config.execution_endpoint_url().to_string(),
-		request_timeout_secs: gateway_config.execution_request_timeout_secs(),
-		max_retries: gateway_config.execution_max_retries(),
-	};
-	let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
+	// Create provider for commitments server (built on demand in utils)
 
 	// Create commitments server state (CommitmentsServerState will handle wrapping in Arc<Mutex<>>)
 	// We need to temporarily take ownership to construct the state, but CommitmentsServerState
@@ -81,7 +75,6 @@ async fn main() -> Result<()> {
 			gateway_config.relay_url().to_string(),
 			gateway_config.constraints_api_key().map(|s| s.to_string()),
 			slot_timer.clone(),
-			execution_client,
 		)
 	};
 

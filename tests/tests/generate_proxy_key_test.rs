@@ -92,14 +92,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	// Create slot timer with test genesis timestamp
 	let slot_timer = SlotTimer::new(1606824023);
 
-	// Create mock Reth client for tests
-	let execution_config = common::execution::ExecutionApiConfig {
-		endpoint: "http://localhost:8545".to_string(),
-		request_timeout_secs: 10,
-		max_retries: 3,
-	};
-	let execution_client =
-		Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config).unwrap());
+	// Execution client removed; provider is constructed on demand in utils
 
 	let rpc_context = commitments::CommitmentsServerState::new(
 		database,
@@ -108,7 +101,7 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		relay_url,
 		api_key,
 		slot_timer,
-		execution_client,
+		// no execution client
 	);
 
 	// Start RPC server

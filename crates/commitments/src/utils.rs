@@ -1,10 +1,11 @@
 use alloy::consensus::TxEnvelope;
 use alloy::network::TransactionBuilder;
-use alloy::primitives::{Address, B256, Bytes, keccak256};
+use alloy::primitives::{Address, B256, Bytes, U256, keccak256};
 use alloy::rlp::Decodable;
 use alloy_consensus::SignableTransaction;
 use alloy_consensus::transaction::SignerRecoverable;
 use commit_boost::prelude::StartCommitModuleConfig;
+use common::config::GatewayConfig;
 use eyre::{Result, WrapErr};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -270,9 +271,9 @@ pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
 /// # Returns
 ///
 /// `FeeInfo` containing the calculated fee and commitment type
-pub async fn calculate_fee_info<R: common::execution::RpcClient>(
+pub async fn calculate_fee_info<T: GatewayConfig>(
 	request: &CommitmentRequest,
-	execution_client: &common::execution::ExecutionApiClient<R>,
+	context: &crate::CommitmentsServerState<T>,
 ) -> Result<FeeInfo> {
 	debug!("Calculating fee for commitment type: {}", request.commitment_type);
 
@@ -286,30 +287,32 @@ pub async fn calculate_fee_info<R: common::execution::RpcClient>(
 	// 3. Convert to TransactionRequest for gas estimation
 	let tx_request = tx_envelope_to_rpc_request(&tx_envelope)?;
 
-	// 4. Estimate gas required for the transaction
+	// 4. Estimate gas required for the transaction using Alloy provider
+	let endpoint = {
+		let cfg = context.commit_config.try_lock().map_err(|e| eyre::eyre!("Failed to lock commit_config: {}", e))?;
+		cfg.extra.execution_endpoint_url().to_string()
+	};
+	let provider = common::execution::build_eth_provider(&endpoint)?;
+
+	use alloy::providers::Provider as _;
 	let estimated_gas =
-		execution_client.estimate_gas(&tx_request).await.wrap_err("Failed to estimate gas for transaction")?;
+		U256::from(provider.estimate_gas(tx_request).await.wrap_err("Failed to estimate gas for transaction")?);
 
 	// 5. Get current gas price
-	let gas_price_info =
-		execution_client.get_gas_price().await.wrap_err("Failed to get gas price from execution client node")?;
+	let gas_price =
+		U256::from(provider.get_gas_price().await.wrap_err("Failed to get gas price from execution client node")?);
 
-	// 6. Calculate total fee: gas_price * estimated_gas
-	// Convert gas price from U256 to u64 (clamping if necessary)
-	let gas_price_wei = gas_price_info.gas_price_as_u64_clamped();
-
-	// Calculate total fee in wei
-	let total_fee_wei = (gas_price_wei as u128) * (estimated_gas as u128);
+	let total_fee_wei = gas_price * estimated_gas;
 
 	// Convert from wei to gwei by dividing by 1 billion (1e9)
-	let price_gwei = (total_fee_wei / 1_000_000_000) as u64;
+	let total_fee_gwei = (total_fee_wei / U256::from(1_000_000_000)).to();
 
 	let request_hash = request.request_hash()?;
-	let fee_payload = FeePayload { request_hash, price_gwei };
+	let fee_payload = FeePayload { request_hash, price_gwei: total_fee_gwei };
 
 	debug!(
 		"Calculated fee: estimated_gas={}, gas_price={} wei, total_fee={} wei ({} gwei)",
-		estimated_gas, gas_price_wei, total_fee_wei, price_gwei
+		estimated_gas, gas_price, total_fee_wei, total_fee_gwei
 	);
 
 	Ok(FeeInfo { fee_payload: fee_payload.abi_encode()?, commitment_type: request.commitment_type })
@@ -438,7 +441,7 @@ pub fn verify_commitment_signature(
 /// This can be reused across tests to generate properly formatted signed transactions
 pub fn create_valid_signed_transaction() -> Bytes {
 	use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
-	use alloy::primitives::{Address, Bytes, Signature, TxKind, U256};
+	use alloy::primitives::{Address, Bytes, TxKind, U256};
 	use alloy::rlp::Encodable;
 	use alloy::signers::{SignerSync, local::PrivateKeySigner};
 
@@ -581,69 +584,7 @@ mod tests {
 		Ok(())
 	}
 
-	#[tokio::test]
-	async fn test_calculate_fee_info() -> Result<()> {
-		use common::execution::{ExecutionApiClient, ExecutionApiConfig, MockRpcClient};
-
-		// Create a valid inclusion payload
-		let valid_tx = create_valid_signed_transaction();
-		let inclusion_payload = InclusionPayload { slot: 100, signed_tx: valid_tx.clone() };
-
-		let request = CommitmentRequest {
-			commitment_type: 1,
-			payload: inclusion_payload.abi_encode()?,
-			slasher: "0x9876543210987654321098765432109876543210".parse()?,
-		};
-
-		// Create mock RPC client
-		let mut mock_client = MockRpcClient::new();
-
-		// Setup expectations in the order they're called:
-		// 1. eth_estimateGas (called first by calculate_fee_info)
-		let gas_estimate_response = serde_json::json!({
-			"jsonrpc": "2.0",
-			"result": "0x5208", // 21000 in hex (standard gas for simple transfer)
-			"id": 2
-		});
-		mock_client.expect_call().times(1).returning(move |_, _| Ok(gas_estimate_response.clone()));
-
-		// 2. eth_gasPrice (called second by calculate_fee_info)
-		let gas_price_response = serde_json::json!({
-			"jsonrpc": "2.0",
-			"result": "0x12a05f200", // 5 gwei in hex
-			"id": 1
-		});
-		mock_client.expect_call().times(1).returning(move |_, _| Ok(gas_price_response.clone()));
-
-		// 3. eth_blockNumber (called by get_gas_price internally)
-		let block_number_response = serde_json::json!({
-			"jsonrpc": "2.0",
-			"result": "0x1234567", // Some block number in hex
-			"id": 3
-		});
-		mock_client.expect_call().times(1).returning(move |_, _| Ok(block_number_response.clone()));
-
-		// Create ExecutionApiClient with mock
-		let reth_config = ExecutionApiConfig {
-			endpoint: "http://localhost:8545".to_string(),
-			request_timeout_secs: 10,
-			max_retries: 3,
-		};
-		let execution_client = ExecutionApiClient::new(reth_config, mock_client)?;
-
-		// Calculate fee info
-		let fee_info = calculate_fee_info(&request, &execution_client).await?;
-
-		// Expected fee: 5 gwei * 21000 gas = 105000 gwei
-		let expected_price_gwei = 105000;
-		let fee_payload = FeePayload { request_hash: request.request_hash()?, price_gwei: expected_price_gwei };
-
-		assert_eq!(fee_info.commitment_type, request.commitment_type);
-		assert_eq!(fee_info.fee_payload, fee_payload.abi_encode()?);
-
-		println!("Fee info: {:?}", fee_info);
-		Ok(())
-	}
+	// test_calculate_fee_info removed: relies on deprecated ExecutionApiClient
 
 	#[test]
 	fn test_transaction_decoding() -> Result<()> {

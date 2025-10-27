@@ -1,5 +1,4 @@
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
-use common::execution::{ExecutionApiClient, ReqwestRpcClient};
 use common::slot_timer::SlotTimer;
 use common::types::database::DatabaseContext;
 use std::sync::Arc;
@@ -21,8 +20,6 @@ pub struct CommitmentsServerState<T> {
 	pub api_key: Option<String>,
 	/// Slot timer for Ethereum slot timing
 	pub slot_timer: SlotTimer,
-	/// Execution RPC client for gas price and estimation
-	pub execution_client: Arc<ExecutionApiClient<ReqwestRpcClient>>,
 }
 
 // Manual Debug implementation since ExecutionApiClient might not derive Debug properly
@@ -33,7 +30,6 @@ impl<T> std::fmt::Debug for CommitmentsServerState<T> {
 			.field("bls_public_key", &self.bls_public_key)
 			.field("relay_url", &self.relay_url)
 			.field("slot_timer", &self.slot_timer)
-			.field("execution_client", &self.execution_client)
 			.finish()
 	}
 }
@@ -47,7 +43,6 @@ impl<T> CommitmentsServerState<T> {
 		relay_url: String,
 		api_key: Option<String>,
 		slot_timer: SlotTimer,
-		execution_client: Arc<ExecutionApiClient<ReqwestRpcClient>>,
 	) -> Self {
 		Self {
 			database,
@@ -56,7 +51,6 @@ impl<T> CommitmentsServerState<T> {
 			relay_url,
 			api_key,
 			slot_timer,
-			execution_client,
 		}
 	}
 
@@ -68,10 +62,5 @@ impl<T> CommitmentsServerState<T> {
 	/// Get a reference to the slot timer
 	pub fn slot_timer(&self) -> &SlotTimer {
 		&self.slot_timer
-	}
-
-	/// Get a reference to the execution RPC client
-	pub fn execution_client(&self) -> &ExecutionApiClient<ReqwestRpcClient> {
-		&self.execution_client
 	}
 }

@@ -347,14 +347,7 @@ impl TestHarnessBuilder {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		// Create mock Reth client for tests
-		use common::execution::{ExecutionApiClient, ExecutionApiConfig};
-		let execution_config = ExecutionApiConfig {
-			endpoint: "http://localhost:8545".to_string(),
-			request_timeout_secs: 10,
-			max_retries: 3,
-		};
-		let execution_client = Arc::new(ExecutionApiClient::with_default_client(execution_config)?);
+		// Provider no longer required here; utils builds provider on demand
 
 		// Create commitments server state - use gateway_one as the primary gateway
 		let context = CommitmentsServerState::new(
@@ -364,7 +357,6 @@ impl TestHarnessBuilder {
 			relay_url.clone(),
 			api_key,
 			slot_timer.clone(),
-			execution_client,
 		);
 
 		// Pre-populate relay database with proposer lookahead before launching relay service
@@ -1282,23 +1274,9 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		// Create mock execution RPC client for tests
-		let execution_config = common::execution::ExecutionApiConfig {
-			endpoint: "http://localhost:8545".to_string(),
-			request_timeout_secs: 10,
-			max_retries: 3,
-		};
-		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
+		// Provider no longer required here; utils builds provider on demand
 
-		Ok(CommitmentsServerState::new(
-			database,
-			commit_config,
-			bls_public_key,
-			relay_url,
-			api_key,
-			slot_timer,
-			execution_client,
-		))
+		Ok(CommitmentsServerState::new(database, commit_config, bls_public_key, relay_url, api_key, slot_timer))
 	}
 
 	/// Creates a test CommitmentsServerState with InclusionGatewayConfig for server tests
@@ -1364,22 +1342,6 @@ pub mod test_helpers {
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		// Create mock execution RPC client for tests
-		let execution_config = common::execution::ExecutionApiConfig {
-			endpoint: "http://localhost:8545".to_string(),
-			request_timeout_secs: 10,
-			max_retries: 3,
-		};
-		let execution_client = Arc::new(common::execution::ExecutionApiClient::with_default_client(execution_config)?);
-
-		Ok(CommitmentsServerState::new(
-			database,
-			commit_config,
-			bls_public_key,
-			relay_url,
-			api_key,
-			slot_timer,
-			execution_client,
-		))
+		Ok(CommitmentsServerState::new(database, commit_config, bls_public_key, relay_url, api_key, slot_timer))
 	}
 }
