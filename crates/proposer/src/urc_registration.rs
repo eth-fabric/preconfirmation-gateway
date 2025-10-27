@@ -3,6 +3,7 @@ use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::TransactionRequest;
 use alloy::signers::local::PrivateKeySigner;
+use alloy::sol_types::SolCall;
 use cb_common::types::BlsPublicKey;
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::signer::call_bls_signer;
@@ -11,6 +12,7 @@ use eyre::{Context, Result};
 use tracing::info;
 
 use crate::utils::get_consensus_keys;
+use urc::registry::Registry::optInToSlasherCall as SolOptInToSlasherCall;
 
 pub async fn sign_registration<T>(
 	commit_config: &mut StartCommitModuleConfig<T>,
@@ -98,6 +100,55 @@ pub async fn send_registration_transaction(
 	let tx_hash = pending_tx.watch().await.context("Failed to confirm transaction")?;
 
 	info!("URC registration transaction confirmed: {:?}", tx_hash);
+
+	Ok(tx_hash)
+}
+
+/// Send URC optInToSlasher(registrationRoot, slasher, committer)
+pub async fn send_opt_in_to_slasher_transaction(
+	urc_address: Address,
+	registration_root: B256,
+	slasher: Address,
+	committer: Address,
+	execution_rpc_url: &str,
+	keystore_path: &str,
+	password: &str,
+) -> Result<B256> {
+	// 1. Load keystore and create signer
+	let private_key = eth_keystore::decrypt_key(keystore_path, password)?;
+
+	// Create signer from the private key bytes
+	let signer = PrivateKeySigner::from_bytes(&B256::from_slice(&private_key))
+		.context("Failed to create signer from private key")?;
+
+	let wallet = EthereumWallet::from(signer);
+
+	info!("Loaded wallet from keystore: {:?}", wallet.default_signer().address());
+
+	// 2. Create provider with wallet
+	let provider =
+		ProviderBuilder::new().wallet(wallet).connect_http(execution_rpc_url.parse().context("Invalid RPC URL")?);
+
+	// 3. Encode calldata for optInToSlasher()
+	let call = SolOptInToSlasherCall { registrationRoot: registration_root, slasher, committer };
+	let calldata = Bytes::from(call.abi_encode());
+
+	// 4. Create transaction
+	let tx = TransactionRequest::default().with_to(urc_address).with_input(calldata);
+
+	info!(
+        "Sending URC optInToSlasher transaction...\n  URC contract: {:?}\n  registrationRoot: {:?}\n  slasher: {:?}\n  committer: {:?}",
+        urc_address, registration_root, slasher, committer
+    );
+
+	// 5. Send transaction and wait for receipt
+	let pending_tx = provider.send_transaction(tx).await.context("Failed to send transaction")?;
+
+	info!("Transaction sent, waiting for confirmation...");
+
+	let tx_hash = pending_tx.watch().await.context("Failed to confirm transaction")?;
+
+	info!("URC optInToSlasher transaction confirmed: {:?}", tx_hash);
 
 	Ok(tx_hash)
 }

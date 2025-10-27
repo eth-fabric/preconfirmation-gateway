@@ -138,6 +138,83 @@ pub fn prepare_urc_registry_config_for_chain(chain: Chain) -> Result<B256> {
 	Ok(domain)
 }
 
+/// Optional overrides for URC registry config to aid testing
+#[derive(Debug, Clone, Default)]
+pub struct URCRegistryOverrides {
+	pub fraud_proof_window: Option<u64>,
+	pub opt_in_delay: Option<u64>,
+	pub slash_window: Option<u64>,
+	pub unregistration_delay: Option<u64>,
+}
+
+/// Same as `prepare_urc_registry_config_for_chain`, but allows overriding timing fields.
+pub fn prepare_urc_registry_config_for_chain_with_overrides(
+	chain: Chain,
+	overrides: URCRegistryOverrides,
+) -> Result<B256> {
+	// Compute signing domain (same as original)
+	let mut domain_bytes = [0u8; 32];
+	domain_bytes[..4].copy_from_slice(&common::constants::COMMIT_BOOST_DOMAIN);
+	let fork_version = chain.genesis_fork_version();
+	let mut leaf0 = [0u8; 32];
+	leaf0[..4].copy_from_slice(&fork_version);
+	let leaf1 = common::constants::GENESIS_VALIDATORS_ROOT;
+	use sha2::{Digest, Sha256};
+	let mut hasher = Sha256::new();
+	hasher.update(&leaf0);
+	hasher.update(&leaf1);
+	let fork_data_root = hasher.finalize();
+	domain_bytes[4..].copy_from_slice(&fork_data_root[..28]);
+	let domain = B256::from_slice(&domain_bytes);
+
+	// Resolve path to JSON
+	let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+	let mut config_path = PathBuf::from(manifest_dir);
+	config_path.pop();
+	config_path.push("urc/config/registry.json");
+
+	// Read JSON
+	let contents = std::fs::read_to_string(&config_path)
+		.with_context(|| format!("Failed to read URC registry config at {}", config_path.display()))?;
+	let mut json: Value = serde_json::from_str(&contents)
+		.with_context(|| format!("Failed to parse JSON at {}", config_path.display()))?;
+
+	// Update signingDomain
+	let domain_hex = format!("0x{}", hex::encode(domain.as_slice()));
+	json["signingDomain"] = Value::String(domain_hex);
+
+	// Apply overrides if provided
+	if let Some(v) = overrides.fraud_proof_window {
+		json["fraudProofWindow"] = Value::Number(serde_json::Number::from(v));
+	}
+	if let Some(v) = overrides.opt_in_delay {
+		json["optInDelay"] = Value::Number(serde_json::Number::from(v));
+	}
+	if let Some(v) = overrides.slash_window {
+		json["slashWindow"] = Value::Number(serde_json::Number::from(v));
+	}
+	if let Some(v) = overrides.unregistration_delay {
+		json["unregistrationDelay"] = Value::Number(serde_json::Number::from(v));
+	}
+
+	// Persist
+	let updated = serde_json::to_string_pretty(&json)?;
+	std::fs::write(&config_path, updated)
+		.with_context(|| format!("Failed to write updated JSON to {}", config_path.display()))?;
+
+	Ok(domain)
+}
+
+/// Deploy helper that patches signingDomain and applies overrides
+pub async fn deploy_urc_to_anvil_with_chain_and_overrides(
+	anvil: &AnvilInstance,
+	chain: Chain,
+	overrides: URCRegistryOverrides,
+) -> Result<Address> {
+	let _ = prepare_urc_registry_config_for_chain_with_overrides(chain, overrides)?;
+	deploy_urc_to_anvil(anvil).await
+}
+
 /// Deploy helper that first patches the signingDomain in config to match the provided chain
 pub async fn deploy_urc_to_anvil_with_chain(anvil: &AnvilInstance, chain: Chain) -> Result<Address> {
 	let _ = prepare_urc_registry_config_for_chain(chain)?;

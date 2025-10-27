@@ -39,6 +39,8 @@ serde = { workspace = true }
 toml = { workspace = true }
 clap = { version = "4.0", features = ["derive"] }
 rpassword = "7.0"
+urc = { workspace = true }
+eth-keystore = "0.5"
 
 # todo eventually remove
 cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }

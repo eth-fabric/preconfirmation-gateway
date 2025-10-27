@@ -5232,6 +5232,7 @@ dependencies = [
  "commitments",
  "common",
  "constraints",
+ "eth-keystore",
  "eyre",
  "gateway",
  "jsonrpsee",
@@ -5244,6 +5245,7 @@ dependencies = [
  "toml 0.9.7",
  "tracing",
  "tracing-subscriber",
+ "urc",
 ]
 
 [[package]]
@@ -5365,6 +5367,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
+ "urc",
 ]
 
 [[package]]

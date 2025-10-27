@@ -16,6 +16,7 @@ alloy = { workspace = true }
 eth-keystore = "0.5"
 common = { path = "../common" }
 constraints = { path = "../constraints" }
+urc = { workspace = true }
 
 [dev-dependencies]
 mockall = "0.12"

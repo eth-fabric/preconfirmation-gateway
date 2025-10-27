@@ -1,4 +1,6 @@
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, B256, U256, address};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::rpc::types::BlockNumberOrTag;
 use clap::{Parser, Subcommand};
 use commit_boost::prelude::*;
 use common::beacon::BeaconApiClient;
@@ -6,7 +8,10 @@ use common::config::BeaconApiConfig;
 use common::slot_timer::SlotTimer;
 use constraints::ConstraintsClient;
 use eyre::{Context, Result};
-use proposer::{ProposerConfig, process_lookahead, send_registration_transaction, sign_registrations};
+use proposer::{
+	ProposerConfig, process_lookahead, send_opt_in_to_slasher_transaction, send_registration_transaction,
+	sign_registrations,
+};
 use tokio::time::{Duration, interval};
 use tracing::{debug, error, info};
 
@@ -41,6 +46,37 @@ enum Commands {
 		#[arg(long)]
 		dry_run: bool,
 	},
+
+	/// Opt-in to a committer for a given slasher
+	OptInToSlasher {
+		/// URC contract address
+		#[arg(long)]
+		urc_address: Address,
+
+		/// Registration root to operate on
+		#[arg(long)]
+		registration_root: B256,
+
+		/// Slasher address
+		#[arg(long)]
+		slasher: Address,
+
+		/// Committer address to authorize
+		#[arg(long)]
+		committer: Address,
+
+		/// Path to keystore file
+		#[arg(long)]
+		keystore: String,
+
+		/// Keystore password (will prompt if not provided)
+		#[arg(long)]
+		password: Option<String>,
+
+		/// Skip pre-flight checks
+		#[arg(long)]
+		skip_precheck: bool,
+	},
 }
 
 #[tokio::main]
@@ -54,6 +90,26 @@ async fn main() -> Result<()> {
 		Commands::Run => run_daemon().await,
 		Commands::Register { urc_address, keystore, password, dry_run } => {
 			handle_register_command(urc_address, keystore, password, dry_run).await
+		}
+		Commands::OptInToSlasher {
+			urc_address,
+			registration_root,
+			slasher,
+			committer,
+			keystore,
+			password,
+			skip_precheck,
+		} => {
+			handle_opt_in_to_slasher_command(
+				urc_address,
+				registration_root,
+				slasher,
+				committer,
+				keystore,
+				password,
+				skip_precheck,
+			)
+			.await
 		}
 	}
 }
@@ -186,6 +242,99 @@ async fn handle_register_command(
 	info!("Transaction hash: {:?}", tx_hash);
 	info!("Owner: {:?}", owner);
 	info!("Number of keys registered: {}", inputs.registrations.len());
+
+	Ok(())
+}
+
+async fn handle_opt_in_to_slasher_command(
+	urc_address: Address,
+	registration_root: B256,
+	slasher: Address,
+	committer: Address,
+	keystore_path: String,
+	password: Option<String>,
+	skip_precheck: bool,
+) -> Result<()> {
+	info!("Starting URC opt-in to slasher process");
+
+	// Load configuration
+	let mut commit_config =
+		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
+
+	// Get password
+	let password = match password {
+		Some(p) => p,
+		None => {
+			info!("Enter keystore password:");
+			rpassword::read_password().context("Failed to read password")?
+		}
+	};
+
+	// Build wallet+provider to use for both checks and sending
+	let private_key = eth_keystore::decrypt_key(&keystore_path, &password)?;
+	let signer = alloy::signers::local::PrivateKeySigner::from_bytes(&B256::from_slice(&private_key))
+		.context("Failed to create signer from private key")?;
+	let wallet = alloy::network::EthereumWallet::from(signer);
+	let provider = ProviderBuilder::new()
+		.wallet(wallet.clone())
+		.connect_http(execution_rpc_url.parse().context("Invalid RPC URL")?);
+
+	// Pre-flight checks
+	if !skip_precheck {
+		info!("Running pre-flight checks...");
+
+		// Create registry instance for view calls
+		let registry = urc::registry::Registry::new(urc_address, provider.clone());
+
+		// Owner match
+		let owner_resp = registry.getOperatorData(registration_root).call().await.context("getOperatorData failed")?;
+		let owner = owner_resp.owner;
+		let sender_addr = wallet.default_signer().address();
+		if owner != sender_addr {
+			return Err(eyre::eyre!("Owner mismatch: on-chain {:?} != sender {:?}", owner, sender_addr));
+		}
+
+		// Fraud window elapsed
+		let cfg = registry.getConfig().call().await.context("getConfig failed")?;
+		let registered_at: u64 = owner_resp.registeredAt.to();
+		let fraud_window: u64 = cfg.fraudProofWindow as u64;
+
+		// Fetch latest block timestamp via eth_getBlockByNumber
+		let latest =
+			provider.get_block_by_number(BlockNumberOrTag::Latest).await.context("Failed to fetch latest block")?;
+		if let Some(latest_block) = latest {
+			let latest_ts = latest_block.header.timestamp;
+			if latest_ts < registered_at + fraud_window {
+				return Err(eyre::eyre!("Fraud window not met: now {} < {}", latest_ts, registered_at + fraud_window));
+			}
+		}
+
+		// Not already opted in
+		if registry.isOptedIntoSlasher(registration_root, slasher).call().await.context("isOptedIntoSlasher failed")? {
+			return Err(eyre::eyre!("Already opted into this slasher"));
+		}
+
+		// Not slashed
+		if registry.isSlashed_0(registration_root).call().await.context("isSlashed(regRoot) failed")? {
+			return Err(eyre::eyre!("Operator already slashed"));
+		}
+	}
+
+	// Send tx
+	let tx_hash = send_opt_in_to_slasher_transaction(
+		urc_address,
+		registration_root,
+		slasher,
+		committer,
+		&execution_rpc_url,
+		&keystore_path,
+		&password,
+	)
+	.await
+	.context("Failed to send optInToSlasher transaction")?;
+
+	info!("✅ Opt-in successful!\nTransaction hash: {:?}", tx_hash);
 
 	Ok(())
 }
