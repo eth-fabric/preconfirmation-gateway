@@ -151,50 +151,52 @@ async fn run_continuous(config: &SpammerConfig, signer: &PrivateKeySigner) -> Re
 	let mut interval = time::interval(Duration::from_secs(config.interval_secs));
 	let mut nonce = 0u64;
 
-	loop {
-		interval.tick().await;
-
-		info!("--- Sending commitment request #{} ---", nonce + 1);
-
-		// Generate transaction
-		match generate_signed_transaction(config, signer, nonce) {
-			Ok(signed_tx) => {
-				info!("Generated signed transaction ({} bytes)", signed_tx.len());
-
-				// Create commitment request
-				match create_commitment_request(config, signed_tx) {
-					Ok(request) => {
-						match request.request_hash() {
-							Ok(request_hash) => {
-								info!("Request hash: {:?}", request_hash);
-
-								// Send request
-								match send_commitment_request(&config.gateway_url, &request).await {
-									Ok(response) => {
-										info!("✓ Commitment request successful!");
-										info!("  Commitment hash: {:?}", response.commitment.request_hash);
-										nonce += 1;
-									}
-									Err(e) => {
-										error!("✗ Failed to send commitment request: {}", e);
-									}
-								}
-							}
-							Err(e) => {
-								error!("✗ Failed to compute request hash: {}", e);
-							}
-						}
-					}
-					Err(e) => {
-						error!("✗ Failed to create commitment request: {}", e);
-					}
-				}
-			}
-			Err(e) => {
-				error!("✗ Failed to generate signed transaction: {}", e);
-			}
-		}
-	}
+    let mut shutdown = Box::pin(common::utils::wait_for_signal());
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {
+                info!("--- Sending commitment request #{} ---", nonce + 1);
+                match generate_signed_transaction(config, signer, nonce) {
+                    Ok(signed_tx) => {
+                        info!("Generated signed transaction ({} bytes)", signed_tx.len());
+                        match create_commitment_request(config, signed_tx) {
+                            Ok(request) => {
+                                match request.request_hash() {
+                                    Ok(request_hash) => {
+                                        info!("Request hash: {:?}", request_hash);
+                                        match send_commitment_request(&config.gateway_url, &request).await {
+                                            Ok(response) => {
+                                                info!("✓ Commitment request successful!");
+                                                info!("  Commitment hash: {:?}", response.commitment.request_hash);
+                                                nonce += 1;
+                                            }
+                                            Err(e) => {
+                                                error!("✗ Failed to send commitment request: {}", e);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("✗ Failed to compute request hash: {}", e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("✗ Failed to create commitment request: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("✗ Failed to generate signed transaction: {}", e);
+                    }
+                }
+            }
+            _ = &mut shutdown => {
+                info!("Shutdown signal received, stopping spammer loop");
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[tokio::main]

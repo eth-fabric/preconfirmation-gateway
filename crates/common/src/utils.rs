@@ -13,3 +13,24 @@ pub fn bls_pubkey_from_hex(hex_str: &str) -> Result<BlsPublicKey, eyre::Error> {
 	}
 	BlsPublicKey::deserialize(&bytes).map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))
 }
+
+#[cfg(unix)]
+pub async fn wait_for_signal() -> eyre::Result<()> {
+	use tokio::signal::unix::{signal, SignalKind};
+
+	let mut sigint = signal(SignalKind::interrupt())?;
+	let mut sigterm = signal(SignalKind::terminate())?;
+
+	tokio::select! {
+		_ = sigint.recv() => {}
+		_ = sigterm.recv() => {}
+	}
+
+	Ok(())
+}
+
+#[cfg(windows)]
+pub async fn wait_for_signal() -> eyre::Result<()> {
+	tokio::signal::ctrl_c().await?;
+	Ok(())
+}

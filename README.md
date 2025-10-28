@@ -169,3 +169,52 @@ This project implements the following Ethereum preconfirmation specifications:
 - [Commitments API](https://github.com/eth-fabric/commitments-specs/blob/main/specs/commitments-api.md)
 - [Constraints API](https://github.com/eth-fabric/constraints-specs/blob/main/specs/constraints-api.md)
 - [Gateway Specification](https://github.com/eth-fabric/constraints-specs/blob/main/specs/gateway.md)
+
+## Docker (dev)
+
+Prereqs: Docker Desktop for macOS, and `just` (`brew install just`).
+
+### 1) Build images (commit-boost style)
+
+Images are built per-binary using Docker Buildx and output tags like `preconfirmation-gateway/<bin>:dev`.
+
+```bash
+# Build all images with tag :dev
+just build-all dev
+
+# Or build a single image (e.g., relay)
+just build-relay dev
+```
+
+### 2) Start containers with Docker Compose
+
+Compose uses the prebuilt images; it no longer builds from source.
+
+```bash
+# Start all services
+just up
+
+# Start a single service (e.g., relay)
+just up relay
+
+# Stop everything
+just down
+```
+
+### 3) Logs
+
+```bash
+just logs relay
+```
+
+### Notes
+- Binaries handle SIGINT/SIGTERM and exit cleanly.
+- Configs are mounted read-only:
+  - gateway: `./gateway.config.toml` via `CB_CONFIG=/cb-config.toml`
+  - proposer: `./proposer.config.toml` via `CB_CONFIG=/cb-config.toml`
+  - relay: `./config/relay.toml`
+- Healthcheck is enabled for `relay` on `http://localhost:8080/health`.
+- Apple Silicon: images build for your local platform (typically `linux/arm64`). To build x64 images, set:
+  ```bash
+  DOCKER_DEFAULT_PLATFORM=linux/amd64 just build-relay dev
+  ```

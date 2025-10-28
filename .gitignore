@@ -28,3 +28,4 @@ logs/
 .cursorrules
 data/rocksdb/
 data/relay-rocksdb/
+build/

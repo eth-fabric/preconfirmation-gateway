@@ -142,12 +142,21 @@ async fn main() -> Result<()> {
 
 	info!("Gateway initialized with commitments server and {} gateway tasks", coordinator.task_count());
 
-	// Run scheduler loop - tasks run independently with their own timing
-	loop {
-		let current_slot = slot_timer.get_current_slot();
-		info!("Current slot: {}", current_slot);
+    // Run scheduler loop concurrently and wait for shutdown signal
+    let slot_timer_clone = slot_timer.clone();
+    let scheduler = tokio::spawn(async move {
+        loop {
+            let current_slot = slot_timer_clone.get_current_slot();
+            info!("Current slot: {}", current_slot);
+            tokio::time::sleep(Duration::from_secs(12)).await;
+        }
+    });
 
-		// Tasks run independently, just log current slot periodically
-		tokio::time::sleep(Duration::from_secs(12)).await;
-	}
+    // Wait for Docker shutdown signals (SIGINT/SIGTERM)
+    common::utils::wait_for_signal().await?;
+
+    // Stop background tasks
+    scheduler.abort();
+
+    Ok(())
 }

@@ -1,0 +1,50 @@
+x-bin-base: &bin-base
+  restart: unless-stopped
+  environment:
+    - RUST_LOG=info
+
+services:
+  gateway:
+    <<: *bin-base
+    image: preconfirmation-gateway/gateway:dev
+    container_name: gateway
+    environment:
+      - CB_CONFIG=/cb-config.toml
+    volumes:
+      - ./gateway.config.toml:/cb-config.toml:ro
+    ports:
+      - "127.0.0.1:18080:8080"
+
+  relay:
+    <<: *bin-base
+    image: preconfirmation-gateway/relay:dev
+    container_name: relay
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  proposer:
+    <<: *bin-base
+    image: preconfirmation-gateway/proposer:dev
+    container_name: proposer
+    environment:
+      - CB_CONFIG=/cb-config.toml
+      - PROPOSER_METRICS_ADDR=0.0.0.0:9902
+    volumes:
+      - ./proposer.config.toml:/cb-config.toml:ro
+    ports:
+      - "127.0.0.1:9902:9902"
+
+  spammer:
+    <<: *bin-base
+    image: preconfirmation-gateway/spammer:dev
+    container_name: spammer
+    volumes:
+      - ./spammer-config.toml:/app/spammer-config.toml:ro

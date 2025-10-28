@@ -62,7 +62,11 @@ pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 	let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.relay.port)).await?;
 	info!("Relay server listening on port {}", config.relay.port);
 
-	axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            let _ = common::utils::wait_for_signal().await;
+        })
+        .await?;
 
 	Ok(())
 }
