@@ -18,6 +18,10 @@ common = { path = "../common" }
 constraints = { path = "../constraints" }
 urc = { workspace = true }
 
+prometheus = { workspace = true }
+lazy_static = { workspace = true }
+axum = { workspace = true }
+
 clap = { version = "4.0", features = ["derive"] }
 rpassword = "7.0"
 

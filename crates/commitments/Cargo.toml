@@ -20,6 +20,9 @@ alloy-primitives = { workspace = true }
 alloy-consensus = { workspace = true }
 commit-boost = { workspace = true }
 cb-common = { workspace = true }
+prometheus = { workspace = true }
+lazy_static = { workspace = true }
+axum = { workspace = true }
 
 [dev-dependencies]
 common = { path = "../common", features = ["test-utils"] }

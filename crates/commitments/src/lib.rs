@@ -4,6 +4,7 @@
 //! lightweight JSON-RPC server for preconfirmation flows.
 pub mod handlers;
 pub mod methods;
+pub mod metrics;
 pub mod server;
 pub mod state;
 pub mod utils;

@@ -1,22 +1,27 @@
+use axum::{Router, routing::get};
 use eyre::Result;
-use lazy_static::lazy_static;
-use prometheus::{IntCounter, Registry, opts};
 use proposer::cli;
-
-lazy_static! {
-	pub static ref MY_CUSTOM_REGISTRY: Registry =
-		Registry::new_custom(Some("inclusion-preconf-proposer".to_string()), None).unwrap();
-	pub static ref SIG_RECEIVED_COUNTER: IntCounter =
-		IntCounter::with_opts(opts!("sig_received_total", "Number of OS signals received")).unwrap();
-}
+use proposer::metrics::metrics_handler;
 
 #[tokio::main]
 async fn main() -> Result<()> {
 	// Initialize tracing
 	tracing_subscriber::fmt::init();
 
-	// Remember to register all your metrics before starting the process
-	MY_CUSTOM_REGISTRY.register(Box::new(SIG_RECEIVED_COUNTER.clone()))?;
+	// Spawn lightweight metrics server exposing only /metrics
+	let metrics_addr = std::env::var("PROPOSER_METRICS_ADDR").unwrap_or_else(|_| "0.0.0.0:9902".to_string());
+	let metrics_addr: std::net::SocketAddr = metrics_addr.parse().unwrap_or_else(|_| "0.0.0.0:9902".parse().unwrap());
+	tokio::spawn(async move {
+		let app = Router::new().route("/metrics", get(metrics_handler));
+		match tokio::net::TcpListener::bind(metrics_addr).await {
+			Ok(listener) => {
+				if let Err(e) = axum::serve(listener, app).await {
+					tracing::error!("proposer metrics server error: {}", e);
+				}
+			}
+			Err(e) => tracing::error!("failed to bind proposer metrics listener: {}", e),
+		}
+	});
 
 	cli::run().await
 }

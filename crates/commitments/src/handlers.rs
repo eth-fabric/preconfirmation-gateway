@@ -1,5 +1,7 @@
+use crate::metrics::{RPC_CALLS_TOTAL, RPC_LATENCY_SECONDS, RPC_RESPONSES_TOTAL};
 use jsonrpsee::Extensions;
 use jsonrpsee::core::RpcResult;
+use std::time::Instant;
 use tracing::{error, info, instrument};
 
 use super::utils;
@@ -17,6 +19,9 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<SignedCommitment> {
+	const METHOD: &str = "commitmentRequest";
+	RPC_CALLS_TOTAL.with_label_values(&[METHOD]).inc();
+	let start = Instant::now();
 	info!("Processing commitment request");
 	let request: CommitmentRequest = params.one()?;
 
@@ -25,6 +30,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 		Ok(payload) => payload,
 		Err(e) => {
 			error!("Invalid commitment request: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Invalid commitment request",
@@ -43,6 +50,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 		}
 		Ok(None) => {
 			error!("No delegation found for slot {}, cannot create commitment", slot);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"No delegation for slot",
@@ -51,6 +60,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 		}
 		Err(e) => {
 			error!("Failed to get delegation for slot {}: {}", slot, e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32603, // Internal error
 				"Failed to get delegation",
@@ -66,6 +77,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 			Ok(id) => id,
 			Err(e) => {
 				error!("Failed to parse module_signing_id from config: {}", e);
+				RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+				RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 				return Err(jsonrpsee::types::error::ErrorObject::owned(
 					-32603, // Internal error
 					"Invalid module_signing_id configuration",
@@ -83,6 +96,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 			Ok(commitment) => commitment,
 			Err(e) => {
 				error!("Failed to create signed commitment: {}", e);
+				RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+				RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 				return Err(jsonrpsee::types::error::ErrorObject::owned(
 					-32602, // Invalid params
 					"Failed to create signed commitment",
@@ -96,6 +111,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 		Ok(constraint) => constraint,
 		Err(e) => {
 			error!("Failed to create constraint from commitment request: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32603, // Internal error
 				"Failed to create constraint",
@@ -110,6 +127,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 		_context.database().store_commitment_and_constraint(slot, &request_hash, &signed_commitment, &constraint)
 	{
 		error!("Failed to store commitment and constraint atomically: {}", e);
+		RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+		RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
 			-32603, // Internal error
 			"Failed to store commitment and constraint",
@@ -118,6 +137,8 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 	}
 
 	info!("Commitment request processed successfully with constraint saved");
+	RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
+	RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(signed_commitment)
 }
 
@@ -127,6 +148,9 @@ pub fn commitment_result_handler<T>(
 	_context: &CommitmentsServerState<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SignedCommitment> {
+	const METHOD: &str = "commitmentResult";
+	RPC_CALLS_TOTAL.with_label_values(&[METHOD]).inc();
+	let start = Instant::now();
 	info!("Processing commitment result request");
 	let request_hash: B256 = params.one()?;
 
@@ -134,10 +158,14 @@ pub fn commitment_result_handler<T>(
 	match _context.database().get_commitment_by_hash(&request_hash) {
 		Ok(Some(signed_commitment)) => {
 			info!("Commitment result request processed successfully");
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			Ok(signed_commitment)
 		}
 		Ok(None) => {
 			error!("Commitment not found for request hash: {}", request_hash);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Commitment not found",
@@ -146,6 +174,8 @@ pub fn commitment_result_handler<T>(
 		}
 		Err(e) => {
 			error!("Failed to retrieve commitment from database: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32603, // Internal error
 				"Database error",
@@ -161,6 +191,9 @@ pub fn slots_handler<T>(
 	_context: &CommitmentsServerState<T>,
 	_extensions: &Extensions,
 ) -> RpcResult<SlotInfoResponse> {
+	const METHOD: &str = "slots";
+	RPC_CALLS_TOTAL.with_label_values(&[METHOD]).inc();
+	let start = Instant::now();
 	info!("Processing slots request");
 
 	// Get current slot
@@ -189,6 +222,8 @@ pub fn slots_handler<T>(
 		Ok(slots) => slots,
 		Err(e) => {
 			error!("Failed to get delegated slots: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32603, // Internal error
 				"Failed to get delegated slots",
@@ -215,6 +250,8 @@ pub fn slots_handler<T>(
 	let response = SlotInfoResponse { slots };
 
 	info!("Slots request processed successfully");
+	RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
+	RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(response)
 }
 
@@ -224,6 +261,9 @@ pub async fn fee_handler<T: GatewayConfig>(
 	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<FeeInfo> {
+	const METHOD: &str = "fee";
+	RPC_CALLS_TOTAL.with_label_values(&[METHOD]).inc();
+	let start = Instant::now();
 	info!("Processing fee request");
 	let request: CommitmentRequest = params.one()?;
 
@@ -232,6 +272,8 @@ pub async fn fee_handler<T: GatewayConfig>(
 		Ok(fee_info) => fee_info,
 		Err(e) => {
 			error!("Failed to calculate fee info: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Invalid request",
@@ -245,6 +287,8 @@ pub async fn fee_handler<T: GatewayConfig>(
 		Ok(hash) => hash,
 		Err(e) => {
 			error!("Failed to calculate request hash: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Invalid request",
@@ -255,6 +299,8 @@ pub async fn fee_handler<T: GatewayConfig>(
 
 	if let Err(e) = _context.database().store_fee_info(&request_hash, &fee_info) {
 		error!("Failed to store fee info in database: {}", e);
+		RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+		RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 		return Err(jsonrpsee::types::error::ErrorObject::owned(
 			-32603, // Internal error
 			"Failed to store fee info",
@@ -263,6 +309,8 @@ pub async fn fee_handler<T: GatewayConfig>(
 	}
 
 	info!("Fee request processed successfully");
+	RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
+	RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(fee_info)
 }
 
@@ -284,6 +332,9 @@ pub async fn generate_proxy_key_handler<T>(
 	_context: std::sync::Arc<CommitmentsServerState<T>>,
 	_extensions: Extensions,
 ) -> RpcResult<GenerateProxyKeyResponse> {
+	const METHOD: &str = "generateProxyKey";
+	RPC_CALLS_TOTAL.with_label_values(&[METHOD]).inc();
+	let start = Instant::now();
 	info!("Processing generate proxy key request");
 	let request: GenerateProxyKeyRequest = params.one()?;
 
@@ -292,6 +343,8 @@ pub async fn generate_proxy_key_handler<T>(
 		Ok(key) => key,
 		Err(e) => {
 			error!("Invalid BLS public key format: {}", e);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Invalid BLS public key format",
@@ -306,6 +359,8 @@ pub async fn generate_proxy_key_handler<T>(
 		"bls" => EncryptionScheme::Bls,
 		_ => {
 			error!("Invalid encryption scheme: {}", request.encryption_scheme);
+			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(jsonrpsee::types::error::ErrorObject::owned(
 				-32602, // Invalid params
 				"Invalid encryption scheme",
@@ -323,6 +378,8 @@ pub async fn generate_proxy_key_handler<T>(
 				let delegation =
 					commit_config.signer_client.generate_proxy_key_ecdsa(bls_public_key).await.map_err(|e| {
 						error!("Failed to generate ECDSA proxy key: {}", e);
+						RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+						RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 						jsonrpsee::types::error::ErrorObject::owned(
 							-32603, // Internal error
 							"Failed to generate ECDSA proxy key",
@@ -342,6 +399,8 @@ pub async fn generate_proxy_key_handler<T>(
 				let delegation =
 					commit_config.signer_client.generate_proxy_key_bls(bls_public_key).await.map_err(|e| {
 						error!("Failed to generate BLS proxy key: {}", e);
+						RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+						RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 						jsonrpsee::types::error::ErrorObject::owned(
 							-32603, // Internal error
 							"Failed to generate BLS proxy key",
@@ -350,6 +409,8 @@ pub async fn generate_proxy_key_handler<T>(
 					})?;
 				serde_json::to_value(delegation).map_err(|e| {
 					error!("Failed to serialize BLS delegation: {}", e);
+					RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+					RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 					jsonrpsee::types::error::ErrorObject::owned(
 						-32603, // Internal error
 						"Failed to serialize delegation",
@@ -361,5 +422,7 @@ pub async fn generate_proxy_key_handler<T>(
 	};
 
 	info!("Proxy key generated successfully");
+	RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
+	RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(GenerateProxyKeyResponse { signed_delegation, encryption_scheme: request.encryption_scheme })
 }

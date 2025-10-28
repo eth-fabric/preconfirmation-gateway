@@ -1,3 +1,4 @@
+use crate::metrics::{REQUESTS_TOTAL, REQUEST_LATENCY_SECONDS, RESPONSES_TOTAL};
 use axum::{extract::Path, extract::State, http::HeaderMap, http::StatusCode, response::Json};
 use commit_boost::prelude::verify_proposer_commitment_signature_bls_for_message;
 use common::types::{
@@ -5,6 +6,7 @@ use common::types::{
 };
 use hex;
 use std::sync::Arc;
+use std::time::Instant;
 use tracing::{debug, error, info};
 
 use crate::utils::{
@@ -119,12 +121,19 @@ pub async fn store_delegation_handler(
 	State(state): State<RelayState>,
 	Json(delegation): Json<SignedDelegation>,
 ) -> StatusCode {
+	const EP: &str = common::constants::routes::relay::DELEGATION;
+	const METHOD: &str = "POST";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	info!("Storing delegation for slot {}", delegation.message.slot);
 
 	// Validate delegation message structure
 	if validate_delegation_message(&delegation.message, &state.slot_timer).is_err() {
 		error!("Invalid delegation message structure");
-		return StatusCode::BAD_REQUEST;
+		let code = StatusCode::BAD_REQUEST;
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+		return code;
 	}
 
 	info!("Delegation message validated");
@@ -136,11 +145,17 @@ pub async fn store_delegation_handler(
 		}
 		Ok(false) => {
 			error!("Delegation signature verification failed");
-			return StatusCode::UNAUTHORIZED;
+			let code = StatusCode::UNAUTHORIZED;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 		Err(e) => {
 			error!("Error verifying delegation signature: {}", e);
-			return StatusCode::BAD_REQUEST;
+			let code = StatusCode::BAD_REQUEST;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 	}
 
@@ -153,11 +168,17 @@ pub async fn store_delegation_handler(
 		}
 		Ok(false) => {
 			error!("Proposer public key is not scheduled for slot {}", delegation.message.slot);
-			return StatusCode::FORBIDDEN;
+			let code = StatusCode::FORBIDDEN;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 		Err(e) => {
 			error!("Error validating proposer for slot {}: {}", delegation.message.slot, e);
-			return StatusCode::INTERNAL_SERVER_ERROR;
+			let code = StatusCode::INTERNAL_SERVER_ERROR;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 	}
 
@@ -170,14 +191,20 @@ pub async fn store_delegation_handler(
 				"Delegation already exists for slot {} - rejecting to prevent equivocation",
 				delegation.message.slot
 			);
-			return StatusCode::CONFLICT;
+			let code = StatusCode::CONFLICT;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 		Ok(None) => {
 			debug!("No existing delegation found for slot {}", delegation.message.slot);
 		}
 		Err(e) => {
 			error!("Error checking for existing delegation for slot {}: {}", delegation.message.slot, e);
-			return StatusCode::INTERNAL_SERVER_ERROR;
+			let code = StatusCode::INTERNAL_SERVER_ERROR;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 	}
 
@@ -187,11 +214,17 @@ pub async fn store_delegation_handler(
 	match state.database.store_delegation(delegation.message.slot, &delegation) {
 		Ok(_) => {
 			info!("Delegation stored successfully for slot {}", delegation.message.slot);
-			StatusCode::OK
+			let code = StatusCode::OK;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			code
 		}
 		Err(e) => {
 			error!("Failed to store delegation: {}", e);
-			StatusCode::INTERNAL_SERVER_ERROR
+			let code = StatusCode::INTERNAL_SERVER_ERROR;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			code
 		}
 	}
 }
@@ -201,19 +234,31 @@ pub async fn get_delegations_handler(
 	State(state): State<RelayState>,
 	axum::extract::Path(slot): axum::extract::Path<u64>,
 ) -> Result<Json<GetDelegationsResponse>, StatusCode> {
+	const EP: &str = common::constants::routes::relay::DELEGATIONS_SLOT;
+	const METHOD: &str = "GET";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	info!("Getting delegations for slot {}", slot);
 
 	match state.database.get_delegation_for_slot(slot) {
 		Ok(Some(delegation)) => {
 			info!("Retrieved delegation for slot {}", slot);
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			Ok(Json(GetDelegationsResponse { delegations: vec![delegation] }))
 		}
 		Ok(None) => {
 			info!("No delegation found for slot {}", slot);
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			Ok(Json(GetDelegationsResponse { delegations: vec![] }))
 		}
 		Err(e) => {
 			error!("Failed to get delegation for slot {}: {}", slot, e);
+			RESPONSES_TOTAL
+				.with_label_values(&[EP, METHOD, &StatusCode::INTERNAL_SERVER_ERROR.as_u16().to_string()])
+				.inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			Err(StatusCode::INTERNAL_SERVER_ERROR)
 		}
 	}
@@ -224,12 +269,19 @@ pub async fn store_constraints_handler(
 	State(state): State<RelayState>,
 	Json(signed_constraints): Json<SignedConstraints>,
 ) -> StatusCode {
+	const EP: &str = common::constants::routes::relay::CONSTRAINTS;
+	const METHOD: &str = "POST";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	info!("Storing constraints for slot {}", signed_constraints.message.slot);
 
 	// Validate constraints message structure
 	if validate_constraints_message(&signed_constraints.message, &state.slot_timer).is_err() {
 		error!("Invalid constraints message structure");
-		return StatusCode::BAD_REQUEST;
+		let code = StatusCode::BAD_REQUEST;
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+		return code;
 	}
 
 	// Verify BLS signature using the delegate public key from the message
@@ -239,11 +291,17 @@ pub async fn store_constraints_handler(
 		}
 		Ok(false) => {
 			error!("Constraints signature verification failed");
-			return StatusCode::UNAUTHORIZED;
+			let code = StatusCode::UNAUTHORIZED;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 		Err(e) => {
 			error!("Error verifying constraints signature: {}", e);
-			return StatusCode::BAD_REQUEST;
+			let code = StatusCode::BAD_REQUEST;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 	}
 
@@ -252,17 +310,26 @@ pub async fn store_constraints_handler(
 		Ok(Some(delegation)) => {
 			if delegation.message.delegate != signed_constraints.message.delegate {
 				error!("Delegation for slot {} is not for the correct gateway", signed_constraints.message.slot);
-				return StatusCode::FORBIDDEN;
+				let code = StatusCode::FORBIDDEN;
+				RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+				REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+				return code;
 			}
 			info!("Delegation exists for slot {}", signed_constraints.message.slot);
 		}
 		Ok(None) => {
 			error!("No delegation found for slot {}", signed_constraints.message.slot);
-			return StatusCode::NOT_FOUND;
+			let code = StatusCode::NOT_FOUND;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 		Err(e) => {
 			error!("Error checking for delegation for slot {}: {}", signed_constraints.message.slot, e);
-			return StatusCode::INTERNAL_SERVER_ERROR;
+			let code = StatusCode::INTERNAL_SERVER_ERROR;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
 		}
 	}
 
@@ -270,11 +337,17 @@ pub async fn store_constraints_handler(
 	match state.database.store_signed_constraints(&signed_constraints) {
 		Ok(_) => {
 			info!("Signed constraints stored successfully for slot {}", signed_constraints.message.slot);
-			StatusCode::OK
+			let code = StatusCode::OK;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			code
 		}
 		Err(e) => {
 			error!("Failed to store signed constraints: {}", e);
-			StatusCode::INTERNAL_SERVER_ERROR
+			let code = StatusCode::INTERNAL_SERVER_ERROR;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			code
 		}
 	}
 }
@@ -285,6 +358,10 @@ pub async fn get_constraints_for_slot_handler(
 	Path(slot): Path<u64>,
 	headers: HeaderMap,
 ) -> Result<Json<Vec<SignedConstraints>>, StatusCode> {
+	const EP: &str = common::constants::routes::relay::CONSTRAINTS_SLOT;
+	const METHOD: &str = "GET";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	info!("Getting constraints for slot {}", slot);
 
 	// Get current slot to check if target slot has passed
@@ -302,11 +379,17 @@ pub async fn get_constraints_for_slot_handler(
 			}
 			Err(e) => {
 				error!("Failed to get signed constraints for slot {}: {}", slot, e);
+				RESPONSES_TOTAL
+					.with_label_values(&[EP, METHOD, &StatusCode::INTERNAL_SERVER_ERROR.as_u16().to_string()])
+					.inc();
+				REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 				return Err(StatusCode::INTERNAL_SERVER_ERROR);
 			}
 		};
 
 		info!("Returning {} constraints for past slot {}", signed_constraints.len(), slot);
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 		return Ok(Json(signed_constraints));
 	}
 
@@ -341,6 +424,8 @@ pub async fn get_constraints_for_slot_handler(
 
 	if !is_valid {
 		error!("Invalid BLS signature for slot {}", slot);
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &StatusCode::BAD_REQUEST.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 		return Err(StatusCode::BAD_REQUEST);
 	}
 
@@ -352,6 +437,10 @@ pub async fn get_constraints_for_slot_handler(
 		}
 		Err(e) => {
 			error!("Failed to get signed constraints for slot {}: {}", slot, e);
+			RESPONSES_TOTAL
+				.with_label_values(&[EP, METHOD, &StatusCode::INTERNAL_SERVER_ERROR.as_u16().to_string()])
+				.inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			return Err(StatusCode::INTERNAL_SERVER_ERROR);
 		}
 	};
@@ -368,27 +457,43 @@ pub async fn get_constraints_for_slot_handler(
 	}
 
 	info!("Returning {} authorized constraints for slot {}", authorized_constraints.len(), slot);
+	RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+	REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(Json(authorized_constraints))
 }
 
 /// GET /constraints/v0/builder/capabilities - Get constraint capabilities
 pub async fn capabilities_handler(State(state): State<RelayState>) -> Result<Json<ConstraintCapabilities>, StatusCode> {
+	const EP: &str = common::constants::routes::constraints::BUILDER_CAPABILITIES;
+	const METHOD: &str = "GET";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	info!("Getting constraint capabilities");
 
 	let capabilities = ConstraintCapabilities { constraint_types: state.config.relay.constraint_capabilities.clone() };
 
 	info!("Returning constraint capabilities: {:?}", capabilities.constraint_types);
+	RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+	REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 	Ok(Json(capabilities))
 }
 
 /// GET /health - Health check endpoint
 pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<HealthResponse>, StatusCode> {
+	const EP: &str = common::constants::routes::relay::HEALTH;
+	const METHOD: &str = "GET";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
 	match state.database.db_healthcheck().await {
 		Ok(_) => {
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			Ok(Json(HealthResponse { status: "healthy".to_string(), timestamp: chrono::Utc::now().timestamp() as u64 }))
 		}
 		Err(e) => {
 			error!("Failed to get health status: {}", e);
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, "200"]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
 			Ok(Json(HealthResponse {
 				status: "unhealthy".to_string(),
 				timestamp: chrono::Utc::now().timestamp() as u64,

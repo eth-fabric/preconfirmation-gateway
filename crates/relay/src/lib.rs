@@ -1,5 +1,6 @@
 pub mod config;
 pub mod handlers;
+pub mod metrics;
 pub mod proposer_lookahead;
 pub mod server;
 pub mod utils;

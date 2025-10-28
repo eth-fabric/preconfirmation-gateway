@@ -1,3 +1,4 @@
+use crate::metrics::metrics_handler;
 use axum::{
 	routing::{get, post},
 	Router,
@@ -49,6 +50,7 @@ pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 		.route(relay::CONSTRAINTS_SLOT, get(get_constraints_for_slot_handler))
 		.route(constraints::BUILDER_CAPABILITIES, get(capabilities_handler))
 		.route(relay::HEALTH, get(health_handler))
+		.route("/metrics", get(metrics_handler))
 		.layer(
 			ServiceBuilder::new()
 				.layer(TraceLayer::new_for_http())

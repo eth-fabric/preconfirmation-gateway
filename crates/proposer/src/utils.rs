@@ -11,6 +11,8 @@ use eyre::{Context, Result};
 use tracing::{debug, info, warn};
 
 use crate::config::ProposerConfig;
+use crate::metrics::{TASK_LATENCY_SECONDS, TASK_RUNS_TOTAL};
+use std::time::Instant;
 
 /// Get all consensus BLS public keys from the signer client
 pub async fn get_consensus_keys<T>(commit_config: &mut StartCommitModuleConfig<T>) -> Result<Vec<BlsPublicKey>> {
@@ -30,11 +32,22 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
 	current_slot: u64,
 ) -> Result<()> {
+	let task_label = "process_lookahead";
+	let start = Instant::now();
 	// Get all consensus BLS public keys from the signer
-	let our_pubkeys = get_consensus_keys(commit_config).await?;
+	let our_pubkeys = match get_consensus_keys(commit_config).await {
+		Ok(keys) => keys,
+		Err(e) => {
+			TASK_RUNS_TOTAL.with_label_values(&[task_label, "error"]).inc();
+			TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
+			return Err(e);
+		}
+	};
 
 	if our_pubkeys.is_empty() {
 		warn!("No consensus keys found in signer");
+		TASK_RUNS_TOTAL.with_label_values(&[task_label, "ok"]).inc();
+		TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
 		return Ok(());
 	}
 
@@ -62,6 +75,8 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 		}
 	}
 
+	TASK_RUNS_TOTAL.with_label_values(&[task_label, "ok"]).inc();
+	TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
 	Ok(())
 }
 

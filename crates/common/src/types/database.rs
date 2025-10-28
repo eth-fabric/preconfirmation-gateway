@@ -611,7 +611,7 @@ mod tests {
 
 	#[test]
 	fn test_slot_info_storage() {
-		let (_temp_dir, db) = create_test_db();
+		let (_temp_dir, _db) = create_test_db();
 
 		let slot = 12345;
 		let offering = Offering { chain_id: 1, commitment_types: vec![1, 2, 3] };
