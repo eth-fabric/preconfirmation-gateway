@@ -357,9 +357,8 @@ async fn test_relay_server_handles_errors_gracefully() {
 	let headers = harness.create_headers_with_valid_signature(invalid_slot, harness.gateway_bls_one.clone()).await;
 	let result2 = client.get_constraints(invalid_slot, headers).await;
 	// Either empty or error is acceptable
-	match result2 {
-		Ok(constraints) => assert!(constraints.is_empty()),
-		Err(_) => {}
+	if let Ok(constraints) = result2 {
+		assert!(constraints.is_empty());
 	}
 
 	// Server should still be responsive after errors

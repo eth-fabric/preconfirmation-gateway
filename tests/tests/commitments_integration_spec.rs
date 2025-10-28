@@ -342,7 +342,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 	let client = harness.create_client_harness();
 
 	// Setup: Store delegation
-	// Fee is now calculated via RPC to execution client (no pricing database needed)
+	// Fee is calculated via RPC to execution client
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =

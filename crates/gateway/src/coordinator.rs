@@ -65,3 +65,9 @@ impl TaskCoordinator {
 		self.task_handles.len()
 	}
 }
+
+impl Default for TaskCoordinator {
+	fn default() -> Self {
+		Self::new()
+	}
+}

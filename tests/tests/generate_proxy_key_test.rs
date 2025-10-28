@@ -4,7 +4,6 @@ use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::{HttpClient, HttpClientBuilder};
 use rand::Rng;
 use serde_json::json;
-use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;

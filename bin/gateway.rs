@@ -3,7 +3,6 @@ use commit_boost::prelude::*;
 use commitments::{CommitmentsServerState, server};
 use common::config::{CommitmentsConfig, GatewayConfig, InclusionGatewayConfig};
 use common::db::create_database;
-use common::execution::build_eth_provider;
 use common::slot_timer::SlotTimer;
 use common::types;
 use eyre::Result;

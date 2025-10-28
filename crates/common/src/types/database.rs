@@ -79,7 +79,7 @@ impl DatabaseContext {
 	fn calculate_signed_constraints_id(
 		signed_constraints: &crate::types::constraints::SignedConstraints,
 	) -> Result<B256> {
-		Ok(signed_constraints.message.to_message_hash()?)
+		signed_constraints.message.to_message_hash()
 	}
 
 	/// Store a key-value pair in the database
@@ -260,11 +260,11 @@ impl DatabaseContext {
 			// Find the last colon to get the request hash part
 			if let Some(last_colon_pos) = key_str.rfind(':') {
 				let request_hash_str = &key_str[last_colon_pos + 1..];
-				if let Ok(key_request_hash) = request_hash_str.parse::<B256>() {
-					if key_request_hash == *request_hash {
-						let signed_commitment: SignedCommitment = serde_json::from_slice(&value)?;
-						return Ok(Some(signed_commitment));
-					}
+				if let Ok(key_request_hash) = request_hash_str.parse::<B256>()
+					&& key_request_hash == *request_hash
+				{
+					let signed_commitment: SignedCommitment = serde_json::from_slice(&value)?;
+					return Ok(Some(signed_commitment));
 				}
 			}
 		}
@@ -634,7 +634,7 @@ mod tests {
 			let request_hash = B256::from_slice(&[i; 32]);
 			let commitment = Commitment {
 				commitment_type: i as u64,
-				payload: Bytes::from(vec![i as u8]),
+				payload: Bytes::from(vec![i]),
 				request_hash,
 				slasher: Address::from([i; 20]),
 			};
@@ -657,7 +657,7 @@ mod tests {
 
 			let commitment = retrieved.unwrap();
 			assert_eq!(commitment.commitment.commitment_type, i as u64);
-			assert_eq!(commitment.commitment.payload, Bytes::from(vec![i as u8]));
+			assert_eq!(commitment.commitment.payload, Bytes::from(vec![i]));
 			assert_eq!(commitment.nonce, i as u64 * 1000);
 		}
 	}

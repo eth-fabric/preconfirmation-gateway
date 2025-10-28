@@ -255,13 +255,3 @@ pub async fn process_constraints<T>(
 		}
 	}
 }
-
-#[cfg(test)]
-mod tests {
-	#[test]
-	fn test_constraints_task_creation() {
-		// This test is simplified to avoid complex commit-boost dependencies
-		// In a real test environment, you would use proper test fixtures
-		assert!(true); // Placeholder test
-	}
-}

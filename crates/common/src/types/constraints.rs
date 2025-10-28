@@ -114,7 +114,7 @@ impl ConstraintsMessage {
 				.iter()
 				.map(|c| SolConstraint { constraintType: c.constraint_type, payload: c.payload.clone() })
 				.collect(),
-			receivers: self.receivers.iter().map(|r| convert_pubkey_to_g1_point(r)).collect::<Result<Vec<_>, _>>()?,
+			receivers: self.receivers.iter().map(convert_pubkey_to_g1_point).collect::<Result<Vec<_>, _>>()?,
 		};
 
 		// Get the object root to sign
@@ -177,8 +177,8 @@ mod tests {
 		);
 
 		let delegation = Delegation {
-			proposer: proposer,
-			delegate: delegate,
+			proposer,
+			delegate,
 			committer: hex!("0x1111111111111111111111111111111111111111").into(),
 			slot: 5,
 			metadata: Bytes::from("some-metadata-here"),
@@ -203,14 +203,14 @@ mod tests {
 		)];
 
 		let constraints_message = ConstraintsMessage {
-			proposer: proposer,
-			delegate: delegate,
+			proposer,
+			delegate,
 			slot: 67890,
 			constraints: vec![
 				Constraint { constraint_type: 1, payload: Bytes::from(vec![0x01, 0x02]) },
 				Constraint { constraint_type: 2, payload: Bytes::from(vec![0x03, 0x04]) },
 			],
-			receivers: receivers,
+			receivers,
 		};
 
 		let message_hash = constraints_message.to_message_hash().unwrap();

@@ -1,3 +1,3 @@
-// Re-export modules from crates for easy access
-pub use commitments::*;
-pub use common::*;
+// Re-export modules (namespaced) from crates for easy access without glob collisions
+pub use commitments;
+pub use common;

@@ -253,7 +253,7 @@ mod tests {
 
 		// Verify the structure contains our data
 		let encoded_bytes = encoded.as_ref();
-		assert!(encoded_bytes.len() > 0);
+		assert!(!encoded_bytes.is_empty());
 
 		assert_eq!(
 			keccak256(&encoded).to_string(),
@@ -274,7 +274,7 @@ mod tests {
 
 		// Verify the structure contains our data
 		let encoded_bytes = encoded.as_ref();
-		assert!(encoded_bytes.len() > 0);
+		assert!(!encoded_bytes.is_empty());
 
 		assert_eq!(
 			keccak256(&encoded).to_string(),

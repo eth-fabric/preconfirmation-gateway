@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, B256, U256, address};
+use alloy::primitives::{Address, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::BlockNumberOrTag;
 use clap::{Parser, Subcommand};
@@ -393,8 +393,7 @@ async fn handle_opt_out_of_slasher_command(
 ) -> Result<()> {
 	info!("Starting URC opt-out of slasher process");
 
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let password = match password {
@@ -428,8 +427,7 @@ async fn handle_unregister_command(
 ) -> Result<()> {
 	info!("Starting URC unregister process");
 
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let password = match password {
@@ -458,8 +456,7 @@ async fn handle_add_collateral_command(
 ) -> Result<()> {
 	info!("Starting URC add-collateral process");
 
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let password = match password {
@@ -490,8 +487,7 @@ async fn handle_get_slasher_commitment_command(
 	registration_root: B256,
 	slasher: Address,
 ) -> Result<()> {
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let sc = get_slasher_commitment(urc_address, registration_root, slasher, &execution_rpc_url)
@@ -513,8 +509,7 @@ async fn handle_claim_collateral_command(
 ) -> Result<()> {
 	info!("Starting URC claim-collateral process");
 
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let password = match password {
@@ -547,8 +542,7 @@ async fn handle_claim_slashed_collateral_command(
 ) -> Result<()> {
 	info!("Starting URC claim-slashed-collateral process");
 
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	let password = match password {
@@ -585,8 +579,7 @@ async fn handle_opt_in_to_slasher_command(
 	info!("Starting URC opt-in to slasher process");
 
 	// Load configuration
-	let mut commit_config =
-		load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
+	let commit_config = load_commit_module_config::<ProposerConfig>().context("Failed to load commit module config")?;
 	let execution_rpc_url = commit_config.extra.execution_rpc_url.clone();
 
 	// Get password

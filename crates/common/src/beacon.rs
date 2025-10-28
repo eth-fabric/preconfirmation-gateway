@@ -3,6 +3,7 @@
 //! This module provides integration with Ethereum Beacon Chain API endpoints,
 //! specifically designed to work with Alchemy's Beacon API or any compatible
 //! beacon node endpoint.
+#![allow(async_fn_in_trait)]
 
 use eyre::{Context, Result};
 use reqwest::Client;
