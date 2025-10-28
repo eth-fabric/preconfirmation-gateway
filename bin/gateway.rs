@@ -1,10 +1,10 @@
-use cb_common::utils::bls_pubkey_from_hex;
 use commit_boost::prelude::*;
 use commitments::{CommitmentsServerState, server};
 use common::config::{CommitmentsConfig, GatewayConfig, InclusionGatewayConfig};
 use common::db::create_database;
 use common::slot_timer::SlotTimer;
 use common::types;
+use common::utils::bls_pubkey_from_hex;
 use eyre::Result;
 use gateway::{ConstraintsTask, DelegationTask, DelegationTaskConfig, TaskCoordinator};
 use lazy_static::lazy_static;

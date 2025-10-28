@@ -1,3 +1,7 @@
+//! Commitments RPC service exposing request/result/fee/slot endpoints.
+//!
+//! This crate wires Commit-Boost config, database, and handlers into a
+//! lightweight JSON-RPC server for preconfirmation flows.
 pub mod handlers;
 pub mod methods;
 pub mod server;

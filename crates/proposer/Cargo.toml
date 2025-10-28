@@ -18,6 +18,9 @@ common = { path = "../common" }
 constraints = { path = "../constraints" }
 urc = { workspace = true }
 
+clap = { version = "4.0", features = ["derive"] }
+rpassword = "7.0"
+
 [dev-dependencies]
 mockall = "0.12"
 common = { path = "../common", features = ["test-utils"] }

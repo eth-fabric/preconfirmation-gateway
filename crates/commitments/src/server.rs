@@ -7,7 +7,10 @@ use super::methods;
 use crate::CommitmentsServerState;
 use common::config::{CommitmentsConfig, GatewayConfig};
 
-// Functions for working with commit-boost configuration
+/// Start the Commitments JSON-RPC server using the provided shared state.
+///
+/// Resolves the listen address from the commit-config and serves until shutdown.
+/// Returns `Ok(())` when the server stops.
 pub async fn run_server<T>(rpc_context: CommitmentsServerState<T>) -> Result<()>
 where
 	T: Send + Sync + 'static + GatewayConfig,

@@ -288,7 +288,7 @@ pub async fn generate_proxy_key_handler<T>(
 	let request: GenerateProxyKeyRequest = params.one()?;
 
 	// Parse BLS public key
-	let bls_public_key = match cb_common::utils::bls_pubkey_from_hex(&request.bls_public_key) {
+	let bls_public_key = match common::utils::bls_pubkey_from_hex(&request.bls_public_key) {
 		Ok(key) => key,
 		Err(e) => {
 			error!("Invalid BLS public key format: {}", e);

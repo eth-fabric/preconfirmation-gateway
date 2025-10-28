@@ -2156,6 +2156,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tracing",
+ "tracing-subscriber",
  "urc",
 ]
 
@@ -5226,8 +5227,6 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "anyhow",
- "cb-common",
- "clap",
  "commit-boost",
  "commitments",
  "common",
@@ -5358,6 +5357,7 @@ version = "0.1.0"
 dependencies = [
  "alloy",
  "cb-common",
+ "clap",
  "commit-boost",
  "common",
  "constraints",
@@ -5365,6 +5365,7 @@ dependencies = [
  "eyre",
  "hex",
  "mockall 0.12.1",
+ "rpassword",
  "serde",
  "serde_json",
  "tokio",

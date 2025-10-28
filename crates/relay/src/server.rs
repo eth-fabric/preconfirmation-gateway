@@ -20,17 +20,8 @@ use common::types::database::DatabaseContext;
 
 /// Setup logging for the relay server
 pub fn setup_logging(log_level: &str) -> eyre::Result<()> {
-	let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-		.unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(log_level));
-
-	tracing_subscriber::fmt()
-		.with_env_filter(filter)
-		.with_target(false)
-		.with_thread_ids(true)
-		.with_thread_names(true)
-		.init();
-
-	Ok(())
+	// Delegate to common logging setup for consistency across binaries
+	common::logging::setup(log_level)
 }
 
 /// Run the relay server
@@ -38,11 +29,9 @@ pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 	info!("Starting relay server on port {}", config.relay.port);
 
 	// Create database using common infrastructure with local path
-	let mut opts = rocksdb::Options::default();
-	opts.create_if_missing(true);
-	opts.create_missing_column_families(true);
-
-	let db = Arc::new(rocksdb::DB::open(&opts, &config.relay.database_path)?);
+	let db = common::db::create_database(
+		config.relay.database_path.to_str().ok_or_else(|| eyre::eyre!("Invalid database path"))?,
+	)?;
 	let database = Arc::new(DatabaseContext::new(db));
 	info!("Database initialized at {:?}", config.relay.database_path);
 
