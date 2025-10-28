@@ -8,6 +8,8 @@ use common::config::BeaconApiConfig;
 use common::slot_timer::SlotTimer;
 use constraints::ConstraintsClient;
 use eyre::{Context, Result};
+use lazy_static::lazy_static;
+use prometheus::{IntCounter, Registry, opts};
 use proposer::{
 	ProposerConfig, get_slasher_commitment, process_lookahead, send_add_collateral_transaction,
 	send_claim_collateral_transaction, send_claim_slashed_collateral_transaction, send_opt_in_to_slasher_transaction,
@@ -16,6 +18,13 @@ use proposer::{
 };
 use tokio::time::{Duration, interval};
 use tracing::{debug, error, info};
+
+lazy_static! {
+	pub static ref MY_CUSTOM_REGISTRY: Registry =
+		Registry::new_custom(Some("inclusion-preconf-proposer".to_string()), None).unwrap();
+	pub static ref SIG_RECEIVED_COUNTER: IntCounter =
+		IntCounter::with_opts(opts!("sig_received_total", "Number of OS signals received")).unwrap();
+}
 
 #[derive(Parser)]
 #[command(name = "proposer")]
@@ -203,6 +212,9 @@ enum Commands {
 async fn main() -> Result<()> {
 	// Initialize tracing
 	tracing_subscriber::fmt::init();
+
+	// Remember to register all your metrics before starting the process
+	MY_CUSTOM_REGISTRY.register(Box::new(SIG_RECEIVED_COUNTER.clone()))?;
 
 	let cli = Cli::parse();
 

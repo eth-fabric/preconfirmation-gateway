@@ -15,6 +15,15 @@ use alloy::consensus::{SignableTransaction, Signed, TxEip1559, TxEnvelope};
 use alloy::primitives::{Address, Bytes, TxKind, U256};
 use alloy::rlp::Encodable;
 use alloy::signers::{SignerSync, local::PrivateKeySigner};
+use lazy_static::lazy_static;
+use prometheus::{IntCounter, Registry, opts};
+
+lazy_static! {
+	pub static ref MY_CUSTOM_REGISTRY: Registry =
+		Registry::new_custom(Some("inclusion-preconf-spammer".to_string()), None).unwrap();
+	pub static ref SIG_RECEIVED_COUNTER: IntCounter =
+		IntCounter::with_opts(opts!("sig_received_total", "Number of OS signals received")).unwrap();
+}
 
 /// Configuration for the spammer
 #[derive(Debug, Deserialize)]
@@ -197,6 +206,9 @@ async fn main() -> Result<()> {
 				.unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
 		)
 		.init();
+
+	// Remember to register all your metrics before starting the process
+	MY_CUSTOM_REGISTRY.register(Box::new(SIG_RECEIVED_COUNTER.clone()))?;
 
 	// Get config file path from args or use default
 	let args: Vec<String> = env::args().collect();

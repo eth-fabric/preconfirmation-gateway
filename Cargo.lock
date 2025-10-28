@@ -5236,6 +5236,8 @@ dependencies = [
  "eyre",
  "gateway",
  "jsonrpsee",
+ "lazy_static",
+ "prometheus",
  "proposer",
  "relay",
  "rocksdb",

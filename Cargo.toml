@@ -44,6 +44,8 @@ urc = { path = "./crates/common/bindings/urc" }
 hex = "0.4"
 axum = { version = "0.8", features = ["macros", "multipart"] }
 tempfile = "3.8"
+prometheus = "0.14.0"
+lazy_static = "1.5.0"
 
 [patch.crates-io]
 blstrs_plus = { git = "https://github.com/Commit-Boost/blstrs" }
