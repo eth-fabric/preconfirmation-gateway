@@ -19,6 +19,18 @@ path = "proposer.rs"
 name = "spammer"
 path = "spammer.rs"
 
+[[bin]]
+name = "simulation-setup"
+path = "simulation-setup.rs"
+
+[[bin]]
+name = "local-signer-module"
+path = "local_signer_module.rs"
+
+[[bin]]
+name = "beacon-mock"
+path = "beacon_mock.rs"
+
 [dependencies]
 common = { path = "../crates/common" }
 commitments = { path = "../crates/commitments" }
@@ -26,6 +38,11 @@ constraints = { path = "../crates/constraints" }
 gateway = { path = "../crates/gateway" }
 relay = { path = "../crates/relay" }
 proposer = { path = "../crates/proposer" }
+cb-common = { workspace = true }
+cb-signer = { workspace = true }
+clap = { workspace = true }
+color-eyre = { workspace = true }
+indexmap = { workspace = true }
 rocksdb = { workspace = true }
 anyhow = { workspace = true }
 eyre = { workspace = true }

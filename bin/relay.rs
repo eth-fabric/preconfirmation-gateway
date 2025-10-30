@@ -34,24 +34,23 @@ async fn main() -> eyre::Result<()> {
 	// Create slot timer
 	let slot_timer = SlotTimer::new(config.relay.genesis_timestamp);
 
-	// Open database for proposer lookahead
+	// Open database (shared between proposer lookahead and relay server)
 	let db = create_database(config.relay.database_path.to_str().ok_or_else(|| eyre::eyre!("Invalid database path"))?)?;
 	let database = DatabaseContext::new(db);
 
 	// Create beacon API client for proposer lookahead
 	let beacon_config = BeaconApiConfig {
-		primary_endpoint: std::env::var("BEACON_API_URL")
-			.unwrap_or_else(|_| "https://ethereum-beacon-api.publicnode.com".to_string()),
+		primary_endpoint: config.relay.beacon_api_url.clone(),
 		fallback_endpoints: vec![],
 		request_timeout_secs: 30,
-		genesis_time: config.relay.genesis_timestamp,
+		genesis_time: config.relay.genesis_timestamp, //todo should be fetched from beacon API
 	};
 	let beacon_client = BeaconApiClient::with_default_client(beacon_config)?;
 
 	// Create proposer lookahead task configuration
 	let proposer_lookahead_config = ProposerLookaheadConfig {
-		update_interval_seconds: 60, // Update every 60 seconds
-		lookahead_window: 64,        // 64 slots lookahead
+		update_interval_seconds: config.relay.lookahead_update_interval,
+		lookahead_window: config.relay.lookahead_window,
 	};
 
 	// Create and spawn proposer lookahead task
@@ -66,8 +65,9 @@ async fn main() -> eyre::Result<()> {
 	});
 
 	// Run relay server (this will block until shutdown)
+	// Pass the already-opened database to avoid opening it twice
 	info!("Starting relay server on port {}", config.relay.port);
-	run_relay_server(config).await?;
+	run_relay_server(config, database).await?;
 
 	Ok(())
 }

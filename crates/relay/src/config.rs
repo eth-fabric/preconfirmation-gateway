@@ -17,6 +17,9 @@ pub struct RelayServerConfig {
 	pub constraint_capabilities: Vec<u64>,
 	pub chain: Chain,
 	pub genesis_timestamp: u64,
+	pub beacon_api_url: String,
+	pub lookahead_window: u64,
+	pub lookahead_update_interval: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +38,9 @@ impl Default for RelayConfig {
 				constraint_capabilities: vec![1],
 				chain: Chain::Hoodi,
 				genesis_timestamp: 1742213400, // Hoodi genesis timestamp
+				beacon_api_url: "http://localhost:5052".to_string(),
+				lookahead_window: 64,
+				lookahead_update_interval: 10,
 			},
 			storage: StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

@@ -21,14 +21,15 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let rpc_port = rng.gen_range(30000..39999);
 
 	// Create test configuration
-	let commitments_config = common::config::InclusionCommitmentsConfig {
-		server_host: "127.0.0.1".to_string(),
-		server_port: rpc_port,
-		database_path: db_path.to_string_lossy().to_string(),
-		log_level: "debug".to_string(),
-		bls_public_key:
+	let app_config = common::config::InclusionGatewayConfig {
+		// Commitments server configuration
+		commitments_server_host: "127.0.0.1".to_string(),
+		commitments_server_port: rpc_port,
+		commitments_database_path: db_path.to_string_lossy().to_string(),
+		commitments_bls_public_key:
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
+		log_level: "debug".to_string(),
 		enable_method_tracing: true,
 		traced_methods: vec![
 			"commitmentRequest".to_string(),
@@ -37,10 +38,8 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"fee".to_string(),
 			"generateProxyKey".to_string(),
 		],
-	};
 
-	let app_config = common::config::InclusionGatewayConfig {
-		commitments: commitments_config,
+		// Gateway orchestration configuration
 		relay_url: "https://relay.example.com".to_string(),
 		constraints_api_key: None,
 		genesis_timestamp: 1606824023,

@@ -6,7 +6,7 @@ use cb_common::{
 };
 use commit_boost::prelude::StartCommitModuleConfig;
 use commitments::CommitmentsServerState;
-use common::config::{InclusionCommitmentsConfig, InclusionGatewayConfig};
+use common::config::InclusionGatewayConfig;
 use common::slot_timer::SlotTimer;
 use common::types::commitments::InclusionPayload;
 use common::types::{Commitment, CommitmentRequest, DatabaseContext, SignedCommitment};
@@ -250,18 +250,17 @@ impl TestHarnessBuilder {
 		let (database, _delegations_database) = self.setup_databases(&temp_dir)?;
 
 		// Create test InclusionGatewayConfig
-		let commitments_config = InclusionCommitmentsConfig {
-			server_host: "127.0.0.1".to_string(),
-			server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
-			database_path: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
+		let app_config = InclusionGatewayConfig {
+			// Commitments server configuration
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
+			commitments_database_path: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
+			commitments_bls_public_key: hex::encode(PUBKEY),
 			log_level: "info".to_string(),
-			bls_public_key: hex::encode(PUBKEY),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-		};
 
-		let app_config = InclusionGatewayConfig {
-			commitments: commitments_config,
+			// Gateway orchestration configuration
 			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
 			genesis_timestamp: 1606824023,
@@ -409,15 +408,14 @@ impl TestHarnessBuilder {
 	async fn launch_commitments_service(
 		rpc_context: CommitmentsServerState<InclusionGatewayConfig>,
 	) -> Result<ServiceHandle> {
-		use common::config::{CommitmentsConfig, GatewayConfig};
+		use common::config::GatewayConfig;
 
 		let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
 		// Get the port from the commit config
 		let commit_config = rpc_context.commit_config.lock().await;
 		let gateway_config = &commit_config.extra;
-		let commitments_config = gateway_config.commitments_config();
-		let port = commitments_config.server_port();
+		let port = gateway_config.server_port();
 		let url = format!("http://127.0.0.1:{}", port);
 		drop(commit_config); // Release the lock
 
@@ -1296,20 +1294,19 @@ pub mod test_helpers {
 		let _constraints_port = rpc_port + 1;
 
 		// Create test config
-		let commitments_config = InclusionCommitmentsConfig {
-			server_host: "127.0.0.1".to_string(),
-			server_port: rpc_port,
-			database_path: "./test_db".to_string(),
-			log_level: "info".to_string(),
-			bls_public_key:
+		let app_config = InclusionGatewayConfig {
+			// Commitments server configuration
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: rpc_port,
+			commitments_database_path: "./test_db".to_string(),
+			commitments_bls_public_key:
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
+			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-		};
 
-		let app_config = InclusionGatewayConfig {
-			commitments: commitments_config,
+			// Gateway orchestration configuration
 			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
 			genesis_timestamp: 1606824023,

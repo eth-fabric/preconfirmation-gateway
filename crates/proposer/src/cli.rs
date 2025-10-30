@@ -5,7 +5,7 @@ use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::BlockNumberOrTag;
 use clap::{Parser, Subcommand};
 use commit_boost::prelude::*;
-use common::beacon::BeaconApiClient;
+use common::beacon::{BeaconApiClient, ReqwestClient};
 use common::config::BeaconApiConfig;
 use common::slot_timer::SlotTimer;
 use constraints::ConstraintsClient;
@@ -248,9 +248,18 @@ async fn handle_opt_in_to_slasher_command(
 /// Entry point for running the CLI; parses args and dispatches subcommands.
 pub async fn run() -> Result<()> {
 	let cli = Cli::parse();
-
 	match cli.command.unwrap_or(Commands::Run) {
 		Commands::Run => run_daemon().await,
+		command => handle_command(command).await,
+	}
+}
+
+/// Handle non-daemon CLI commands
+pub async fn handle_command(command: Commands) -> Result<()> {
+	match command {
+		Commands::Run => {
+			unreachable!("Run command should be handled separately")
+		}
 		Commands::Register { urc_address, keystore, password, dry_run } => {
 			handle_register_command(urc_address, keystore, password, dry_run).await
 		}
@@ -295,12 +304,23 @@ pub async fn run() -> Result<()> {
 	}
 }
 
-async fn run_daemon() -> Result<()> {
-	info!("Starting proposer service");
+/// Configuration and state for daemon work loop
+pub struct DaemonContext {
+	pub commit_config: StartCommitModuleConfig<crate::ProposerConfig>,
+	pub beacon_client: BeaconApiClient<ReqwestClient>,
+	pub constraints_client: ConstraintsClient,
+	pub slot_timer: SlotTimer,
+	pub poll_interval_seconds: u64,
+}
 
+/// Load daemon configuration (must be called from main async context)
+pub async fn load_daemon_config() -> Result<DaemonContext> {
 	// Load configuration using commit-boost's config loader
-	let mut commit_config = load_commit_module_config::<crate::ProposerConfig>()
+	// CRITICAL: This must be called in main async context, not in spawned task
+	let commit_config = load_commit_module_config::<crate::ProposerConfig>()
 		.map_err(|e| eyre::eyre!("Failed to load commit module config: {}", e))?;
+
+	info!("Loaded config");
 
 	let config = commit_config.extra.clone();
 
@@ -336,20 +356,32 @@ async fn run_daemon() -> Result<()> {
 
 	// Create slot timer for tracking current slot
 	let slot_timer = SlotTimer::new(config.beacon_genesis_timestamp);
+	let poll_interval_seconds = config.poll_interval_seconds;
 
+	Ok(DaemonContext {
+		commit_config,
+		beacon_client,
+		constraints_client,
+		slot_timer,
+		poll_interval_seconds,
+	})
+}
+
+/// Run the daemon work loop (can be called from spawned task)
+pub async fn run_daemon_loop(mut context: DaemonContext) -> Result<()> {
 	info!("Starting proposer duty polling loop");
 
 	// Set up polling interval
-	let mut poll_interval = tokio::time::interval(std::time::Duration::from_secs(config.poll_interval_seconds));
+	let mut poll_interval = tokio::time::interval(std::time::Duration::from_secs(context.poll_interval_seconds));
 
 	loop {
 		poll_interval.tick().await;
 
-		let current_slot = slot_timer.get_current_slot();
+		let current_slot = context.slot_timer.get_current_slot();
 		debug!("Checking proposer duties for current slot: {}", current_slot);
 
 		// Process lookahead to find and post delegations
-		match crate::process_lookahead(&beacon_client, &constraints_client, &mut commit_config, current_slot).await {
+		match crate::process_lookahead(&context.beacon_client, &context.constraints_client, &mut context.commit_config, current_slot).await {
 			Ok(_) => {
 				debug!("Lookahead processed successfully for slot {}", current_slot);
 			}
@@ -358,6 +390,12 @@ async fn run_daemon() -> Result<()> {
 			}
 		}
 	}
+}
+
+/// Legacy function kept for backwards compatibility
+pub async fn run_daemon() -> Result<()> {
+	let context = load_daemon_config().await?;
+	run_daemon_loop(context).await
 }
 
 async fn handle_register_command(

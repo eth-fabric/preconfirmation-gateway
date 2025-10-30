@@ -21,6 +21,7 @@ target
 #.idea/
 
 .env
+.simulation.env
 
 plan.md
 scratch.md
@@ -29,3 +30,5 @@ logs/
 data/rocksdb/
 data/relay-rocksdb/
 build/
+signer-setup.sh
+data/*db

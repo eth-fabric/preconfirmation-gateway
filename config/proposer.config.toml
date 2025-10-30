@@ -27,24 +27,25 @@ keys_path = "./tests/data/keystores/keys"
 secrets_path = "./tests/data/keystores/secrets"
 
 [signer.local.store]
-proxy_dir = "./tests/data/keystores/proxies"
+proxy_dir = "./tests/data/proxy"
 
 # Proposer Module configuration
 [[modules]]
 id = "proposer-module"
-module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111113"
+signing_id = "0x2222222222222222222222222222222222222222222222222222222222222222"
 type = "commit"
 docker_image = "todo"
 env_file = ".cb.env"
 
 # Proposer service configuration
-delegate_bls_public_key = "0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754"
+delegate_bls_public_key = "0xa77084280678d9f1efe4ef47a3d62af27872ce82db19a35ee012c4fd5478e6b1123b8869032ba18b2383e8873294f0ba"
 committer_address = "0x1111111111111111111111111111111111111111"
-relay_url = "http://localhost:3001"
+relay_url = "http://localhost:9999"
 relay_api_key = ""
-beacon_api_url = "https://ethereum-beacon-api.publicnode.com"
-beacon_genesis_timestamp = 1606824023
-poll_interval_seconds = 60
+beacon_api_url = "http://localhost:5052"
+beacon_genesis_timestamp = 1606824023 # mainnet
+poll_interval_seconds = 5
+module_signing_id = "0x2222222222222222222222222222222222222222222222222222222222222222"
 
 # URC Registration Configuration
 urc_owner = "0xBB771250f7CA20123AA4c4175a49fdD8774838F3"

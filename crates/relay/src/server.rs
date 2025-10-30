@@ -26,14 +26,11 @@ pub fn setup_logging(log_level: &str) -> eyre::Result<()> {
 }
 
 /// Run the relay server
-pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
+pub async fn run_relay_server(config: RelayConfig, database: DatabaseContext) -> eyre::Result<()> {
 	info!("Starting relay server on port {}", config.relay.port);
 
-	// Create database using common infrastructure with local path
-	let db = common::db::create_database(
-		config.relay.database_path.to_str().ok_or_else(|| eyre::eyre!("Invalid database path"))?,
-	)?;
-	let database = Arc::new(DatabaseContext::new(db));
+	// Use the provided database (already opened by the caller)
+	let database = Arc::new(database);
 	info!("Database initialized at {:?}", config.relay.database_path);
 
 	// Create slot timer
@@ -62,11 +59,11 @@ pub async fn run_relay_server(config: RelayConfig) -> eyre::Result<()> {
 	let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.relay.port)).await?;
 	info!("Relay server listening on port {}", config.relay.port);
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = common::utils::wait_for_signal().await;
-        })
-        .await?;
+	axum::serve(listener, app)
+		.with_graceful_shutdown(async {
+			let _ = common::utils::wait_for_signal().await;
+		})
+		.await?;
 
 	Ok(())
 }
@@ -86,6 +83,9 @@ mod tests {
 				constraint_capabilities: vec![1],
 				chain: commit_boost::prelude::Chain::Hoodi,
 				genesis_timestamp: 1742213400,
+				beacon_api_url: "http://localhost:5052".to_string(),
+				lookahead_window: 64,
+				lookahead_update_interval: 10,
 			},
 			storage: crate::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

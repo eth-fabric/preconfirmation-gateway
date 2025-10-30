@@ -1,6 +1,6 @@
 use commit_boost::prelude::*;
 use commitments::{CommitmentsServerState, server};
-use common::config::{CommitmentsConfig, GatewayConfig, InclusionGatewayConfig};
+use common::config::{GatewayConfig, InclusionGatewayConfig};
 use common::db::create_database;
 use common::slot_timer::SlotTimer;
 use common::types;
@@ -43,7 +43,6 @@ async fn main() -> Result<()> {
 		let config_guard = shared_commit_config.lock().await;
 		config_guard.extra.clone()
 	};
-	let commitments_config = gateway_config.commitments_config();
 	let genesis_timestamp = gateway_config.genesis_timestamp();
 	info!("Using Ethereum genesis timestamp: {}", genesis_timestamp);
 
@@ -51,7 +50,7 @@ async fn main() -> Result<()> {
 	let slot_timer = SlotTimer::new(genesis_timestamp);
 
 	// Create databases
-	let commitments_db = create_database(commitments_config.database_path())
+	let commitments_db = create_database(gateway_config.database_path())
 		.map_err(|e| eyre::eyre!("Failed to create commitments database: {}", e))?;
 	let commitments_database = types::DatabaseContext::new(commitments_db);
 
@@ -60,7 +59,7 @@ async fn main() -> Result<()> {
 	let delegations_database = types::DatabaseContext::new(delegations_db);
 
 	// Get BLS public key for commitments server
-	let bls_public_key = bls_pubkey_from_hex(commitments_config.bls_public_key())
+	let bls_public_key = bls_pubkey_from_hex(gateway_config.bls_public_key())
 		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 
 	// Create provider for commitments server (built on demand in utils)
@@ -90,11 +89,7 @@ async fn main() -> Result<()> {
 	};
 
 	// Spawn commitments RPC server
-	info!(
-		"Starting commitments RPC server on {}:{}",
-		commitments_config.server_host(),
-		commitments_config.server_port()
-	);
+	info!("Starting commitments RPC server on {}:{}", gateway_config.server_host(), gateway_config.server_port());
 	tokio::spawn(async move {
 		if let Err(e) = server::run_server(commitments_state).await {
 			tracing::error!("Commitments server error: {}", e);
@@ -142,21 +137,21 @@ async fn main() -> Result<()> {
 
 	info!("Gateway initialized with commitments server and {} gateway tasks", coordinator.task_count());
 
-    // Run scheduler loop concurrently and wait for shutdown signal
-    let slot_timer_clone = slot_timer.clone();
-    let scheduler = tokio::spawn(async move {
-        loop {
-            let current_slot = slot_timer_clone.get_current_slot();
-            info!("Current slot: {}", current_slot);
-            tokio::time::sleep(Duration::from_secs(12)).await;
-        }
-    });
+	// Run scheduler loop concurrently and wait for shutdown signal
+	let slot_timer_clone = slot_timer.clone();
+	let scheduler = tokio::spawn(async move {
+		loop {
+			let current_slot = slot_timer_clone.get_current_slot();
+			info!("Current slot: {}", current_slot);
+			tokio::time::sleep(Duration::from_secs(12)).await;
+		}
+	});
 
-    // Wait for Docker shutdown signals (SIGINT/SIGTERM)
-    common::utils::wait_for_signal().await?;
+	// Wait for Docker shutdown signals (SIGINT/SIGTERM)
+	common::utils::wait_for_signal().await?;
 
-    // Stop background tasks
-    scheduler.abort();
+	// Stop background tasks
+	scheduler.abort();
 
-    Ok(())
+	Ok(())
 }

@@ -15,23 +15,17 @@ pub struct BeaconApiConfig {
 
 // ==================== Configuration Trait System ====================
 
-/// Commitments service configuration trait
-/// Defines the minimal interface required by the commitments RPC server
-pub trait CommitmentsConfig {
+/// Gateway configuration trait
+/// Defines the interface for gateway orchestration configuration
+pub trait GatewayConfig {
+	// Commitments server configuration
 	fn server_host(&self) -> &str;
 	fn server_port(&self) -> u16;
 	fn database_path(&self) -> &str;
 	fn log_level(&self) -> &str;
 	fn bls_public_key(&self) -> &str;
-}
 
-/// Gateway configuration trait
-/// Defines the interface for gateway orchestration configuration
-/// Nests a CommitmentsConfig for the commitments server component
-pub trait GatewayConfig {
-	type CommitmentsConfig: CommitmentsConfig;
-
-	fn commitments_config(&self) -> &Self::CommitmentsConfig;
+	// Gateway orchestration configuration
 	fn relay_url(&self) -> &str;
 	fn constraints_api_key(&self) -> Option<&str>;
 	fn genesis_timestamp(&self) -> u64;
@@ -65,46 +59,14 @@ pub trait RelayConfig {
 
 // ==================== Concrete Inclusion Preconf Configurations ====================
 
-/// Commitments service configuration for inclusion preconfs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InclusionCommitmentsConfig {
-	pub server_host: String,
-	pub server_port: u16,
-	pub database_path: String,
-	pub log_level: String,
-	pub bls_public_key: String,
-	// Inclusion-specific extras
-	pub enable_method_tracing: bool,
-	pub traced_methods: Vec<String>,
-}
-
-impl CommitmentsConfig for InclusionCommitmentsConfig {
-	fn server_host(&self) -> &str {
-		&self.server_host
-	}
-
-	fn server_port(&self) -> u16 {
-		self.server_port
-	}
-
-	fn database_path(&self) -> &str {
-		&self.database_path
-	}
-
-	fn log_level(&self) -> &str {
-		&self.log_level
-	}
-
-	fn bls_public_key(&self) -> &str {
-		&self.bls_public_key
-	}
-}
-
 /// Gateway configuration for inclusion preconfs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InclusionGatewayConfig {
-	/// Nested commitments configuration
-	pub commitments: InclusionCommitmentsConfig,
+	// Commitments server configuration
+	pub commitments_server_host: String,
+	pub commitments_server_port: u16,
+	pub commitments_database_path: String,
+	pub commitments_bls_public_key: String,
 
 	/// Gateway orchestration configuration
 	pub relay_url: String,
@@ -123,13 +85,32 @@ pub struct InclusionGatewayConfig {
 
 	/// Module signing ID for this gateway instance
 	pub module_signing_id: String,
+
+	// Commitments-specific configuration
+	pub log_level: String,
+	pub enable_method_tracing: bool,
+	pub traced_methods: Vec<String>,
 }
 
 impl GatewayConfig for InclusionGatewayConfig {
-	type CommitmentsConfig = InclusionCommitmentsConfig;
+	fn server_host(&self) -> &str {
+		&self.commitments_server_host
+	}
 
-	fn commitments_config(&self) -> &Self::CommitmentsConfig {
-		&self.commitments
+	fn server_port(&self) -> u16 {
+		self.commitments_server_port
+	}
+
+	fn database_path(&self) -> &str {
+		&self.commitments_database_path
+	}
+
+	fn log_level(&self) -> &str {
+		&self.log_level
+	}
+
+	fn bls_public_key(&self) -> &str {
+		&self.commitments_bls_public_key
 	}
 
 	fn relay_url(&self) -> &str {

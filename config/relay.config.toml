@@ -1,10 +1,13 @@
 [relay]
-port = 8080
+port = 9999
 database_path = "data/relay-rocksdb"
 log_level = "info"
 constraint_capabilities = [1]
 chain = "Hoodi"
-genesis_timestamp = 1742213400
+genesis_timestamp = 1606824023 # mainnet
+beacon_api_url = "http://localhost:5052"
+lookahead_window = 64
+lookahead_update_interval = 10
 
 [storage]
 max_delegations_per_slot = 100

@@ -128,24 +128,21 @@ mod tests {
 
 	#[test]
 	fn test_delegation_task_creation() {
-		use common::config::InclusionCommitmentsConfig;
-
 		let config = DelegationTaskConfig { check_interval_seconds: 1, lookahead_window: 64 };
 
-		let commitments_config = InclusionCommitmentsConfig {
-			server_host: "127.0.0.1".to_string(),
-			server_port: 8080,
-			database_path: "test.db".to_string(),
-			log_level: "info".to_string(),
-			bls_public_key:
+		let app_config = InclusionGatewayConfig {
+			// Commitments server configuration
+			commitments_server_host: "127.0.0.1".to_string(),
+			commitments_server_port: 8080,
+			commitments_database_path: "test.db".to_string(),
+			commitments_bls_public_key:
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
+			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
-		};
 
-		let app_config = InclusionGatewayConfig {
-			commitments: commitments_config,
+			// Gateway orchestration configuration
 			relay_url: "https://relay.example.com".to_string(),
 			constraints_api_key: None,
 			genesis_timestamp: 1606824023,

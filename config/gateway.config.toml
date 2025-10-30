@@ -27,30 +27,30 @@ keys_path = "./tests/data/keystores/keys"
 secrets_path = "./tests/data/keystores/secrets"
 
 [signer.local.store]
-proxy_dir = "./tests/data/keystores/proxies"
+proxy_dir = "./tests/data/proxy"
 
 # Gateway Module configuration
 [[modules]]
 id = "gateway-module"
-module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111112"
+signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
 type = "commit"
 docker_image = "todo"
 env_file = ".cb.env"
 
 # Commitments server configuration
-[modules.commitments]
-server_host = "127.0.0.1"
-server_port = 8080
-database_path = "./data/rocksdb"
+commitments_server_host = "127.0.0.1"
+commitments_server_port = 8080
+commitments_database_path = "./data/rocksdb"
+commitments_bls_public_key = "0xa77084280678d9f1efe4ef47a3d62af27872ce82db19a35ee012c4fd5478e6b1123b8869032ba18b2383e8873294f0ba"
+module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
 log_level = "info"
-bls_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 enable_method_tracing = true
 traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
 
 # Gateway orchestration configuration
-relay_url = "https://relay.example.com"
+relay_url = "http://localhost:9999"
 constraints_api_key = ""
-genesis_timestamp = 1606824023
+genesis_timestamp = 1606824023 # mainnet
 delegation_database_path = "./data/delegations-rocksdb"
 
 # Execution client configuration
@@ -61,4 +61,5 @@ execution_max_retries = 3
 # Constraints receivers configuration
 constraints_receivers = ["0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"]
 delegate_public_key = "0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
+
 

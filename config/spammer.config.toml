@@ -26,7 +26,7 @@ slasher_address = "0x1234567890123456789012345678901234567890"
 
 # Chain ID for transactions
 # 1 = Ethereum mainnet, 11155111 = Sepolia, 31337 = Local/Anvil
-chain_id = 1
+chain_id = 31337
 
 # Genesis timestamp for slot calculation
 # Ethereum mainnet: 1606824023

@@ -8,7 +8,7 @@ use jsonrpsee::server::Server;
 use super::methods;
 use crate::CommitmentsServerState;
 use crate::metrics::metrics_handler;
-use common::config::{CommitmentsConfig, GatewayConfig};
+use common::config::GatewayConfig;
 
 /// Start the Commitments JSON-RPC server using the provided shared state.
 ///
@@ -20,8 +20,7 @@ where
 {
 	// Extract the server address from the commit config
 	let commit_config = rpc_context.commit_config.lock().await;
-	let commitments_config = commit_config.extra.commitments_config();
-	let server_address = format!("{}:{}", commitments_config.server_host(), commitments_config.server_port());
+	let server_address = format!("{}:{}", commit_config.extra.server_host(), commit_config.extra.server_port());
 	drop(commit_config); // Release the lock
 
 	let server = Server::builder().build(server_address.parse::<SocketAddr>()?).await?;
