@@ -38,7 +38,7 @@ docker_image = "todo"
 env_file = ".cb.env"
 
 # Proposer service configuration
-delegate_bls_public_key = "0xa77084280678d9f1efe4ef47a3d62af27872ce82db19a35ee012c4fd5478e6b1123b8869032ba18b2383e8873294f0ba"
+delegate_bls_public_key = "0xb3a22e4a673ac7a153ab5b3c17a4dbef55f7e47210b20c0cbb0e66df5b36bb49ef808577610b034172e955d2312a61b9"
 committer_address = "0x1111111111111111111111111111111111111111"
 relay_url = "http://localhost:9999"
 relay_api_key = ""

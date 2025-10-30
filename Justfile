@@ -290,20 +290,17 @@ run-local-beacon-mock bls_key="0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1
 	export RUST_LOG=info
 	cargo run --bin beacon-mock -- "{{bls_key}}"
 
-# Generate ECDSA proxy key via signer service
-generate-proxy-key-ecdsa bls_pubkey="0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4" module_jwt="":
+# Generate ECDSA proxy key for gateway
+generate-proxy-key-gateway-ecdsa:
 	#!/usr/bin/env bash
 	set -a
 	source .simulation.env 2>/dev/null || true
 	set +a
-	JWT="${module_jwt:-$GATEWAY_JWT}"
-	echo "Generating ECDSA proxy key for BLS pubkey: {{bls_pubkey}}"
-	echo "Using signer URL: $CB_SIGNER_URL"
-	echo "Using JWT: ${JWT:0:10}..."
+	echo "Generating ECDSA proxy key for gateway..."
 	RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $CB_SIGNER_URL/signer/v1/generate_proxy_key \
 		-H "Content-Type: application/json" \
-		-H "Authorization: Bearer $JWT" \
-		-d '{"pubkey": "{{bls_pubkey}}", "scheme": "ecdsa"}')
+		-H "Authorization: Bearer $GATEWAY_PROXY_ECDSA_JWT" \
+		-d "{\"pubkey\":\"$GATEWAY_DEFAULT_BLS_KEY\",\"scheme\":\"ecdsa\"}")
 	HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 	BODY=$(echo "$RESPONSE" | sed '$d')
 	if [ "$HTTP_CODE" -eq 200 ]; then \
@@ -314,20 +311,59 @@ generate-proxy-key-ecdsa bls_pubkey="0x883827193f7627cd04e621e1e8d56498362a52b2a
 		exit 1; \
 	fi
 
-# Generate BLS proxy key via signer service  
-generate-proxy-key-bls bls_pubkey="0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4" module_jwt="":
+# Generate BLS proxy key for gateway
+generate-proxy-key-gateway-bls:
 	#!/usr/bin/env bash
 	set -a
 	source .simulation.env 2>/dev/null || true
 	set +a
-	JWT="${module_jwt:-$GATEWAY_JWT}"
-	echo "Generating BLS proxy key for BLS pubkey: {{bls_pubkey}}"
-	echo "Using signer URL: $CB_SIGNER_URL"
-	echo "Using JWT: ${JWT:0:10}..."
+	echo "Generating BLS proxy key for gateway..."
 	RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $CB_SIGNER_URL/signer/v1/generate_proxy_key \
 		-H "Content-Type: application/json" \
-		-H "Authorization: Bearer $JWT" \
-		-d '{"pubkey": "{{bls_pubkey}}", "scheme": "bls"}')
+		-H "Authorization: Bearer $GATEWAY_PROXY_BLS_JWT" \
+		-d "{\"pubkey\":\"$GATEWAY_DEFAULT_BLS_KEY\",\"scheme\":\"bls\"}")
+	HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+	BODY=$(echo "$RESPONSE" | sed '$d')
+	if [ "$HTTP_CODE" -eq 200 ]; then \
+		echo "$BODY" | jq; \
+	else \
+		echo "Error: HTTP $HTTP_CODE"; \
+		echo "$BODY"; \
+		exit 1; \
+	fi
+
+# Generate ECDSA proxy key for proposer
+generate-proxy-key-proposer-ecdsa:
+	#!/usr/bin/env bash
+	set -a
+	source .simulation.env 2>/dev/null || true
+	set +a
+	echo "Generating ECDSA proxy key for proposer..."
+	RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $CB_SIGNER_URL/signer/v1/generate_proxy_key \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $PROPOSER_PROXY_ECDSA_JWT" \
+		-d "{\"pubkey\":\"$PROPOSER_DEFAULT_BLS_KEY\",\"scheme\":\"ecdsa\"}")
+	HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+	BODY=$(echo "$RESPONSE" | sed '$d')
+	if [ "$HTTP_CODE" -eq 200 ]; then \
+		echo "$BODY" | jq; \
+	else \
+		echo "Error: HTTP $HTTP_CODE"; \
+		echo "$BODY"; \
+		exit 1; \
+	fi
+
+# Generate BLS proxy key for proposer
+generate-proxy-key-proposer-bls:
+	#!/usr/bin/env bash
+	set -a
+	source .simulation.env 2>/dev/null || true
+	set +a
+	echo "Generating BLS proxy key for proposer..."
+	RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $CB_SIGNER_URL/signer/v1/generate_proxy_key \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $PROPOSER_PROXY_BLS_JWT" \
+		-d "{\"pubkey\":\"$PROPOSER_DEFAULT_BLS_KEY\",\"scheme\":\"bls\"}")
 	HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 	BODY=$(echo "$RESPONSE" | sed '$d')
 	if [ "$HTTP_CODE" -eq 200 ]; then \
