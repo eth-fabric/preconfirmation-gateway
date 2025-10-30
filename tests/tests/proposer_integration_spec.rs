@@ -68,7 +68,15 @@ async fn test_proposer_end_to_end() -> Result<()> {
 	};
 	drop(commit_config_guard); // Release the lock
 
-	process_lookahead(&beacon_client, &constraints_client, &mut commit_config, current_slot).await?;
+	// Create a temporary database for the test
+	let temp_dir = tempfile::tempdir()?;
+	let db_path = temp_dir.path().join("test_db");
+	let mut db_opts = rocksdb::Options::default();
+	db_opts.create_if_missing(true);
+	let db = rocksdb::DB::open(&db_opts, &db_path)?;
+	let database = common::types::database::DatabaseContext::new(std::sync::Arc::new(db));
+
+	process_lookahead(&beacon_client, &constraints_client, &mut commit_config, current_slot, &database).await?;
 
 	// 6. Verify delegations were posted to relay
 	// Check the next slot (should have a delegation)
@@ -139,7 +147,15 @@ async fn test_proposer_no_duties() -> Result<()> {
 	};
 	drop(commit_config_guard);
 
-	process_lookahead(&beacon_client, &constraints_client, &mut commit_config, current_slot).await?;
+	// Create a temporary database for the test
+	let temp_dir = tempfile::tempdir()?;
+	let db_path = temp_dir.path().join("test_db");
+	let mut db_opts = rocksdb::Options::default();
+	db_opts.create_if_missing(true);
+	let db = rocksdb::DB::open(&db_opts, &db_path)?;
+	let database = common::types::database::DatabaseContext::new(std::sync::Arc::new(db));
+
+	process_lookahead(&beacon_client, &constraints_client, &mut commit_config, current_slot, &database).await?;
 
 	// 7. Verify no new delegations were posted
 	let final_delegations = constraints_client.get_delegations_for_slot(next_slot).await?;

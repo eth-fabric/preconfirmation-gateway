@@ -13,6 +13,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 
 use crate::config::BeaconApiConfig;
+use crate::constants::routes::beacon;
 use crate::types::beacon::{
 	BeaconTiming, ProposerDutiesResponse, ValidatorData, ValidatorDuty, ValidatorInfo, ValidatorResponse,
 };
@@ -128,7 +129,7 @@ impl<H: HttpClient> BeaconApiClient<H> {
 	/// # Examples
 	///
 	pub async fn get_proposer_duties(&self, epoch: u64) -> Result<ProposerDutiesResponse> {
-		let endpoint = format!("eth/v1/validator/duties/proposer/{}", epoch);
+		let endpoint = format!("{}/{}", beacon::PROPOSER_DUTIES, epoch);
 
 		// Try primary endpoint first, then fallbacks
 		let mut _last_error = None;

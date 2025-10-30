@@ -311,6 +311,7 @@ pub struct DaemonContext {
 	pub constraints_client: ConstraintsClient,
 	pub slot_timer: SlotTimer,
 	pub poll_interval_seconds: u64,
+	pub database: common::types::database::DatabaseContext,
 }
 
 /// Load daemon configuration (must be called from main async context)
@@ -358,7 +359,19 @@ pub async fn load_daemon_config() -> Result<DaemonContext> {
 	let slot_timer = SlotTimer::new(config.beacon_genesis_timestamp);
 	let poll_interval_seconds = config.poll_interval_seconds;
 
-	Ok(DaemonContext { commit_config, beacon_client, constraints_client, slot_timer, poll_interval_seconds })
+	// Initialize RocksDB for delegation storage (equivocation prevention)
+	let db_path = &config.delegation_db_path;
+	info!("Initializing delegation database at: {}", db_path);
+
+	let mut db_opts = rocksdb::Options::default();
+	db_opts.create_if_missing(true);
+	let db = rocksdb::DB::open(&db_opts, db_path)
+		.map_err(|e| eyre::eyre!("Failed to open delegation database at {}: {}", db_path, e))?;
+	let database = common::types::database::DatabaseContext::new(std::sync::Arc::new(db));
+
+	info!("Delegation database initialized successfully");
+
+	Ok(DaemonContext { commit_config, beacon_client, constraints_client, slot_timer, poll_interval_seconds, database })
 }
 
 /// Run the daemon work loop (can be called from spawned task)
@@ -380,6 +393,7 @@ pub async fn run_daemon_loop(mut context: DaemonContext) -> Result<()> {
 			&context.constraints_client,
 			&mut context.commit_config,
 			current_slot,
+			&context.database,
 		)
 		.await
 		{

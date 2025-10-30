@@ -22,10 +22,11 @@ async fn get_proposer_duties_handler(
 	Path(epoch): Path<u64>,
 	axum::extract::State(proposer_key): axum::extract::State<String>,
 ) -> Json<ProposerDutiesResponse> {
-	info!("Getting proposer duties for epoch {}", epoch);
 	// Calculate slot range for epoch (32 slots per epoch)
 	let start_slot = BeaconTiming::epoch_to_first_slot(epoch);
 	let end_slot = BeaconTiming::epoch_to_last_slot(epoch);
+
+	info!("Getting proposer duties for epoch {} from slot {} to slot {}", epoch, start_slot, end_slot);
 
 	// Generate alternating duties
 	// Even slots: use provided proposer key
@@ -36,8 +37,8 @@ async fn get_proposer_duties_handler(
 			let pubkey = if is_even {
 				proposer_key.clone()
 			} else {
-				// Default zero BLS public key (96 hex chars = 48 bytes)
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+				// Default random but valid BLS public key
+				"0x879d322fb401a2638b6217cab6e9bf954e6df9b18e0c302f3bdc00551a8ac308459d8a79eb54f0f272e6b648ee4d03b3"
 					.to_string()
 			};
 
@@ -55,9 +56,8 @@ async fn main() -> Result<()> {
 	let args = Args::parse();
 
 	// Parse the URL to extract host and port
-	let url = args.url.parse::<url::Url>()
-		.map_err(|e| eyre::eyre!("Invalid URL '{}': {}", args.url, e))?;
-	
+	let url = args.url.parse::<url::Url>().map_err(|e| eyre::eyre!("Invalid URL '{}': {}", args.url, e))?;
+
 	let host = url.host_str().unwrap_or("0.0.0.0");
 	let port = url.port().unwrap_or(5052);
 	let bind_addr = format!("{}:{}", host, port);

@@ -35,6 +35,9 @@ pub struct ProposerConfig {
 
 	/// Collateral amount to send with registration (in wei)
 	pub registration_collateral_wei: String,
+
+	/// Path to the RocksDB database for storing delegations (for equivocation prevention)
+	pub delegation_db_path: String,
 }
 
 impl common::config::ProposerConfig for ProposerConfig {
@@ -77,7 +80,8 @@ mod tests {
 			"module_signing_id": "0x1111111111111111111111111111111111111111111111111111111111111111",
 			"urc_owner": "0x2222222222222222222222222222222222222222",
 			"execution_rpc_url": "http://localhost:8545",
-			"registration_collateral_wei": "1000000000000000000"
+			"registration_collateral_wei": "1000000000000000000",
+			"delegation_db_path": "data/proposer-delegations-rocksdb"
 		}"#;
 
 		let config: ProposerConfig = serde_json::from_str(json).unwrap();

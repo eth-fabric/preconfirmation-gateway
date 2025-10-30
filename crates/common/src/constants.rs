@@ -71,6 +71,12 @@ pub mod routes {
 		/// Get constraints for a specific slot
 		pub const CONSTRAINTS_SLOT: &str = "/constraints/v0/relay/constraints/{slot}";
 	}
+
+	/// Beacon API routes
+	pub mod beacon {
+		/// Proposer duties endpoint prefix
+		pub const PROPOSER_DUTIES: &str = "eth/v1/validator/duties/proposer";
+	}
 }
 
 /// Default configuration values

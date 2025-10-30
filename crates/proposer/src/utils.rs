@@ -31,6 +31,7 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 	constraints_client: &C,
 	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
 	current_slot: u64,
+	database: &common::types::database::DatabaseContext,
 ) -> Result<()> {
 	let task_label = "process_lookahead";
 	let start = Instant::now();
@@ -59,8 +60,16 @@ pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
 
 	// Check duties for both current and next epoch
 	for epoch in [current_epoch, next_epoch] {
-		match process_epoch_duties(beacon_client, constraints_client, commit_config, epoch, current_slot, &our_pubkeys)
-			.await
+		match process_epoch_duties(
+			beacon_client,
+			constraints_client,
+			commit_config,
+			epoch,
+			current_slot,
+			&our_pubkeys,
+			database,
+		)
+		.await
 		{
 			Ok(posted_count) => {
 				if posted_count > 0 {
@@ -88,23 +97,48 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 	epoch: u64,
 	current_slot: u64,
 	our_pubkeys: &[BlsPublicKey],
+	database: &common::types::database::DatabaseContext,
 ) -> Result<usize> {
 	// Get proposer duties for this epoch
-	let duties = beacon_client.get_proposer_duties(epoch).await?;
+	let duties = match beacon_client.get_proposer_duties(epoch).await {
+		Ok(d) => d,
+		Err(e) => {
+			return Err(eyre::eyre!("Failed to get proposer duties for epoch {}: {}", epoch, e));
+		}
+	};
+
+	info!("Received {} proposer duties for epoch {}", duties.data.len(), epoch);
 
 	let mut posted_count = 0;
+	let mut errors: Vec<String> = Vec::new();
 
 	// Parse module_signing_id from config
-	let module_signing_id = commit_config
-		.extra
-		.module_signing_id()
-		.parse::<B256>()
-		.context("Failed to parse module_signing_id from config")?;
+	let module_signing_id = match commit_config.extra.module_signing_id().parse::<B256>() {
+		Ok(id) => id,
+		Err(e) => {
+			return Err(eyre::eyre!("Failed to parse module_signing_id from config: {}", e));
+		}
+	};
 
 	// Check each duty to see if it's for one of our proposers
 	for duty in duties.data {
-		let duty_pubkey = duty.parse_pubkey().context("Failed to parse duty pubkey")?;
-		let duty_slot = duty.parse_slot().context("Failed to parse duty slot")?;
+		let duty_pubkey = match duty.parse_pubkey() {
+			Ok(pk) => pk,
+			Err(e) => {
+				errors.push(format!("Failed to parse duty pubkey: {}", e));
+				continue;
+			}
+		};
+
+		let duty_slot = match duty.parse_slot() {
+			Ok(slot) => slot,
+			Err(e) => {
+				errors.push(format!("Failed to parse duty slot: {}", e));
+				continue;
+			}
+		};
+
+		info!("Duty pubkey: {:?}, Duty slot: {}", duty_pubkey, duty_slot);
 
 		// Only process duties that:
 		// 1. Match one of our proposer keys
@@ -112,21 +146,69 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 		if our_pubkeys.contains(&duty_pubkey) && duty_slot > current_slot {
 			info!("Found proposer duty for slot {}", duty_slot);
 
+			// Check if we've already posted a delegation for this slot (equivocation prevention)
+			match database.get_delegation_for_slot(duty_slot) {
+				Ok(Some(existing_delegation)) => {
+					warn!(
+						"Delegation already exists for slot {}. Skipping to prevent equivocation. Existing delegation: proposer={:?}",
+						duty_slot,
+						existing_delegation.message.proposer
+					);
+					continue;
+				}
+				Ok(None) => {
+					// No existing delegation, proceed
+				}
+				Err(e) => {
+					errors.push(format!("Failed to check existing delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			}
+
 			// Create and sign delegation
-			let delegation = create_delegation(&commit_config.extra, &duty_pubkey, duty_slot)?;
-			let signed_delegation = sign_delegation(commit_config, &delegation, &module_signing_id).await?;
+			let delegation = match create_delegation(&commit_config.extra, &duty_pubkey, duty_slot) {
+				Ok(d) => d,
+				Err(e) => {
+					errors.push(format!("Failed to create delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			};
+
+			let signed_delegation = match sign_delegation(commit_config, &delegation, &module_signing_id).await {
+				Ok(sd) => sd,
+				Err(e) => {
+					errors.push(format!("Failed to sign delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			};
 
 			info!("Signed delegation: {:?}", signed_delegation);
 
 			// Post to relay
-			constraints_client
-				.post_delegation(&signed_delegation)
-				.await
-				.context("Failed to post delegation to relay")?;
+			match constraints_client.post_delegation(&signed_delegation).await {
+				Ok(_) => {
+					info!("Successfully posted delegation for slot {}", duty_slot);
 
-			info!("Successfully posted delegation for slot {}", duty_slot);
-			posted_count += 1;
+					// Store the delegation in the database to prevent future equivocation
+					if let Err(e) = database.store_delegation(duty_slot, &signed_delegation) {
+						warn!("Failed to store delegation for slot {} in database: {}. Delegation was posted successfully but equivocation prevention may not work for this slot.", duty_slot, e);
+					} else {
+						info!("Stored delegation for slot {} in database", duty_slot);
+					}
+
+					posted_count += 1;
+				}
+				Err(e) => {
+					errors.push(format!("Failed to post delegation to relay for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			}
 		}
+	}
+
+	// Return error if any errors occurred during processing
+	if !errors.is_empty() {
+		return Err(eyre::eyre!("Failed to process {} duties: {}", errors.len(), errors.join("; ")));
 	}
 
 	Ok(posted_count)
@@ -222,6 +304,7 @@ mod tests {
 			urc_owner: "0x1111111111111111111111111111111111111111".to_string(),
 			execution_rpc_url: "http://localhost:8545".to_string(),
 			registration_collateral_wei: "1000000000000000000".to_string(),
+			delegation_db_path: "data/test-proposer-delegations-rocksdb".to_string(),
 		};
 
 		let proposer_key = parse_bls_public_key(TEST_PROPOSER_KEY).unwrap();

@@ -55,3 +55,6 @@ urc_owner = "0xBB771250f7CA20123AA4c4175a49fdD8774838F3"
 execution_rpc_url = "http://localhost:8545"
 registration_collateral_wei = "1000000000000000000"
 
+# Database Configuration
+delegation_db_path = "data/proposer-delegations-rocksdb"
+

@@ -5379,6 +5379,7 @@ dependencies = [
  "lazy_static",
  "mockall 0.12.1",
  "prometheus",
+ "rocksdb",
  "rpassword",
  "serde",
  "serde_json",
