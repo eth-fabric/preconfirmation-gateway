@@ -9,6 +9,10 @@ use tracing::info;
 #[command(name = "beacon-mock")]
 #[command(about = "Mock beacon node for testing")]
 struct Args {
+	/// Beacon API URL to bind to (e.g., http://localhost:5052)
+	#[arg(long, default_value = "http://0.0.0.0:5052")]
+	url: String,
+
 	/// Proposer BLS public key (hex format with 0x prefix)
 	proposer_bls_key: String,
 }
@@ -50,9 +54,17 @@ async fn main() -> Result<()> {
 	// Parse command line arguments
 	let args = Args::parse();
 
+	// Parse the URL to extract host and port
+	let url = args.url.parse::<url::Url>()
+		.map_err(|e| eyre::eyre!("Invalid URL '{}': {}", args.url, e))?;
+	
+	let host = url.host_str().unwrap_or("0.0.0.0");
+	let port = url.port().unwrap_or(5052);
+	let bind_addr = format!("{}:{}", host, port);
+
 	info!("Mock Beacon Node Server");
 	info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-	info!("Listening on: http://0.0.0.0:5052");
+	info!("Listening on: {}", bind_addr);
 	info!("Proposer key: {}", args.proposer_bls_key);
 	info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 	info!("Endpoint: GET /eth/v1/validator/duties/proposer/{{epoch}}");
@@ -63,8 +75,8 @@ async fn main() -> Result<()> {
 		.route("/eth/v1/validator/duties/proposer/{epoch}", get(get_proposer_duties_handler))
 		.with_state(args.proposer_bls_key);
 
-	// Bind to port 5052 (standard beacon node port)
-	let listener = tokio::net::TcpListener::bind("0.0.0.0:5052").await?;
+	// Bind to the specified address
+	let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
 
 	info!("✓ Server ready");
 

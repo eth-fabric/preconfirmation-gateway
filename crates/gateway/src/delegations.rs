@@ -158,6 +158,10 @@ mod tests {
 				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
 					.to_string(),
 			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+
+			// Delegation task configuration
+			delegation_check_interval_seconds: 1,
+			delegation_lookahead_window: 64,
 		};
 		let slot_timer = SlotTimer::new(1606824023); // Mainnet genesis
 											   // Create a mock database context for testing

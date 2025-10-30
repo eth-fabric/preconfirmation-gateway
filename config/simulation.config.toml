@@ -1,0 +1,20 @@
+# Simulation Setup Configuration
+# This file contains configuration settings for the simulation-setup binary
+
+# Module names
+gateway_module_name = "gateway-module"
+proposer_module_name = "proposer-module"
+relay_module_name = "relay-module"
+
+# BLS public keys for each module
+gateway_bls_key = "0xb3a22e4a673ac7a153ab5b3c17a4dbef55f7e47210b20c0cbb0e66df5b36bb49ef808577610b034172e955d2312a61b9"
+proposer_bls_key = "0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
+
+# Paths
+signer_config_path = "config/signer.config.toml"
+output_env_file = ".simulation.env"
+
+# Service URLs
+signer_url = "http://localhost:20000"
+beacon_api_url = "http://localhost:5052"
+

@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
 			// Load config in main thread (critical: not in spawned task)
 			tracing::info!("Starting proposer service");
 			let config_and_task = proposer::cli::load_daemon_config().await?;
-			
+
 			// Spawn daemon work loop as background task
 			let daemon_task = tokio::spawn(async move {
 				if let Err(e) = proposer::cli::run_daemon_loop(config_and_task).await {

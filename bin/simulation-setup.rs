@@ -1,29 +1,39 @@
 use cb_common::commit::constants::GENERATE_PROXY_KEY_PATH;
+use cb_common::commit::request::{EncryptionScheme, GenerateProxyRequest};
 use cb_common::types::ModuleId;
-use cb_common::commit::request::{GenerateProxyRequest, EncryptionScheme};
 use cb_common::utils::{create_jwt, random_jwt_secret};
 use common::utils::bls_pubkey_from_hex;
 use indexmap::IndexMap;
+use serde::Deserialize;
 
 // Generate .simulation.env file with all required environment variables
 // for running the signer and other modules locally
 
-// BLS keys from config files
-const GATEWAY_BLS_KEY: &str = "0xb3a22e4a673ac7a153ab5b3c17a4dbef55f7e47210b20c0cbb0e66df5b36bb49ef808577610b034172e955d2312a61b9";
-const PROPOSER_BLS_KEY: &str = "0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4";
+#[derive(Debug, Deserialize)]
+struct SimulationConfig {
+	gateway_module_name: String,
+	proposer_module_name: String,
+	relay_module_name: String,
+	gateway_bls_key: String,
+	proposer_bls_key: String,
+	signer_config_path: String,
+	output_env_file: String,
+	signer_url: String,
+	#[allow(dead_code)] // Used by Justfile, not by Rust code
+	beacon_api_url: String,
+}
 
-fn create_proxy_jwt(
-	module_id: &str,
-	jwt_secret: &str,
-	pubkey: &str,
-	scheme: EncryptionScheme,
-) -> eyre::Result<String> {
+fn load_config() -> eyre::Result<SimulationConfig> {
+	let config_path = "config/simulation.config.toml";
+	let content = std::fs::read_to_string(config_path)?;
+	let config: SimulationConfig = toml::from_str(&content)?;
+	Ok(config)
+}
+
+fn create_proxy_jwt(module_id: &str, jwt_secret: &str, pubkey: &str, scheme: EncryptionScheme) -> eyre::Result<String> {
 	let consensus_pubkey = bls_pubkey_from_hex(pubkey)?;
-	let request = GenerateProxyRequest {
-		consensus_pubkey,
-		scheme,
-	};
-	
+	let request = GenerateProxyRequest { consensus_pubkey, scheme };
+
 	let payload = serde_json::to_vec(&request)?;
 	let module_id_typed = ModuleId::from(module_id.to_string());
 	let jwt = create_jwt(&module_id_typed, jwt_secret, GENERATE_PROXY_KEY_PATH, Some(&payload))?;
@@ -31,8 +41,14 @@ fn create_proxy_jwt(
 }
 
 fn main() -> eyre::Result<()> {
-	let modules = vec!["gateway-module", "proposer-module", "relay-module"];
-	let config_path = "config/signer.config.toml".to_string();
+	// Load configuration
+	let config = load_config()?;
+
+	let modules = vec![
+		config.gateway_module_name.as_str(),
+		config.proposer_module_name.as_str(),
+		config.relay_module_name.as_str(),
+	];
 
 	let mut jwts = IndexMap::new();
 
@@ -49,29 +65,29 @@ fn main() -> eyre::Result<()> {
 
 	// Generate proxy key JWTs for gateway (ECDSA and BLS)
 	let gateway_proxy_ecdsa_jwt = create_proxy_jwt(
-		"gateway-module",
-		&jwts["gateway-module"],
-		GATEWAY_BLS_KEY,
+		&config.gateway_module_name,
+		&jwts[config.gateway_module_name.as_str()],
+		&config.gateway_bls_key,
 		EncryptionScheme::Ecdsa,
 	)?;
 	let gateway_proxy_bls_jwt = create_proxy_jwt(
-		"gateway-module",
-		&jwts["gateway-module"],
-		GATEWAY_BLS_KEY,
+		&config.gateway_module_name,
+		&jwts[config.gateway_module_name.as_str()],
+		&config.gateway_bls_key,
 		EncryptionScheme::Bls,
 	)?;
 
 	// Generate proxy key JWTs for proposer (ECDSA and BLS)
 	let proposer_proxy_ecdsa_jwt = create_proxy_jwt(
-		"proposer-module",
-		&jwts["proposer-module"],
-		PROPOSER_BLS_KEY,
+		&config.proposer_module_name,
+		&jwts[config.proposer_module_name.as_str()],
+		&config.proposer_bls_key,
 		EncryptionScheme::Ecdsa,
 	)?;
 	let proposer_proxy_bls_jwt = create_proxy_jwt(
-		"proposer-module",
-		&jwts["proposer-module"],
-		PROPOSER_BLS_KEY,
+		&config.proposer_module_name,
+		&jwts[config.proposer_module_name.as_str()],
+		&config.proposer_bls_key,
 		EncryptionScheme::Bls,
 	)?;
 
@@ -82,33 +98,33 @@ fn main() -> eyre::Result<()> {
 	env_content.push_str("# Source with: set -a; source .simulation.env; set +a\n\n");
 
 	env_content.push_str("# Signer configuration\n");
-	env_content.push_str(&format!("CB_CONFIG={}\n", config_path));
+	env_content.push_str(&format!("CB_CONFIG={}\n", config.signer_config_path));
 	env_content.push_str(&format!("CB_JWTS={}\n", formatted_jwts));
 	env_content.push_str(&format!("CB_SIGNER_ADMIN_JWT={}\n\n", admin_jwt));
 
 	env_content.push_str("# Individual module JWTs\n");
-	env_content.push_str(&format!("GATEWAY_JWT={}\n", jwts["gateway-module"]));
-	env_content.push_str(&format!("PROPOSER_JWT={}\n", jwts["proposer-module"]));
-	env_content.push_str(&format!("RELAY_JWT={}\n\n", jwts["relay-module"]));
+	env_content.push_str(&format!("GATEWAY_JWT={}\n", jwts[config.gateway_module_name.as_str()]));
+	env_content.push_str(&format!("PROPOSER_JWT={}\n", jwts[config.proposer_module_name.as_str()]));
+	env_content.push_str(&format!("RELAY_JWT={}\n\n", jwts[config.relay_module_name.as_str()]));
 
 	env_content.push_str("# Pre-generated proxy key JWTs (for specific BLS keys)\n");
-	env_content.push_str(&format!("GATEWAY_DEFAULT_BLS_KEY={}\n\n", GATEWAY_BLS_KEY));
-	env_content.push_str(&format!("PROPOSER_DEFAULT_BLS_KEY={}\n\n", PROPOSER_BLS_KEY));
+	env_content.push_str(&format!("GATEWAY_DEFAULT_BLS_KEY={}\n\n", config.gateway_bls_key));
+	env_content.push_str(&format!("PROPOSER_DEFAULT_BLS_KEY={}\n\n", config.proposer_bls_key));
 	env_content.push_str(&format!("GATEWAY_PROXY_ECDSA_JWT={}\n", gateway_proxy_ecdsa_jwt));
 	env_content.push_str(&format!("GATEWAY_PROXY_BLS_JWT={}\n", gateway_proxy_bls_jwt));
 	env_content.push_str(&format!("PROPOSER_PROXY_ECDSA_JWT={}\n", proposer_proxy_ecdsa_jwt));
 	env_content.push_str(&format!("PROPOSER_PROXY_BLS_JWT={}\n\n", proposer_proxy_bls_jwt));
 
 	env_content.push_str("# Service configuration\n");
-	env_content.push_str("CB_SIGNER_URL=http://localhost:20000\n\n");
+	env_content.push_str(&format!("CB_SIGNER_URL={}\n\n", config.signer_url));
 
 	env_content.push_str("# Module IDs\n");
-	env_content.push_str("GATEWAY_MODULE_ID=gateway-module\n");
-	env_content.push_str("PROPOSER_MODULE_ID=proposer-module\n");
-	env_content.push_str("RELAY_MODULE_ID=relay-module\n");
+	env_content.push_str(&format!("GATEWAY_MODULE_ID={}\n", config.gateway_module_name));
+	env_content.push_str(&format!("PROPOSER_MODULE_ID={}\n", config.proposer_module_name));
+	env_content.push_str(&format!("RELAY_MODULE_ID={}\n", config.relay_module_name));
 
-	// Write to .simulation.env
-	let env_path = std::path::Path::new(".simulation.env");
+	// Write to output file
+	let env_path = std::path::Path::new(&config.output_env_file);
 	std::fs::write(&env_path, env_content)?;
 	println!("\n✓ Simulation environment file written to: {env_path:?}");
 	println!("  Use 'set -a; source .simulation.env; set +a' to load variables");

@@ -358,13 +358,7 @@ pub async fn load_daemon_config() -> Result<DaemonContext> {
 	let slot_timer = SlotTimer::new(config.beacon_genesis_timestamp);
 	let poll_interval_seconds = config.poll_interval_seconds;
 
-	Ok(DaemonContext {
-		commit_config,
-		beacon_client,
-		constraints_client,
-		slot_timer,
-		poll_interval_seconds,
-	})
+	Ok(DaemonContext { commit_config, beacon_client, constraints_client, slot_timer, poll_interval_seconds })
 }
 
 /// Run the daemon work loop (can be called from spawned task)
@@ -381,7 +375,14 @@ pub async fn run_daemon_loop(mut context: DaemonContext) -> Result<()> {
 		debug!("Checking proposer duties for current slot: {}", current_slot);
 
 		// Process lookahead to find and post delegations
-		match crate::process_lookahead(&context.beacon_client, &context.constraints_client, &mut context.commit_config, current_slot).await {
+		match crate::process_lookahead(
+			&context.beacon_client,
+			&context.constraints_client,
+			&mut context.commit_config,
+			current_slot,
+		)
+		.await
+		{
 			Ok(_) => {
 				debug!("Lookahead processed successfully for slot {}", current_slot);
 			}

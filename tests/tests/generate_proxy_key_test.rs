@@ -55,6 +55,10 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
 				.to_string(),
 		module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+
+		// Delegation task configuration
+		delegation_check_interval_seconds: 1,
+		delegation_lookahead_window: 64,
 	};
 
 	// Start local signer server with test configuration

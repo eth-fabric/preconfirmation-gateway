@@ -271,6 +271,10 @@ impl TestHarnessBuilder {
 			constraints_receivers: vec![hex::encode(PUBKEY)],
 			delegate_public_key: hex::encode(PUBKEY),
 			module_signing_id: format!("{:?}", SIGNING_ID),
+
+			// Delegation task configuration
+			delegation_check_interval_seconds: 1,
+			delegation_lookahead_window: 64,
 		};
 
 		// Start local signer server with config
@@ -447,21 +451,30 @@ impl TestHarnessBuilder {
 		let config = relay::config::RelayConfig {
 			relay: relay::config::RelayServerConfig {
 				port,
-				database_path,
+				database_path: database_path.clone(),
 				log_level: "info".to_string(),
 				constraint_capabilities: vec![1],
 				chain: commit_boost::prelude::Chain::Hoodi,
 				genesis_timestamp: 1742213400,
+				beacon_api_url: "https://test-beacon.example.com".to_string(),
+				lookahead_window: 64,
+				lookahead_update_interval: 60,
 			},
 			storage: relay::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		};
+
+		// Open the database for the relay server
+		let mut opts = rocksdb::Options::default();
+		opts.create_if_missing(true);
+		let db = rocksdb::DB::open(&opts, &database_path)?;
+		let database = DatabaseContext::new(Arc::new(db));
 
 		let url = format!("http://127.0.0.1:{}", port);
 
 		// Spawn the server task
 		let handle = tokio::spawn(async move {
 			tokio::select! {
-				result = relay::server::run_relay_server(config) => {
+				result = relay::server::run_relay_server(config, database) => {
 					result
 				}
 				_ = shutdown_rx => {
@@ -1322,6 +1335,10 @@ pub mod test_helpers {
 				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
 					.to_string(),
 			module_signing_id: format!("{:?}", SIGNING_ID),
+
+			// Delegation task configuration
+			delegation_check_interval_seconds: 1,
+			delegation_lookahead_window: 64,
 		};
 
 		// Start local signer server with config

@@ -285,10 +285,15 @@ run-local-spammer:
 	export RUST_LOG=info
 	cargo run --bin spammer config/spammer.config.toml
 
-# Run local mock beacon node
-run-local-beacon-mock bls_key="0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4":
+# Run local mock beacon node (reads config from simulation.config.toml)
+run-local-beacon-mock:
+	#!/usr/bin/env bash
 	export RUST_LOG=info
-	cargo run --bin beacon-mock -- "{{bls_key}}"
+	# Extract beacon_api_url and proposer_bls_key from simulation.config.toml
+	BEACON_URL=$(grep '^beacon_api_url' config/simulation.config.toml | cut -d'"' -f2)
+	PROPOSER_KEY=$(grep '^proposer_bls_key' config/simulation.config.toml | cut -d'"' -f2)
+	echo "Starting beacon mock with URL: $BEACON_URL and Proposer Key: $PROPOSER_KEY"
+	cargo run --bin beacon-mock -- --url "$BEACON_URL" "$PROPOSER_KEY"
 
 # Generate ECDSA proxy key for gateway
 generate-proxy-key-gateway-ecdsa:

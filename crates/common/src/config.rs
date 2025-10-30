@@ -90,6 +90,10 @@ pub struct InclusionGatewayConfig {
 	pub log_level: String,
 	pub enable_method_tracing: bool,
 	pub traced_methods: Vec<String>,
+
+	/// Delegation task configuration
+	pub delegation_check_interval_seconds: u64,
+	pub delegation_lookahead_window: u64,
 }
 
 impl GatewayConfig for InclusionGatewayConfig {
@@ -147,6 +151,18 @@ impl GatewayConfig for InclusionGatewayConfig {
 
 	fn module_signing_id(&self) -> &str {
 		&self.module_signing_id
+	}
+}
+
+impl InclusionGatewayConfig {
+	/// Get delegation check interval in seconds
+	pub fn delegation_check_interval_seconds(&self) -> u64 {
+		self.delegation_check_interval_seconds
+	}
+
+	/// Get delegation lookahead window in slots
+	pub fn delegation_lookahead_window(&self) -> u64 {
+		self.delegation_lookahead_window
 	}
 }
 

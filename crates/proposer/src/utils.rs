@@ -116,6 +116,8 @@ async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
 			let delegation = create_delegation(&commit_config.extra, &duty_pubkey, duty_slot)?;
 			let signed_delegation = sign_delegation(commit_config, &delegation, &module_signing_id).await?;
 
+			info!("Signed delegation: {:?}", signed_delegation);
+
 			// Post to relay
 			constraints_client
 				.post_delegation(&signed_delegation)

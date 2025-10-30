@@ -10,7 +10,6 @@ use gateway::{ConstraintsTask, DelegationTask, DelegationTaskConfig, TaskCoordin
 use lazy_static::lazy_static;
 use prometheus::{IntCounter, Registry, opts};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::info;
 
@@ -99,10 +98,10 @@ async fn main() -> Result<()> {
 	// Create task coordinator for gateway tasks
 	let mut coordinator = TaskCoordinator::new();
 
-	// Create delegation task configuration
+	// Create delegation task configuration from config
 	let delegation_config = DelegationTaskConfig {
-		check_interval_seconds: 1, // 1 second interval as requested
-		lookahead_window: 64,      // 64 slots lookahead
+		check_interval_seconds: gateway_config.delegation_check_interval_seconds(),
+		lookahead_window: gateway_config.delegation_lookahead_window(),
 	};
 
 	// Clone gateway config for tasks
@@ -137,21 +136,8 @@ async fn main() -> Result<()> {
 
 	info!("Gateway initialized with commitments server and {} gateway tasks", coordinator.task_count());
 
-	// Run scheduler loop concurrently and wait for shutdown signal
-	let slot_timer_clone = slot_timer.clone();
-	let scheduler = tokio::spawn(async move {
-		loop {
-			let current_slot = slot_timer_clone.get_current_slot();
-			info!("Current slot: {}", current_slot);
-			tokio::time::sleep(Duration::from_secs(12)).await;
-		}
-	});
-
 	// Wait for Docker shutdown signals (SIGINT/SIGTERM)
 	common::utils::wait_for_signal().await?;
-
-	// Stop background tasks
-	scheduler.abort();
 
 	Ok(())
 }
