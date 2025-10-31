@@ -1,4 +1,5 @@
 pub mod client;
+pub mod metrics;
 pub mod utils;
 
 // Re-export commonly used types and functions for easier access

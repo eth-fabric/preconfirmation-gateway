@@ -6,26 +6,14 @@ use common::slot_timer::SlotTimer;
 use common::types;
 use eyre::Result;
 use gateway::{ConstraintsTask, DelegationTask, DelegationTaskConfig, TaskCoordinator};
-use lazy_static::lazy_static;
-use prometheus::{IntCounter, Registry, opts};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::info;
-
-lazy_static! {
-	pub static ref MY_CUSTOM_REGISTRY: Registry =
-		Registry::new_custom(Some("inclusion-preconf-gateway".to_string()), None).unwrap();
-	pub static ref SIG_RECEIVED_COUNTER: IntCounter =
-		IntCounter::with_opts(opts!("sig_received_total", "Number of OS signals received")).unwrap();
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
 	// Initialize tracing
 	tracing_subscriber::fmt::init();
-
-	// Remember to register all your metrics before starting the process
-	MY_CUSTOM_REGISTRY.register(Box::new(SIG_RECEIVED_COUNTER.clone()))?;
 
 	info!("Starting gateway service (commitments server + gateway tasks)");
 

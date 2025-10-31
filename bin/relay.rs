@@ -3,25 +3,13 @@ use common::config::BeaconApiConfig;
 use common::db::create_database;
 use common::slot_timer::SlotTimer;
 use common::types::DatabaseContext;
-use lazy_static::lazy_static;
-use prometheus::{IntCounter, Registry, opts};
 use relay::{ProposerLookaheadConfig, ProposerLookaheadTask, config::RelayConfig, run_relay_server, setup_logging};
 use std::env;
 use tracing::info;
 
-lazy_static! {
-	pub static ref MY_CUSTOM_REGISTRY: Registry =
-		Registry::new_custom(Some("inclusion-preconf-relay".to_string()), None).unwrap();
-	pub static ref SIG_RECEIVED_COUNTER: IntCounter =
-		IntCounter::with_opts(opts!("sig_received_total", "Number of OS signals received")).unwrap();
-}
-
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
 	// Load configuration
-
-	// Remember to register all your metrics before starting the process
-	MY_CUSTOM_REGISTRY.register(Box::new(SIG_RECEIVED_COUNTER.clone()))?;
 	let config_path = env::args().nth(1).unwrap_or_else(|| "config/relay.toml".to_string());
 
 	let config = RelayConfig::from_file(&config_path)?;

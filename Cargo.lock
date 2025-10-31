@@ -2269,7 +2269,9 @@ dependencies = [
  "common",
  "eyre",
  "hex",
+ "lazy_static",
  "mockall 0.12.1",
+ "prometheus",
  "reqwest 0.11.27",
  "serde",
  "serde_json",
@@ -3378,6 +3380,7 @@ name = "gateway"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "axum 0.8.6",
  "cb-common",
  "commit-boost",
  "commitments",
@@ -3385,6 +3388,8 @@ dependencies = [
  "constraints",
  "eyre",
  "hex",
+ "lazy_static",
+ "prometheus",
  "reqwest 0.11.27",
  "rocksdb",
  "serde",

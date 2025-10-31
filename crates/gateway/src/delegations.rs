@@ -1,5 +1,5 @@
 use eyre::Result;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
@@ -9,6 +9,10 @@ use common::slot_timer::SlotTimer;
 use common::types::{DatabaseContext, ProcessDelegationsResponse, SignedDelegation};
 use constraints::client::ConstraintsClient;
 use constraints::parse_bls_public_key;
+
+use crate::metrics::{
+	DELEGATIONS_STORED_TOTAL, DELEGATION_CHECKS_TOTAL, DELEGATION_CHECK_LATENCY_SECONDS, DELEGATION_DB_OPERATIONS_TOTAL,
+};
 
 /// Configuration for the delegation task
 #[derive(Debug, Clone)]
@@ -60,32 +64,42 @@ impl DelegationTask {
 
 	/// Check delegations for upcoming slots
 	async fn check_delegations(&self) -> Result<()> {
+		let start = Instant::now();
 		let current_slot = self.slot_timer.get_current_slot();
 		let lookahead_end = current_slot + self.config.lookahead_window;
 
 		info!("Checking delegations for slots {} to {}", current_slot, lookahead_end);
 
-		// Check each slot in the lookahead window
-		for slot in current_slot..=lookahead_end {
-			// Check if slot is already delegated in database
-			match self.database.is_delegated(slot) {
-				Ok(true) => {
-					info!("Slot {} already has delegations, skipping", slot);
-					continue;
-				}
-				Ok(false) => {
-					// Slot is not delegated, call process_delegations endpoint
-					if let Err(e) = self.process_delegations_for_slot(slot).await {
-						warn!("Failed to process delegations for slot {}: {}", slot, e);
+		let result = async {
+			// Check each slot in the lookahead window
+			for slot in current_slot..=lookahead_end {
+				// Check if slot is already delegated in database
+				match self.database.is_delegated(slot) {
+					Ok(true) => {
+						info!("Slot {} already has delegations, skipping", slot);
+						continue;
+					}
+					Ok(false) => {
+						// Slot is not delegated, call process_delegations endpoint
+						if let Err(e) = self.process_delegations_for_slot(slot).await {
+							warn!("Failed to process delegations for slot {}: {}", slot, e);
+						}
+					}
+					Err(e) => {
+						error!("Failed to check delegation status for slot {}: {}", slot, e);
 					}
 				}
-				Err(e) => {
-					error!("Failed to check delegation status for slot {}: {}", slot, e);
-				}
 			}
+			Ok(())
 		}
+		.await;
 
-		Ok(())
+		// Record metrics
+		let result_label = if result.is_ok() { "success" } else { "failure" };
+		DELEGATION_CHECKS_TOTAL.with_label_values(&[result_label]).inc();
+		DELEGATION_CHECK_LATENCY_SECONDS.with_label_values(&[result_label]).observe(start.elapsed().as_secs_f64());
+
+		result
 	}
 
 	/// Process delegations for a specific slot
@@ -221,11 +235,16 @@ pub async fn process_delegations(
 
 	// Store matching delegations in the database
 	for delegation in &matching_delegations {
+		DELEGATION_DB_OPERATIONS_TOTAL.with_label_values(&["store_delegation", "attempt"]).inc();
 		if let Err(e) = database.store_delegation(slot, delegation) {
 			error!("Failed to store delegation for slot {}: {}", slot, e);
+			DELEGATION_DB_OPERATIONS_TOTAL.with_label_values(&["store_delegation", "failure"]).inc();
+			DELEGATIONS_STORED_TOTAL.with_label_values(&["failure"]).inc();
 			// Continue processing other delegations even if one fails
 		} else {
 			info!("Stored delegation for slot {} with committer {}", slot, delegation.message.committer);
+			DELEGATION_DB_OPERATIONS_TOTAL.with_label_values(&["store_delegation", "success"]).inc();
+			DELEGATIONS_STORED_TOTAL.with_label_values(&["success"]).inc();
 		}
 	}
 

@@ -1,11 +1,15 @@
 use eyre::Result;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tracing::{debug, error, info};
 
 use common::constants::routes;
 use common::types::{SignedConstraints, SignedDelegation};
+
+use crate::metrics::{
+	CONSTRAINTS_CLIENT_LATENCY_SECONDS, CONSTRAINTS_CLIENT_REQUESTS_TOTAL, CONSTRAINTS_CLIENT_RESPONSES_TOTAL,
+};
 
 /// Trait for constraints client operations (mockable for testing)
 #[cfg_attr(test, mockall::automock)]
@@ -54,7 +58,12 @@ impl ConstraintsClient {
 
 	/// POST signed constraints to relay
 	pub async fn post_constraints(&self, signed_constraints: &SignedConstraints) -> Result<()> {
-		let url = format!("{}{}", self.base_url, routes::relay::CONSTRAINTS);
+		let endpoint = routes::relay::CONSTRAINTS;
+		let method = "POST";
+		CONSTRAINTS_CLIENT_REQUESTS_TOTAL.with_label_values(&[endpoint, method]).inc();
+		let start = Instant::now();
+
+		let url = format!("{}{}", self.base_url, endpoint);
 
 		debug!("Posting constraints to: {}", url);
 
@@ -66,6 +75,12 @@ impl ConstraintsClient {
 		}
 
 		let response = request.send().await?;
+		let status_code = response.status().as_u16().to_string();
+
+		CONSTRAINTS_CLIENT_RESPONSES_TOTAL.with_label_values(&[endpoint, method, &status_code]).inc();
+		CONSTRAINTS_CLIENT_LATENCY_SECONDS
+			.with_label_values(&[endpoint, method])
+			.observe(start.elapsed().as_secs_f64());
 
 		if response.status().is_success() {
 			info!("Successfully posted constraints (status: {})", response.status());
@@ -80,7 +95,12 @@ impl ConstraintsClient {
 
 	/// GET delegations from relay for a specific slot
 	pub async fn get_delegations_for_slot(&self, slot: u64) -> Result<Vec<SignedDelegation>> {
-		let url = format!("{}{}", self.base_url, routes::relay::DELEGATIONS_SLOT.replace("{slot}", &slot.to_string()));
+		let endpoint = routes::relay::DELEGATIONS_SLOT;
+		let method = "GET";
+		CONSTRAINTS_CLIENT_REQUESTS_TOTAL.with_label_values(&[endpoint, method]).inc();
+		let start = Instant::now();
+
+		let url = format!("{}{}", self.base_url, endpoint.replace("{slot}", &slot.to_string()));
 
 		let mut request = self.client.get(&url);
 
@@ -90,6 +110,12 @@ impl ConstraintsClient {
 		}
 
 		let response = request.send().await?;
+		let status_code = response.status().as_u16().to_string();
+
+		CONSTRAINTS_CLIENT_RESPONSES_TOTAL.with_label_values(&[endpoint, method, &status_code]).inc();
+		CONSTRAINTS_CLIENT_LATENCY_SECONDS
+			.with_label_values(&[endpoint, method])
+			.observe(start.elapsed().as_secs_f64());
 
 		if response.status().is_success() {
 			let result: GetDelegationsResponse = response.json().await?;
@@ -105,7 +131,12 @@ impl ConstraintsClient {
 
 	/// POST signed delegation to relay
 	pub async fn post_delegation(&self, signed_delegation: &SignedDelegation) -> Result<()> {
-		let url = format!("{}{}", self.base_url, routes::relay::DELEGATION);
+		let endpoint = routes::relay::DELEGATION;
+		let method = "POST";
+		CONSTRAINTS_CLIENT_REQUESTS_TOTAL.with_label_values(&[endpoint, method]).inc();
+		let start = Instant::now();
+
+		let url = format!("{}{}", self.base_url, endpoint);
 
 		debug!("Posting delegation to: {}", url);
 
@@ -117,6 +148,12 @@ impl ConstraintsClient {
 		}
 
 		let response = request.send().await?;
+		let status_code = response.status().as_u16().to_string();
+
+		CONSTRAINTS_CLIENT_RESPONSES_TOTAL.with_label_values(&[endpoint, method, &status_code]).inc();
+		CONSTRAINTS_CLIENT_LATENCY_SECONDS
+			.with_label_values(&[endpoint, method])
+			.observe(start.elapsed().as_secs_f64());
 
 		if response.status().is_success() {
 			info!("Successfully posted delegation (status: {})", response.status());

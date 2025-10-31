@@ -1,5 +1,5 @@
 use eyre::Result;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{error, info, warn};
 
 use alloy::primitives::B256;
@@ -11,6 +11,8 @@ use constraints::client::ConstraintsClient;
 use constraints::utils::{create_constraints_message, create_signed_constraints};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+
+use crate::metrics::{CONSTRAINTS_DB_OPERATIONS_TOTAL, CONSTRAINTS_POSTS_TOTAL, CONSTRAINTS_POST_LATENCY_SECONDS};
 
 /// Constraints task that monitors delegated slots and triggers constraint processing
 /// 2 seconds before each delegated slot begins
@@ -120,63 +122,75 @@ impl ConstraintsTask {
 
 	/// Process constraints for a specific slot
 	async fn post_constraints(&self, slot: u64) -> Result<()> {
-		// Get delegation from database
-		let delegation = match self.database.get_delegation_for_slot(slot) {
-			Ok(Some(delegation)) => delegation,
-			Ok(None) => {
-				warn!("No delegation found for slot {} despite is_delegated() returning true", slot);
-				return Ok(());
-			}
-			Err(e) => {
-				error!("Failed to get delegation for slot {}: {}", slot, e);
-				return Err(eyre::eyre!("Failed to get delegation for slot {}: {}", slot, e));
-			}
-		};
+		let start = Instant::now();
 
-		// Extract BLS keys from delegation
-		let gateway_public_key = delegation.message.delegate;
-		let proposer_public_key = delegation.message.proposer;
+		let result = async {
+			// Get delegation from database
+			let delegation = match self.database.get_delegation_for_slot(slot) {
+				Ok(Some(delegation)) => delegation,
+				Ok(None) => {
+					warn!("No delegation found for slot {} despite is_delegated() returning true", slot);
+					return Ok(());
+				}
+				Err(e) => {
+					error!("Failed to get delegation for slot {}: {}", slot, e);
+					return Err(eyre::eyre!("Failed to get delegation for slot {}: {}", slot, e));
+				}
+			};
 
-		// Parse receiver BLS public keys from config
-		let receivers = constraints::parse_bls_public_keys(self.config.constraints_receivers(), "receiver")?;
+			// Extract BLS keys from delegation
+			let gateway_public_key = delegation.message.delegate;
+			let proposer_public_key = delegation.message.proposer;
 
-		// Parse module_signing_id from config
-		let module_signing_id = self
-			.config
-			.module_signing_id()
-			.parse::<B256>()
-			.map_err(|e| eyre::eyre!("Failed to parse module_signing_id from config: {}", e))?;
+			// Parse receiver BLS public keys from config
+			let receivers = constraints::parse_bls_public_keys(self.config.constraints_receivers(), "receiver")?;
 
-		info!("Processing constraints for slot {}", slot);
+			// Parse module_signing_id from config
+			let module_signing_id = self
+				.config
+				.module_signing_id()
+				.parse::<B256>()
+				.map_err(|e| eyre::eyre!("Failed to parse module_signing_id from config: {}", e))?;
 
-		// Call constraints processing function
-		let response = process_constraints::<InclusionGatewayConfig>(
-			slot,
-			gateway_public_key,
-			proposer_public_key,
-			receivers, // receivers
-			&self.database,
-			self.commit_config.clone(),
-			self.relay_url.clone(),
-			self.api_key.clone(),
-			&module_signing_id,
-		)
-		.await?;
+			info!("Processing constraints for slot {}", slot);
 
-		if response.success {
-			info!("Successfully processed {} constraints for slot {}", response.processed_count, slot);
+			// Call constraints processing function
+			let response = process_constraints::<InclusionGatewayConfig>(
+				slot,
+				gateway_public_key,
+				proposer_public_key,
+				receivers, // receivers
+				&self.database,
+				self.commit_config.clone(),
+				self.relay_url.clone(),
+				self.api_key.clone(),
+				&module_signing_id,
+			)
+			.await?;
 
-			// Mark constraints as posted for this slot to prevent reprocessing
-			if let Err(e) = self.database.mark_constraints_posted_for_slot(slot) {
-				error!("Failed to mark constraints as posted for slot {}: {}", slot, e);
+			if response.success {
+				info!("Successfully processed {} constraints for slot {}", response.processed_count, slot);
+
+				// Mark constraints as posted for this slot to prevent reprocessing
+				if let Err(e) = self.database.mark_constraints_posted_for_slot(slot) {
+					error!("Failed to mark constraints as posted for slot {}: {}", slot, e);
+				} else {
+					info!("Marked constraints as posted for slot {}", slot);
+				}
 			} else {
-				info!("Marked constraints as posted for slot {}", slot);
+				warn!("Process constraints failed for slot {}: {}", slot, response.message);
 			}
-		} else {
-			warn!("Process constraints failed for slot {}: {}", slot, response.message);
-		}
 
-		Ok(())
+			Ok(())
+		}
+		.await;
+
+		// Record metrics
+		let result_label = if result.is_ok() { "success" } else { "failure" };
+		CONSTRAINTS_POSTS_TOTAL.with_label_values(&[result_label]).inc();
+		CONSTRAINTS_POST_LATENCY_SECONDS.with_label_values(&[result_label]).observe(start.elapsed().as_secs_f64());
+
+		result
 	}
 }
 
@@ -196,9 +210,17 @@ pub async fn process_constraints<T>(
 	info!("Processing constraints for slot {} with gateway public key", slot);
 
 	// 1. Get constraints for the specific slot
-	let slot_constraints = database
-		.get_constraints_for_slot(slot)
-		.map_err(|e| eyre::eyre!("Failed to get constraints for slot {}: {}", slot, e))?;
+	CONSTRAINTS_DB_OPERATIONS_TOTAL.with_label_values(&["get_constraints_for_slot", "attempt"]).inc();
+	let slot_constraints = match database.get_constraints_for_slot(slot) {
+		Ok(constraints) => {
+			CONSTRAINTS_DB_OPERATIONS_TOTAL.with_label_values(&["get_constraints_for_slot", "success"]).inc();
+			constraints
+		}
+		Err(e) => {
+			CONSTRAINTS_DB_OPERATIONS_TOTAL.with_label_values(&["get_constraints_for_slot", "failure"]).inc();
+			return Err(eyre::eyre!("Failed to get constraints for slot {}: {}", slot, e));
+		}
+	};
 
 	if slot_constraints.is_empty() {
 		info!("No constraints found for slot {}", slot);

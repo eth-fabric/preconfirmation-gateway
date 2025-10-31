@@ -17,6 +17,13 @@ commit-boost = { workspace = true }
 cb-common = { workspace = true }
 alloy = { workspace = true }
 
+# Metrics
+prometheus = { workspace = true }
+lazy_static = { workspace = true }
+
+# HTTP server for metrics
+axum = { workspace = true }
+
 # Workspace dependencies
 common = { path = "../common" }
 constraints = { path = "../constraints" }

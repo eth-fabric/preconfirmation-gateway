@@ -1,6 +1,6 @@
 use commit_boost::prelude::BlsPublicKey;
 use eyre::Result;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
@@ -8,6 +8,11 @@ use common::beacon::{BeaconApiClient, HttpClient};
 use common::slot_timer::SlotTimer;
 use common::types::beacon::BeaconTiming;
 use common::types::DatabaseContext;
+
+use crate::metrics::{
+	PROPOSER_DUTIES_FETCHED_TOTAL, PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL, PROPOSER_LOOKAHEAD_UPDATES_TOTAL,
+	PROPOSER_LOOKAHEAD_UPDATE_LATENCY_SECONDS,
+};
 
 /// Configuration for the proposer lookahead task
 #[derive(Debug, Clone)]
@@ -55,6 +60,7 @@ impl<H: HttpClient> ProposerLookaheadTask<H> {
 
 	/// Update the proposer lookahead for upcoming slots
 	async fn update_lookahead(&self) -> Result<()> {
+		let start = Instant::now();
 		let current_slot = self.slot_timer.get_current_slot();
 		let lookahead_end_slot = current_slot + self.config.lookahead_window;
 
@@ -67,15 +73,26 @@ impl<H: HttpClient> ProposerLookaheadTask<H> {
 			current_epoch, end_epoch, current_slot, lookahead_end_slot
 		);
 
-		// Populate each epoch in the range
-		for epoch in current_epoch..=end_epoch {
-			if let Err(e) = self.populate_lookahead(epoch, None).await {
-				error!("Failed to populate lookahead for epoch {}: {}", epoch, e);
-				// Continue to next epoch instead of failing completely
+		let result = async {
+			// Populate each epoch in the range
+			for epoch in current_epoch..=end_epoch {
+				if let Err(e) = self.populate_lookahead(epoch, None).await {
+					error!("Failed to populate lookahead for epoch {}: {}", epoch, e);
+					// Continue to next epoch instead of failing completely
+				}
 			}
+			Ok(())
 		}
+		.await;
 
-		Ok(())
+		// Record metrics
+		let result_label = if result.is_ok() { "success" } else { "failure" };
+		PROPOSER_LOOKAHEAD_UPDATES_TOTAL.with_label_values(&[result_label]).inc();
+		PROPOSER_LOOKAHEAD_UPDATE_LATENCY_SECONDS
+			.with_label_values(&[result_label])
+			.observe(start.elapsed().as_secs_f64());
+
+		result
 	}
 
 	/// Populate the proposer lookahead for a specific epoch
@@ -90,7 +107,22 @@ impl<H: HttpClient> ProposerLookaheadTask<H> {
 		// If a test proposer key is provided, use it for all slots in the epoch
 		if let Some(key) = proposer_key {
 			for slot in start_slot..=end_slot {
-				self.database.store_proposer_lookahead(slot, &key)?;
+				PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+					.with_label_values(&["store_proposer_lookahead", "attempt"])
+					.inc();
+				match self.database.store_proposer_lookahead(slot, &key) {
+					Ok(_) => {
+						PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+							.with_label_values(&["store_proposer_lookahead", "success"])
+							.inc();
+					}
+					Err(e) => {
+						PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+							.with_label_values(&["store_proposer_lookahead", "failure"])
+							.inc();
+						return Err(e);
+					}
+				}
 			}
 			info!(
 				"Populated proposer lookahead for epoch {} (slots {} to {}) with test key",
@@ -104,12 +136,28 @@ impl<H: HttpClient> ProposerLookaheadTask<H> {
 		// Fetch proposer duties for this epoch
 		match self.beacon_client.get_proposer_duties(epoch).await {
 			Ok(duties) => {
+				PROPOSER_DUTIES_FETCHED_TOTAL.with_label_values(&["success"]).inc();
 				// Process each duty and store the slot's proposer
 				for duty in duties.data {
 					match duty.parse_slot() {
 						Ok(slot) => match duty.parse_pubkey() {
 							Ok(pubkey) => {
-								self.database.store_proposer_lookahead(slot, &pubkey)?;
+								PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+									.with_label_values(&["store_proposer_lookahead", "attempt"])
+									.inc();
+								match self.database.store_proposer_lookahead(slot, &pubkey) {
+									Ok(_) => {
+										PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+											.with_label_values(&["store_proposer_lookahead", "success"])
+											.inc();
+									}
+									Err(e) => {
+										PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL
+											.with_label_values(&["store_proposer_lookahead", "failure"])
+											.inc();
+										return Err(e);
+									}
+								}
 							}
 							Err(e) => {
 								warn!("Failed to parse pubkey for slot {} in epoch {}: {}", slot, epoch, e);
@@ -125,6 +173,7 @@ impl<H: HttpClient> ProposerLookaheadTask<H> {
 			}
 			Err(e) => {
 				error!("Failed to fetch proposer duties for epoch {}: {}", epoch, e);
+				PROPOSER_DUTIES_FETCHED_TOTAL.with_label_values(&["failure"]).inc();
 				Err(e)
 			}
 		}

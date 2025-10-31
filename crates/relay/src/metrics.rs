@@ -31,6 +31,39 @@ lazy_static! {
 		RELAY_METRICS_REGISTRY
 	)
 	.unwrap();
+
+	// Proposer lookahead task metrics
+	pub static ref PROPOSER_LOOKAHEAD_UPDATES_TOTAL: IntCounterVec = register_int_counter_vec_with_registry!(
+		"proposer_lookahead_updates_total",
+		"Total number of proposer lookahead updates by result",
+		&["result"],
+		RELAY_METRICS_REGISTRY
+	)
+	.unwrap();
+
+	pub static ref PROPOSER_LOOKAHEAD_UPDATE_LATENCY_SECONDS: HistogramVec = register_histogram_vec_with_registry!(
+		"proposer_lookahead_update_latency_seconds",
+		"Latency of proposer lookahead updates in seconds",
+		&["result"],
+		RELAY_METRICS_REGISTRY
+	)
+	.unwrap();
+
+	pub static ref PROPOSER_DUTIES_FETCHED_TOTAL: IntCounterVec = register_int_counter_vec_with_registry!(
+		"proposer_duties_fetched_total",
+		"Total number of proposer duties fetched by result",
+		&["result"],
+		RELAY_METRICS_REGISTRY
+	)
+	.unwrap();
+
+	pub static ref PROPOSER_LOOKAHEAD_DB_OPERATIONS_TOTAL: IntCounterVec = register_int_counter_vec_with_registry!(
+		"proposer_lookahead_db_operations_total",
+		"Total database operations for proposer lookahead by operation type and result",
+		&["operation", "result"],
+		RELAY_METRICS_REGISTRY
+	)
+	.unwrap();
 }
 
 pub async fn metrics_handler() -> axum::response::Response {
