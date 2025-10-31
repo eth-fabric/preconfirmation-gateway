@@ -460,6 +460,7 @@ impl TestHarnessBuilder {
 				beacon_api_url: "https://test-beacon.example.com".to_string(),
 				lookahead_window: 64,
 				lookahead_update_interval: 60,
+				upstream_relay_url: None,
 			},
 			storage: relay::config::StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		};
@@ -730,6 +731,8 @@ impl TestHarness {
 			database: Arc::new(self.context.delegations_database.clone()),
 			config,
 			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
 		}
 	}
 

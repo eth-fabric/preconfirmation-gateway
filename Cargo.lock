@@ -5759,6 +5759,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "prometheus",
+ "reqwest 0.12.23",
  "rocksdb",
  "serde",
  "serde_json",

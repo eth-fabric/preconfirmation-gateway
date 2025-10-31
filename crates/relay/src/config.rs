@@ -20,6 +20,9 @@ pub struct RelayServerConfig {
 	pub beacon_api_url: String,
 	pub lookahead_window: u64,
 	pub lookahead_update_interval: u64,
+	/// Optional upstream relay URL for proxying unhandled requests
+	#[serde(default)]
+	pub upstream_relay_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +44,7 @@ impl Default for RelayConfig {
 				beacon_api_url: "http://localhost:5052".to_string(),
 				lookahead_window: 64,
 				lookahead_update_interval: 10,
+				upstream_relay_url: None,
 			},
 			storage: StorageConfig { max_delegations_per_slot: 100, max_constraints_per_slot: 1000 },
 		}

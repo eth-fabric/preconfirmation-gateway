@@ -114,6 +114,8 @@ pub struct RelayState {
 	pub database: Arc<DatabaseContext>,
 	pub config: crate::config::RelayConfig,
 	pub slot_timer: common::slot_timer::SlotTimer,
+	pub proxy_client: Option<reqwest::Client>,
+	pub upstream_relay_url: Option<String>,
 }
 
 /// POST /delegation - Store a verified delegation
@@ -725,7 +727,13 @@ mod tests {
 		let (database, _temp_dir) = create_test_database();
 		let config = crate::config::RelayConfig::default();
 		let slot_timer = common::slot_timer::SlotTimer::new(config.relay.genesis_timestamp);
-		let state = RelayState { database: Arc::new(database), config, slot_timer };
+		let state = RelayState {
+			database: Arc::new(database),
+			config,
+			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
+		};
 
 		let result = capabilities_handler(State(state)).await;
 		assert!(result.is_ok());
@@ -919,7 +927,13 @@ mod tests {
 		Arc::new(database.clone()).store_signed_constraints(&signed_constraints).unwrap();
 
 		let config = crate::config::RelayConfig::default();
-		let state = RelayState { database: Arc::new(database), config, slot_timer };
+		let state = RelayState {
+			database: Arc::new(database),
+			config,
+			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
+		};
 
 		// Call handler without auth headers
 		let headers = HeaderMap::new();
@@ -941,7 +955,13 @@ mod tests {
 		let current_slot = slot_timer.get_current_slot();
 
 		let config = crate::config::RelayConfig::default();
-		let state = RelayState { database: Arc::new(database), config, slot_timer };
+		let state = RelayState {
+			database: Arc::new(database),
+			config,
+			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
+		};
 
 		// Call handler without auth headers for current slot
 		let headers = HeaderMap::new();
@@ -963,7 +983,13 @@ mod tests {
 		let future_slot = current_slot + 100;
 
 		let config = crate::config::RelayConfig::default();
-		let state = RelayState { database: Arc::new(database), config, slot_timer };
+		let state = RelayState {
+			database: Arc::new(database),
+			config,
+			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
+		};
 
 		// Call handler without auth headers for future slot
 		let headers = HeaderMap::new();
@@ -1019,7 +1045,13 @@ mod tests {
 		Arc::new(database.clone()).store_signed_constraints(&signed_constraints).unwrap();
 
 		let config = crate::config::RelayConfig::default();
-		let state = RelayState { database: Arc::new(database), config, slot_timer };
+		let state = RelayState {
+			database: Arc::new(database),
+			config,
+			slot_timer,
+			proxy_client: None,
+			upstream_relay_url: None,
+		};
 
 		// Call handler without auth headers (so no matching public key)
 		let headers = HeaderMap::new();
