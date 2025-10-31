@@ -22,7 +22,7 @@ async fn test_valid_commitment_request() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create commitment request
 	let signed_tx = harness.create_signed_tx();
@@ -60,7 +60,7 @@ async fn test_commitment_request_stores_in_database() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create commitment request and signed commitment
 	let signed_tx = harness.create_signed_tx();
@@ -78,7 +78,7 @@ async fn test_commitment_request_stores_in_database() {
 	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 	harness
 		.context
-		.database
+		.commitments_database
 		.store_commitment_and_constraint(
 			slot,
 			&signed_commitment.commitment.request_hash,
@@ -88,7 +88,11 @@ async fn test_commitment_request_stores_in_database() {
 		.unwrap();
 
 	// Verify it was stored - use request_hash to retrieve
-	let stored = harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap();
+	let stored = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&signed_commitment.commitment.request_hash)
+		.unwrap();
 
 	assert!(stored.is_some());
 	let stored_commitment = stored.unwrap();
@@ -107,7 +111,7 @@ async fn test_commitment_request_with_different_slasher_addresses() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Test with multiple different slasher addresses
 	let slasher1 = Address::random();
@@ -150,7 +154,7 @@ async fn test_commitment_request_signature_is_valid() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create commitment request
 	let signed_tx = harness.create_signed_tx();
@@ -183,7 +187,7 @@ async fn test_commitment_request_without_delegation() {
 	let slot = 99999; // No delegation for this slot
 
 	// Check that no delegation exists
-	let delegation = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	let delegation = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap();
 	assert!(delegation.is_none());
 
 	// The commitment request itself should be valid
@@ -207,7 +211,7 @@ async fn test_commitment_request_wrong_gateway() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_two.clone(), harness.committer_two);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create request (it validates fine)
 	let signed_tx = harness.create_signed_tx();
@@ -273,7 +277,7 @@ async fn test_commitment_request_with_invalid_transaction() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create request with invalid transaction (empty bytes) - creation succeeds
 	let invalid_tx = vec![];
@@ -306,7 +310,7 @@ async fn test_commitment_request_for_past_slot() {
 	let delegation = harness.create_delegation(past_slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(past_slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(past_slot, &signed_delegation).unwrap();
 
 	// Try to create and validate commitment request for past slot
 	let signed_tx = harness.create_signed_tx();
@@ -337,7 +341,7 @@ async fn test_commitment_request_duplicate_request() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create same request and sign it twice
 	let signed_tx = harness.create_signed_tx();

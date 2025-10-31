@@ -256,7 +256,6 @@ impl TestHarnessBuilder {
 			commitments_server_host: "127.0.0.1".to_string(),
 			commitments_server_port: commitments_port.unwrap_or(18545), // Default port if not launching service
 			commitments_database_path: temp_dir.path().join("test_commitments_db").to_string_lossy().to_string(),
-			commitments_bls_public_key: hex::encode(PUBKEY),
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
@@ -354,10 +353,11 @@ impl TestHarnessBuilder {
 		// Provider no longer required here; utils builds provider on demand
 
 		// Create commitments server state - use gateway_one as the primary gateway
+		// For tests, we use the same database for both commitments and delegations
 		let context = CommitmentsServerState::new(
+			database.clone(),
 			database,
 			commit_config,
-			gateway_bls_one.clone(),
 			relay_url.clone(),
 			api_key,
 			slot_timer.clone(),
@@ -725,7 +725,12 @@ impl TestHarness {
 	pub fn create_relay_state(&self) -> relay::handlers::RelayState {
 		let config = relay::config::RelayConfig::default();
 		let slot_timer = common::slot_timer::SlotTimer::new(config.relay.genesis_timestamp);
-		relay::handlers::RelayState { database: Arc::new(self.context.database.clone()), config, slot_timer }
+		// Use delegations database for relay state since relay primarily manages delegations
+		relay::handlers::RelayState {
+			database: Arc::new(self.context.delegations_database.clone()),
+			config,
+			slot_timer,
+		}
 	}
 
 	/// Create a ClientHarness for making RPC/HTTP calls to running services
@@ -754,7 +759,7 @@ impl TestHarness {
 		gateway::delegations::process_delegations(
 			slot,
 			self.gateway_bls_one.clone(),
-			&self.context.database,
+			&self.context.delegations_database,
 			relay_url,
 			None,
 		)
@@ -776,7 +781,7 @@ impl TestHarness {
 			self.gateway_bls_one.clone(),
 			self.proposer_bls_public_key.clone(),
 			receivers,
-			&self.context.database,
+			&self.context.commitments_database,
 			self.context.commit_config.clone(),
 			relay_url,
 			None,
@@ -1275,11 +1280,6 @@ pub mod test_helpers {
 		let commit_config = start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", port, ()).await?;
 
 		// TODO: Get these from configuration - using defaults for tests
-		// Use a valid BLS public key for testing
-		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
@@ -1288,7 +1288,7 @@ pub mod test_helpers {
 
 		// Provider no longer required here; utils builds provider on demand
 
-		Ok(CommitmentsServerState::new(database, commit_config, bls_public_key, relay_url, api_key, slot_timer))
+		Ok(CommitmentsServerState::new(database.clone(), database, commit_config, relay_url, api_key, slot_timer))
 	}
 
 	/// Creates a test CommitmentsServerState with InclusionGatewayConfig for server tests
@@ -1313,9 +1313,6 @@ pub mod test_helpers {
 			commitments_server_host: "127.0.0.1".to_string(),
 			commitments_server_port: rpc_port,
 			commitments_database_path: "./test_db".to_string(),
-			commitments_bls_public_key:
-				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6"
-					.to_string(),
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],
@@ -1346,17 +1343,12 @@ pub mod test_helpers {
 		let commit_config =
 			start_local_signer_server(MODULE_ID, SIGNING_ID, "test-admin-secret", rpc_port, app_config.clone()).await?;
 
-		// Use a valid BLS public key for testing
-		let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)
-		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 		let relay_url = "https://relay.example.com".to_string();
 		let api_key = None::<String>;
 
 		// Create slot timer with test genesis timestamp
 		let slot_timer = SlotTimer::new(1606824023);
 
-		Ok(CommitmentsServerState::new(database, commit_config, bls_public_key, relay_url, api_key, slot_timer))
+		Ok(CommitmentsServerState::new(database.clone(), database, commit_config, relay_url, api_key, slot_timer))
 	}
 }

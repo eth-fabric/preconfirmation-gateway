@@ -25,10 +25,10 @@ async fn test_store_and_retrieve_delegation() {
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 
 	// Store in database
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Retrieve
-	let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	let retrieved = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap();
 
 	assert!(retrieved.is_some());
 	let retrieved_delegation = retrieved.unwrap();
@@ -71,13 +71,13 @@ async fn test_multiple_delegations_different_slots() {
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 		let signed_delegation =
 			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-		harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+		harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 	}
 
 	// Retrieve each delegation
 	for i in 0..3 {
 		let slot = base_slot + i;
-		let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap();
+		let retrieved = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap();
 		assert!(retrieved.is_some());
 		assert_eq!(retrieved.unwrap().message.slot, slot);
 	}
@@ -94,18 +94,18 @@ async fn test_delegation_with_different_delegates() {
 	let delegation1 = harness.create_delegation(slot1, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation1 =
 		harness.create_signed_delegation(&delegation1, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot1, &signed_delegation1).unwrap();
+	harness.context.delegations_database.store_delegation(slot1, &signed_delegation1).unwrap();
 
 	// Create delegation for gateway_two
 	let slot2 = slot1 + 1;
 	let delegation2 = harness.create_delegation(slot2, harness.gateway_bls_two.clone(), harness.committer_two);
 	let signed_delegation2 =
 		harness.create_signed_delegation(&delegation2, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot2, &signed_delegation2).unwrap();
+	harness.context.delegations_database.store_delegation(slot2, &signed_delegation2).unwrap();
 
 	// Retrieve and verify
-	let retrieved1 = harness.context.database.get_delegation_for_slot(slot1).unwrap().unwrap();
-	let retrieved2 = harness.context.database.get_delegation_for_slot(slot2).unwrap().unwrap();
+	let retrieved1 = harness.context.delegations_database.get_delegation_for_slot(slot1).unwrap().unwrap();
+	let retrieved2 = harness.context.delegations_database.get_delegation_for_slot(slot2).unwrap().unwrap();
 
 	assert_eq!(retrieved1.message.delegate, harness.gateway_bls_one);
 	assert_eq!(retrieved2.message.delegate, harness.gateway_bls_two);
@@ -121,7 +121,7 @@ async fn test_retrieve_nonexistent_delegation() {
 
 	// Try to retrieve delegation for slot that doesn't exist
 	let nonexistent_slot = 99999;
-	let result = harness.context.database.get_delegation_for_slot(nonexistent_slot).unwrap();
+	let result = harness.context.delegations_database.get_delegation_for_slot(nonexistent_slot).unwrap();
 
 	assert!(result.is_none());
 	println!(" Correctly returns None for nonexistent delegation");
@@ -434,7 +434,7 @@ async fn test_delegation_required_for_constraints() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Now create constraints
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
@@ -462,7 +462,7 @@ async fn test_delegation_required_for_constraints() {
 	};
 
 	// Both delegation and constraints exist for the slot
-	let delegation_exists = harness.context.database.get_delegation_for_slot(slot).unwrap().is_some();
+	let delegation_exists = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap().is_some();
 	assert!(delegation_exists);
 
 	// Can verify constraints signature
@@ -479,7 +479,7 @@ async fn test_constraint_without_delegation() {
 	let slot = 99999;
 
 	// No delegation stored for this slot
-	let delegation = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	let delegation = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap();
 	assert!(delegation.is_none());
 
 	// Can still create constraints (validation happens in handler)
@@ -523,10 +523,10 @@ async fn test_delegation_fields_preserved() {
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
 
 	// Store
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Retrieve and verify all fields
-	let retrieved = harness.context.database.get_delegation_for_slot(slot).unwrap().unwrap();
+	let retrieved = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap().unwrap();
 
 	assert_eq!(retrieved.message.proposer, harness.proposer_bls_public_key);
 	assert_eq!(retrieved.message.delegate, harness.gateway_bls_one);

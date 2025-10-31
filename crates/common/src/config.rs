@@ -21,9 +21,8 @@ pub trait GatewayConfig {
 	// Commitments server configuration
 	fn server_host(&self) -> &str;
 	fn server_port(&self) -> u16;
-	fn database_path(&self) -> &str;
+	fn commitments_database_path(&self) -> &str;
 	fn log_level(&self) -> &str;
-	fn bls_public_key(&self) -> &str;
 
 	// Gateway orchestration configuration
 	fn relay_url(&self) -> &str;
@@ -66,7 +65,6 @@ pub struct InclusionGatewayConfig {
 	pub commitments_server_host: String,
 	pub commitments_server_port: u16,
 	pub commitments_database_path: String,
-	pub commitments_bls_public_key: String,
 
 	/// Gateway orchestration configuration
 	pub relay_url: String,
@@ -105,16 +103,12 @@ impl GatewayConfig for InclusionGatewayConfig {
 		self.commitments_server_port
 	}
 
-	fn database_path(&self) -> &str {
+	fn commitments_database_path(&self) -> &str {
 		&self.commitments_database_path
 	}
 
 	fn log_level(&self) -> &str {
 		&self.log_level
-	}
-
-	fn bls_public_key(&self) -> &str {
-		&self.commitments_bls_public_key
 	}
 
 	fn relay_url(&self) -> &str {

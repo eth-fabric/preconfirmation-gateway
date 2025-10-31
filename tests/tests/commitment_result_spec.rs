@@ -35,7 +35,7 @@ async fn test_retrieve_commitment_by_request_hash() {
 	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 	harness
 		.context
-		.database
+		.commitments_database
 		.store_commitment_and_constraint(
 			slot,
 			&signed_commitment.commitment.request_hash,
@@ -45,8 +45,11 @@ async fn test_retrieve_commitment_by_request_hash() {
 		.unwrap();
 
 	// Retrieve by request hash
-	let retrieved =
-		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap();
+	let retrieved = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&signed_commitment.commitment.request_hash)
+		.unwrap();
 
 	assert!(retrieved.is_some());
 	let retrieved_commitment = retrieved.unwrap();
@@ -83,7 +86,7 @@ async fn test_retrieve_multiple_commitments() {
 		let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 		harness
 			.context
-			.database
+			.commitments_database
 			.store_commitment_and_constraint(
 				slot,
 				&signed_commitment.commitment.request_hash,
@@ -97,7 +100,8 @@ async fn test_retrieve_multiple_commitments() {
 
 	// Retrieve each commitment and verify
 	for stored in &stored_commitments {
-		let retrieved = harness.context.database.get_commitment_by_hash(&stored.commitment.request_hash).unwrap();
+		let retrieved =
+			harness.context.commitments_database.get_commitment_by_hash(&stored.commitment.request_hash).unwrap();
 
 		assert!(retrieved.is_some());
 		let retrieved_commitment = retrieved.unwrap();
@@ -132,7 +136,7 @@ async fn test_commitment_fields_preserved_after_storage() {
 	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 	harness
 		.context
-		.database
+		.commitments_database
 		.store_commitment_and_constraint(
 			slot,
 			&signed_commitment.commitment.request_hash,
@@ -142,8 +146,12 @@ async fn test_commitment_fields_preserved_after_storage() {
 		.unwrap();
 
 	// Retrieve and verify all fields are preserved
-	let retrieved =
-		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
+	let retrieved = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&signed_commitment.commitment.request_hash)
+		.unwrap()
+		.unwrap();
 
 	assert_eq!(retrieved.commitment.commitment_type, signed_commitment.commitment.commitment_type);
 	assert_eq!(retrieved.commitment.payload, signed_commitment.commitment.payload);
@@ -176,7 +184,7 @@ async fn test_retrieve_commitment_idempotent() {
 	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 	harness
 		.context
-		.database
+		.commitments_database
 		.store_commitment_and_constraint(
 			slot,
 			&signed_commitment.commitment.request_hash,
@@ -186,10 +194,18 @@ async fn test_retrieve_commitment_idempotent() {
 		.unwrap();
 
 	// Retrieve multiple times
-	let retrieved1 =
-		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
-	let retrieved2 =
-		harness.context.database.get_commitment_by_hash(&signed_commitment.commitment.request_hash).unwrap().unwrap();
+	let retrieved1 = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&signed_commitment.commitment.request_hash)
+		.unwrap()
+		.unwrap();
+	let retrieved2 = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&signed_commitment.commitment.request_hash)
+		.unwrap()
+		.unwrap();
 
 	// Should get same data
 	assert_eq!(retrieved1.commitment.request_hash, retrieved2.commitment.request_hash);
@@ -206,7 +222,7 @@ async fn test_retrieve_nonexistent_commitment() {
 
 	// Try to retrieve a commitment that doesn't exist
 	let nonexistent_hash = B256::random();
-	let result = harness.context.database.get_commitment_by_hash(&nonexistent_hash).unwrap();
+	let result = harness.context.commitments_database.get_commitment_by_hash(&nonexistent_hash).unwrap();
 
 	assert!(result.is_none());
 	println!(" Correctly returns None for nonexistent commitment");
@@ -218,7 +234,7 @@ async fn test_retrieve_with_zero_hash() {
 
 	// Try to retrieve with zero hash
 	let zero_hash = B256::ZERO;
-	let result = harness.context.database.get_commitment_by_hash(&zero_hash).unwrap();
+	let result = harness.context.commitments_database.get_commitment_by_hash(&zero_hash).unwrap();
 
 	assert!(result.is_none());
 	println!(" Correctly handles zero hash");
@@ -245,7 +261,7 @@ async fn test_retrieve_after_multiple_stores() {
 		let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 		harness
 			.context
-			.database
+			.commitments_database
 			.store_commitment_and_constraint(
 				slot,
 				&signed_commitment.commitment.request_hash,
@@ -271,7 +287,7 @@ async fn test_retrieve_after_multiple_stores() {
 	let constraint = commitments::utils::create_constraint_from_commitment_request(&request, slot).unwrap();
 	harness
 		.context
-		.database
+		.commitments_database
 		.store_commitment_and_constraint(
 			slot,
 			&target_commitment.commitment.request_hash,
@@ -281,8 +297,11 @@ async fn test_retrieve_after_multiple_stores() {
 		.unwrap();
 
 	// Retrieve the specific commitment
-	let retrieved =
-		harness.context.database.get_commitment_by_hash(&target_commitment.commitment.request_hash).unwrap();
+	let retrieved = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&target_commitment.commitment.request_hash)
+		.unwrap();
 
 	assert!(retrieved.is_some());
 	let retrieved_commitment = retrieved.unwrap();

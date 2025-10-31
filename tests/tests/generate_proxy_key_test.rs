@@ -26,9 +26,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 		commitments_server_host: "127.0.0.1".to_string(),
 		commitments_server_port: rpc_port,
 		commitments_database_path: db_path.to_string_lossy().to_string(),
-		commitments_bls_public_key:
-			"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"
-				.to_string(),
 		log_level: "debug".to_string(),
 		enable_method_tracing: true,
 		traced_methods: vec![
@@ -85,9 +82,6 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	let _committer_address = proxy_address.message.proxy;
 
 	// Create RPC context with constraints fields
-	let bls_public_key = cb_common::utils::bls_pubkey_from_hex(
-		"0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4",
-	)?;
 	let relay_url = "https://relay.example.com".to_string();
 	let api_key = None::<String>;
 
@@ -97,13 +91,12 @@ async fn setup_test_env() -> Result<(HttpClient, TempDir, tokio::task::JoinHandl
 	// Execution client removed; provider is constructed on demand in utils
 
 	let rpc_context = commitments::CommitmentsServerState::new(
+		database.clone(),
 		database,
 		commit_config_guard,
-		bls_public_key,
 		relay_url,
 		api_key,
 		slot_timer,
-		// no execution client
 	);
 
 	// Start RPC server

@@ -23,7 +23,7 @@ async fn test_commitment_request_rpc_success() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create commitment request
 	let signed_tx = harness.create_signed_tx();
@@ -40,7 +40,7 @@ async fn test_commitment_request_rpc_success() {
 	assert!(!result.signature.to_string().is_empty());
 
 	// Verify commitment was stored in database
-	let stored = harness.context.database.get_commitment_by_hash(&result.commitment.request_hash).unwrap();
+	let stored = harness.context.commitments_database.get_commitment_by_hash(&result.commitment.request_hash).unwrap();
 	assert!(stored.is_some());
 
 	println!("commitmentRequest RPC successful");
@@ -73,7 +73,7 @@ async fn test_commitment_request_rpc_invalid_slot() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create request with slot 0 (invalid)
 	let signed_tx = harness.create_signed_tx();
@@ -96,7 +96,7 @@ async fn test_commitment_request_rpc_zero_address_slasher() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create request with zero address slasher
 	let signed_tx = harness.create_signed_tx();
@@ -119,7 +119,7 @@ async fn test_commitment_request_rpc_multiple_sequential() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Make multiple RPC calls
 	let mut results = vec![];
@@ -149,7 +149,7 @@ async fn test_commitment_request_rpc_duplicate() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create same request and send twice
 	let signed_tx = harness.create_signed_tx();
@@ -178,7 +178,7 @@ async fn test_commitment_result_rpc_success() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create commitment via RPC
 	let signed_tx = harness.create_signed_tx();
@@ -227,7 +227,7 @@ async fn test_commitment_result_rpc_multiple_commitments() {
 		let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 		let signed_delegation =
 			harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-		harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+		harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 		// Create commitment via RPC
 		let signed_tx = harness.create_signed_tx();
@@ -347,7 +347,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Step 1: Get fee (calculated from execution client RPC)
 	let signed_tx = harness.create_signed_tx();
@@ -389,7 +389,7 @@ async fn test_concurrent_commitment_requests() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Create multiple requests
 	let mut requests = vec![];
@@ -443,7 +443,7 @@ async fn test_rpc_server_handles_errors_gracefully() {
 	let delegation = harness.create_delegation(slot, harness.gateway_bls_one.clone(), harness.committer_one);
 	let signed_delegation =
 		harness.create_signed_delegation(&delegation, harness.proposer_bls_public_key.clone()).await.unwrap();
-	harness.context.database.store_delegation(slot, &signed_delegation).unwrap();
+	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	let signed_tx = harness.create_signed_tx();
 	let valid_request = harness.create_commitment_request(slot, signed_tx, Address::random()).unwrap();

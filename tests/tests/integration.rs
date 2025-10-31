@@ -40,7 +40,7 @@ async fn test_complete_preconfirmation_workflow() {
 	println!("Gateway processed delegations: found {} matching", delegation_response.matching_delegations.len());
 
 	// Verify delegation is stored in local database
-	let stored_delegation = harness.context.database.get_delegation_for_slot(slot).unwrap();
+	let stored_delegation = harness.context.delegations_database.get_delegation_for_slot(slot).unwrap();
 	assert!(stored_delegation.is_some(), "Delegation should be stored in local DB");
 	println!("Delegation stored in local database");
 
@@ -58,13 +58,16 @@ async fn test_complete_preconfirmation_workflow() {
 	println!("Commitment created with hash: {:?}", commitment_result.commitment.request_hash);
 
 	// Verify commitment is stored
-	let stored_commitment =
-		harness.context.database.get_commitment_by_hash(&commitment_result.commitment.request_hash).unwrap();
+	let stored_commitment = harness
+		.context
+		.commitments_database
+		.get_commitment_by_hash(&commitment_result.commitment.request_hash)
+		.unwrap();
 	assert!(stored_commitment.is_some(), "Commitment should be stored");
 	println!("Commitment stored in database");
 
 	// Verify constraint was written to local DB (this happens during commitment creation)
-	let constraints_for_slot = harness.context.database.get_constraints_for_slot(slot).unwrap();
+	let constraints_for_slot = harness.context.commitments_database.get_constraints_for_slot(slot).unwrap();
 	assert!(!constraints_for_slot.is_empty(), "Constraints should be written to local DB");
 	println!("Constraint written to local database: {} constraints", constraints_for_slot.len());
 

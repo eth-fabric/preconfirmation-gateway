@@ -12,7 +12,7 @@ gateway_url = "http://127.0.0.1:8080"
 
 # Interval between requests in seconds (only used in continuous mode)
 # In continuous mode, a new commitment request will be sent every interval_secs seconds
-interval_secs = 5
+interval_secs = 2
 
 # Sender private key (must have ETH balance for test transactions)
 # This is the private key used to sign the transactions in the commitment requests

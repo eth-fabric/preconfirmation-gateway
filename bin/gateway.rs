@@ -4,7 +4,6 @@ use common::config::{GatewayConfig, InclusionGatewayConfig};
 use common::db::create_database;
 use common::slot_timer::SlotTimer;
 use common::types;
-use common::utils::bls_pubkey_from_hex;
 use eyre::Result;
 use gateway::{ConstraintsTask, DelegationTask, DelegationTaskConfig, TaskCoordinator};
 use lazy_static::lazy_static;
@@ -49,17 +48,13 @@ async fn main() -> Result<()> {
 	let slot_timer = SlotTimer::new(genesis_timestamp);
 
 	// Create databases
-	let commitments_db = create_database(gateway_config.database_path())
+	let commitments_db = create_database(gateway_config.commitments_database_path())
 		.map_err(|e| eyre::eyre!("Failed to create commitments database: {}", e))?;
 	let commitments_database = types::DatabaseContext::new(commitments_db);
 
 	let delegations_db = create_database(gateway_config.delegation_database_path())
 		.map_err(|e| eyre::eyre!("Failed to create delegations database: {}", e))?;
 	let delegations_database = types::DatabaseContext::new(delegations_db);
-
-	// Get BLS public key for commitments server
-	let bls_public_key = bls_pubkey_from_hex(gateway_config.bls_public_key())
-		.map_err(|e| eyre::eyre!("Failed to create BLS public key: {}", e))?;
 
 	// Create provider for commitments server (built on demand in utils)
 
@@ -79,8 +74,8 @@ async fn main() -> Result<()> {
 
 		CommitmentsServerState::new(
 			commitments_database,
+			delegations_database.clone(),
 			commit_config_for_server,
-			bls_public_key,
 			gateway_config.relay_url().to_string(),
 			gateway_config.constraints_api_key().map(|s| s.to_string()),
 			slot_timer.clone(),

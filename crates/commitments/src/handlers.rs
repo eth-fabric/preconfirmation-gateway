@@ -43,7 +43,7 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 	let slot = inclusion_payload.slot;
 
 	// Get the delegation for this slot
-	let signed_delegation = match _context.database().get_delegation_for_slot(slot) {
+	let signed_delegation = match _context.delegations_database().get_delegation_for_slot(slot) {
 		Ok(Some(delegation)) => {
 			info!("Found delegation for slot {}, proceeding with commitment", slot);
 			delegation
@@ -123,9 +123,12 @@ pub async fn commitment_request_handler<T: GatewayConfig>(
 
 	// Store both commitment and constraint atomically to prevent race conditions
 	let request_hash = signed_commitment.commitment.request_hash;
-	if let Err(e) =
-		_context.database().store_commitment_and_constraint(slot, &request_hash, &signed_commitment, &constraint)
-	{
+	if let Err(e) = _context.commitments_database().store_commitment_and_constraint(
+		slot,
+		&request_hash,
+		&signed_commitment,
+		&constraint,
+	) {
 		error!("Failed to store commitment and constraint atomically: {}", e);
 		RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
 		RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
@@ -155,7 +158,7 @@ pub fn commitment_result_handler<T>(
 	let request_hash: B256 = params.one()?;
 
 	// Retrieve the commitment from the database using just the request hash
-	match _context.database().get_commitment_by_hash(&request_hash) {
+	match _context.commitments_database().get_commitment_by_hash(&request_hash) {
 		Ok(Some(signed_commitment)) => {
 			info!("Commitment result request processed successfully");
 			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "ok"]).inc();
@@ -218,19 +221,20 @@ pub fn slots_handler<T>(
 	let chain_id = chain_id_uint.to::<u64>();
 
 	// Get all delegated slots in range with a single database query
-	let delegated_slots = match _context.database().get_delegated_slots_in_range(current_slot, current_slot + 64) {
-		Ok(slots) => slots,
-		Err(e) => {
-			error!("Failed to get delegated slots: {}", e);
-			RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
-			RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
-			return Err(jsonrpsee::types::error::ErrorObject::owned(
-				-32603, // Internal error
-				"Failed to get delegated slots",
-				Some(format!("{}", e)),
-			));
-		}
-	};
+	let delegated_slots =
+		match _context.delegations_database().get_delegated_slots_in_range(current_slot, current_slot + 64) {
+			Ok(slots) => slots,
+			Err(e) => {
+				error!("Failed to get delegated slots: {}", e);
+				RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
+				RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());
+				return Err(jsonrpsee::types::error::ErrorObject::owned(
+					-32603, // Internal error
+					"Failed to get delegated slots",
+					Some(format!("{}", e)),
+				));
+			}
+		};
 
 	// Build slot info for each delegated slot
 	let mut slots = Vec::new();
@@ -297,7 +301,7 @@ pub async fn fee_handler<T: GatewayConfig>(
 		}
 	};
 
-	if let Err(e) = _context.database().store_fee_info(&request_hash, &fee_info) {
+	if let Err(e) = _context.commitments_database().store_fee_info(&request_hash, &fee_info) {
 		error!("Failed to store fee info in database: {}", e);
 		RPC_RESPONSES_TOTAL.with_label_values(&[METHOD, "error"]).inc();
 		RPC_LATENCY_SECONDS.with_label_values(&[METHOD]).observe(start.elapsed().as_secs_f64());

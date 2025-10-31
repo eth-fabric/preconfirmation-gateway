@@ -135,9 +135,6 @@ mod tests {
 			commitments_server_host: "127.0.0.1".to_string(),
 			commitments_server_port: 8080,
 			commitments_database_path: "test.db".to_string(),
-			commitments_bls_public_key:
-				"0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
-					.to_string(),
 			log_level: "info".to_string(),
 			enable_method_tracing: false,
 			traced_methods: vec![],

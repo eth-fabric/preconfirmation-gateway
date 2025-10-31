@@ -361,12 +361,12 @@ pub fn format_error(context: &str, error: &str) -> String {
 /// Creates a constraint from a commitment request
 /// This function creates a constraint with the same payload but using the constraint type
 pub fn create_constraint_from_commitment_request(request: &CommitmentRequest, slot: u64) -> Result<Constraint> {
-	debug!("Creating constraint from commitment request for slot {}", slot);
+	info!("Creating constraint from commitment request for slot {}", slot);
 
 	// Create the constraint with the same payload but constraint type
 	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: request.payload.clone() };
 
-	debug!(
+	info!(
 		"Created constraint with type {} and payload length {} for slot {}",
 		constraint.constraint_type,
 		constraint.payload.len(),
@@ -382,15 +382,11 @@ pub async fn create_signed_commitment<T>(
 	committer_address: Address,
 	module_signing_id: &B256,
 ) -> Result<SignedCommitment> {
-	debug!("Creating signed commitment with proper ECDSA signing");
-
 	// 1. ABI-encode the CommitmentRequest
 	let encoded_request = request.abi_encode()?;
-	debug!("ABI-encoded CommitmentRequest: {:?}", encoded_request);
 
 	// 2. Keccak256 hash the encoded request
 	let request_hash = keccak256(&encoded_request);
-	debug!("Keccak256 hash: {:?}", request_hash);
 
 	// 3. Create the commitment
 	let commitment = Commitment {
@@ -402,14 +398,12 @@ pub async fn create_signed_commitment<T>(
 
 	// 4. Get the object root
 	let message_hash = commitment.to_message_hash()?;
-	debug!("Object root: {:?}", message_hash);
 
 	// 5. Call the proxy_ecdsa signer
 	let response = {
 		let mut commit_config = commit_config.lock().await;
 		signer::call_proxy_ecdsa_signer(&mut *commit_config, message_hash, committer_address, module_signing_id).await?
 	};
-	debug!("Received response from proxy_ecdsa: {:?}", response);
 
 	// 6. Construct the SignedCommitment
 	let signed_commitment = SignedCommitment {
@@ -419,7 +413,6 @@ pub async fn create_signed_commitment<T>(
 		signature: response.signature.normalized_s(),
 	};
 
-	debug!("Signed commitment created successfully");
 	Ok(signed_commitment)
 }
 
@@ -429,7 +422,6 @@ pub fn verify_commitment_signature(
 	signature: &alloy::primitives::Signature,
 	expected_signer: &Address,
 ) -> Result<bool> {
-	debug!("Verifying commitment signature");
 	let message_hash = commitment.to_message_hash()?;
 	let recovered_address =
 		signature.recover_address_from_prehash(&message_hash).wrap_err("Failed to recover address from signature")?;
