@@ -4,6 +4,9 @@ pub const COMMITMENT_TYPE: u64 = 1;
 /// The constraint type for inclusion constraints
 pub const CONSTRAINT_TYPE: u64 = 1;
 
+/// Maximum number of constraints per slot
+pub const MAX_CONSTRAINTS_PER_SLOT: usize = 256;
+
 // Commit-Boost signing constants
 pub const APPLICATION_BUILDER_DOMAIN: [u8; 4] = [0, 0, 0, 1];
 pub const GENESIS_VALIDATORS_ROOT: [u8; 32] = [0; 32];
@@ -70,6 +73,12 @@ pub mod routes {
 
 		/// Get constraints for a specific slot
 		pub const CONSTRAINTS_SLOT: &str = "/constraints/v0/relay/constraints/{slot}";
+
+		/// Submit block with proofs endpoint
+		pub const BLOCKS_WITH_PROOFS: &str = "/constraints/v0/relay/blocks_with_proofs";
+
+		/// Upstream builder API submit block endpoint
+		pub const UPSTREAM_BUILDER_SUBMIT_BLOCK: &str = "/eth/v1/builder/blocks";
 	}
 
 	/// Beacon API routes

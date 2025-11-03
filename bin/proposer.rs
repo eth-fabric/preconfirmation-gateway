@@ -1,7 +1,6 @@
 use axum::{Router, routing::get};
-use clap::Parser;
 use eyre::Result;
-use proposer::cli::{Cli, Commands};
+use proposer::cli;
 use proposer::metrics::metrics_handler;
 
 #[tokio::main]
@@ -23,35 +22,14 @@ async fn main() -> Result<()> {
 		}
 	});
 
-	// Parse CLI arguments in main thread (not in spawned task)
-	let cli = Cli::parse();
+	// Run CLI in background; exit gracefully on shutdown signal
+	let cli_task = tokio::spawn(async move { cli::run().await });
 
-	// Handle commands - for Run, load config in main then spawn work; others execute directly
-	match cli.command.unwrap_or(Commands::Run) {
-		Commands::Run => {
-			// Load config in main thread (critical: not in spawned task)
-			tracing::info!("Starting proposer service");
-			let config_and_task = proposer::cli::load_daemon_config().await?;
+	// Wait for Docker shutdown signal
+	let _ = common::utils::wait_for_signal().await;
 
-			// Spawn daemon work loop as background task
-			let daemon_task = tokio::spawn(async move {
-				if let Err(e) = proposer::cli::run_daemon_loop(config_and_task).await {
-					tracing::error!("Daemon error: {}", e);
-					eprintln!("Daemon error: {}", e);
-				}
-			});
-
-			// Wait for Docker shutdown signal
-			let _ = common::utils::wait_for_signal().await;
-
-			// Stop daemon task
-			daemon_task.abort();
-		}
-		command => {
-			// For CLI commands (register, opt-in, etc.), execute directly and exit
-			proposer::cli::handle_command(command).await?;
-		}
-	}
+	// Stop CLI task
+	cli_task.abort();
 
 	Ok(())
 }

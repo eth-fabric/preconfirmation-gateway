@@ -9,6 +9,10 @@ use ::urc::registry::BLS::G1Point;
 use commit_boost::prelude::BlsPublicKey;
 use urc::registry::ISlasher::Delegation as SolDelegation;
 
+// Import PBS types from commit-boost common crate
+// ExecutionPayload and BlobsBundle are generic over EthSpec for different fork versions
+pub use cb_common::pbs::{BlobsBundle, ExecutionPayload};
+
 use super::{MessageType, convert_pubkey_to_g1_point};
 
 /// A constraint with its type and payload
@@ -138,6 +142,94 @@ pub struct SignedConstraints {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstraintCapabilities {
 	pub constraint_types: Vec<u64>,
+}
+
+// ===== Block submission types for relay API =====
+// These types match the relay-specs API and are JSON-compatible.
+// They align with commit-boost's ExecutionPayload structure.
+
+/// Proofs of constraint validity for a block
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConstraintProofs {
+	#[serde(rename = "constraintTypes")]
+	pub constraint_types: Vec<u64>,
+	pub payloads: Vec<Bytes>,
+}
+
+/// BidTrace message from builder block submission (relay-specs)
+/// Contains the bid metadata for a block submission
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BidTrace {
+	pub slot: String,
+	pub parent_hash: String,
+	pub block_hash: String,
+	pub builder_pubkey: String,
+	pub proposer_pubkey: String,
+	pub proposer_fee_recipient: String,
+	pub gas_limit: String,
+	pub gas_used: String,
+	pub value: String,
+}
+
+/// Block submission request using commit-boost types
+/// Generic over EthSpec to support different fork versions (Bellatrix, Capella, Deneb, Electra)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitBlockRequest<T: cb_common::pbs::EthSpec> {
+	/// Bid trace with block metadata
+	pub message: BidTrace,
+	/// Execution payload from commit-boost (fork-specific via EthSpec)
+	pub execution_payload: ExecutionPayload<T>,
+	/// Builder's BLS signature
+	pub signature: String,
+	/// Blobs bundle (Deneb+, optional for earlier forks)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub blobs_bundle: Option<BlobsBundle<T>>,
+}
+
+impl<T: cb_common::pbs::EthSpec> SubmitBlockRequest<T> {
+	/// Extract the slot from the BidTrace message
+	pub fn slot(&self) -> Result<u64, eyre::Error> {
+		self.message.slot.parse().map_err(|e| eyre::eyre!("Failed to parse slot: {}", e))
+	}
+}
+
+/// Block submission request with proofs of constraint validity
+/// Extends SubmitBlockRequest with constraint proofs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitBlockRequestWithProofs<T: cb_common::pbs::EthSpec> {
+	/// Bid trace with block metadata
+	pub message: BidTrace,
+	/// Execution payload from commit-boost (fork-specific via EthSpec)
+	pub execution_payload: ExecutionPayload<T>,
+	/// Builder's BLS signature
+	pub signature: String,
+	/// Blobs bundle (Deneb+, optional for earlier forks)
+	#[serde(skip_serializing_if = "Option::is_none")]
+	pub blobs_bundle: Option<BlobsBundle<T>>,
+	/// Proofs of constraint validity for this block
+	pub proofs: ConstraintProofs,
+}
+
+impl<T: cb_common::pbs::EthSpec> SubmitBlockRequestWithProofs<T> {
+	/// Extract the slot from the BidTrace message
+	pub fn slot(&self) -> Result<u64, eyre::Error> {
+		self.message.slot.parse().map_err(|e| eyre::eyre!("Failed to parse slot: {}", e))
+	}
+
+	/// Get reference to the proofs
+	pub fn proofs(&self) -> &ConstraintProofs {
+		&self.proofs
+	}
+
+	/// Convert to standard SubmitBlockRequest (without proofs) for upstream relay
+	pub fn into_block_request(self) -> SubmitBlockRequest<T> {
+		SubmitBlockRequest {
+			message: self.message,
+			execution_payload: self.execution_payload,
+			signature: self.signature,
+			blobs_bundle: self.blobs_bundle,
+		}
+	}
 }
 
 // URC-related types and conversion helpers moved to `types::urc` and `types::mod`

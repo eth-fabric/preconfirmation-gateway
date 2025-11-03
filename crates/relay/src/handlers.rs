@@ -504,6 +504,151 @@ pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<Heal
 	}
 }
 
+/// POST /constraints/v0/relay/blocks_with_proofs - Submit block with proofs
+/// Accepts blocks from any fork version (Bellatrix, Capella, Deneb, Electra)
+pub async fn submit_blocks_with_proofs_handler(
+	State(state): State<RelayState>,
+	axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+	headers: HeaderMap,
+	Json(request): Json<serde_json::Value>,
+) -> StatusCode {
+	use common::constants::MAX_CONSTRAINTS_PER_SLOT;
+
+	const EP: &str = common::constants::routes::relay::BLOCKS_WITH_PROOFS;
+	const METHOD: &str = "POST";
+	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
+	let start = Instant::now();
+
+	// Extract cancellations query parameter (default to false)
+	let cancellations = params.get("cancellations").and_then(|v| v.parse::<bool>().ok()).unwrap_or(false);
+
+	// Extract slot and proofs from the JSON request
+	let slot = request
+		.get("message")
+		.and_then(|m| m.get("slot"))
+		.and_then(|s| s.as_str())
+		.and_then(|s| s.parse::<u64>().ok())
+		.unwrap_or(0);
+
+	let proofs = match request.get("proofs") {
+		Some(p) => match serde_json::from_value::<common::types::ConstraintProofs>(p.clone()) {
+			Ok(proofs) => proofs,
+			Err(e) => {
+				error!("Failed to parse proofs: {}", e);
+				let code = StatusCode::BAD_REQUEST;
+				RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+				REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+				return code;
+			}
+		},
+		None => {
+			error!("Missing proofs field");
+			let code = StatusCode::BAD_REQUEST;
+			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+			return code;
+		}
+	};
+
+	info!("Received block submission with proofs for slot {}, cancellations: {}", slot, cancellations);
+
+	// Validate proofs structure
+	if proofs.constraint_types.len() != proofs.payloads.len() {
+		error!(
+			"Constraint types and payloads length mismatch: {} vs {}",
+			proofs.constraint_types.len(),
+			proofs.payloads.len()
+		);
+		let code = StatusCode::BAD_REQUEST;
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+		return code;
+	}
+
+	if proofs.constraint_types.len() > MAX_CONSTRAINTS_PER_SLOT {
+		error!("Too many proofs: {} exceeds maximum of {}", proofs.constraint_types.len(), MAX_CONSTRAINTS_PER_SLOT);
+		let code = StatusCode::BAD_REQUEST;
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+		return code;
+	}
+
+	// Fetch constraints from database for the slot
+	let constraints_result = state.database.get_signed_constraints_for_slot(slot);
+	match constraints_result {
+		Ok(constraints) => {
+			info!("Retrieved {} constraints for slot {} from database", constraints.len(), slot);
+			// TODO: Validate proofs against constraints
+			// For now, we just log that we would validate the proofs here
+			debug!("TODO: Implement proof validation for {} constraints", constraints.len());
+		}
+		Err(e) => {
+			error!("Failed to retrieve constraints for slot {}: {}", slot, e);
+			// Continue processing even if constraints retrieval fails
+		}
+	}
+
+	// Remove proofs field for upstream proxy
+	let mut block_request_json = request.clone();
+	block_request_json.as_object_mut().and_then(|obj| obj.remove("proofs"));
+
+	// Proxy to upstream relay if configured
+	if let (Some(client), Some(upstream_url)) = (&state.proxy_client, &state.upstream_relay_url) {
+		let upstream_endpoint =
+			format!("{}{}", upstream_url, common::constants::routes::relay::UPSTREAM_BUILDER_SUBMIT_BLOCK);
+		info!("Proxying block submission to upstream relay: {}", upstream_endpoint);
+
+		// Build upstream request
+		let mut upstream_req = client.post(&upstream_endpoint);
+
+		// Forward relevant headers
+		for (key, value) in headers.iter() {
+			let key_str = key.as_str();
+			if key_str != "host" && key_str != "connection" && !key_str.starts_with("x-forwarded") {
+				if let Ok(val) = value.to_str() {
+					upstream_req = upstream_req.header(key_str, val);
+				}
+			}
+		}
+
+		// Set content type
+		upstream_req = upstream_req.header("Content-Type", "application/json");
+
+		// Send request without proofs (raw JSON)
+		match upstream_req.json(&block_request_json).send().await {
+			Ok(response) => {
+				let status = response.status();
+				info!("Upstream relay responded with status: {}", status);
+				if status.is_success() {
+					let code = StatusCode::OK;
+					RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+					REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+					return code;
+				} else {
+					error!("Upstream relay returned error status: {}", status);
+					let code = StatusCode::BAD_GATEWAY;
+					RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+					REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+					return code;
+				}
+			}
+			Err(e) => {
+				error!("Failed to proxy block submission to upstream relay: {}", e);
+				let code = StatusCode::BAD_GATEWAY;
+				RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+				REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+				return code;
+			}
+		}
+	} else {
+		info!("No upstream relay configured, accepting block submission locally");
+		let code = StatusCode::OK;
+		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
+		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
+		return code;
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
