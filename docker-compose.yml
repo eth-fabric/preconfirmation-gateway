@@ -12,10 +12,10 @@ services:
       - CB_CONFIG=/cb-config.toml
       - CB_MODULE_ID=${GATEWAY_MODULE_ID:-gateway-module}
       - CB_SIGNER_JWT=${GATEWAY_JWT}
-      - CB_SIGNER_URL=${CB_SIGNER_URL:-http://localhost:20000}
+      - CB_SIGNER_URL=http://signer:20000
       - GATEWAY_DEFAULT_BLS_KEY=${GATEWAY_DEFAULT_BLS_KEY}
     volumes:
-      - ./config/gateway.config.toml:/cb-config.toml:ro
+      - ./config/gateway.docker.toml:/cb-config.toml:ro
     ports:
       - "127.0.0.1:18080:8080"
 
@@ -26,12 +26,12 @@ services:
     environment:
       - RELAY_JWT=${RELAY_JWT}
     volumes:
-      - ./config/relay.config.toml:/cb-config.toml:ro
+      - ./config/relay.docker.toml:/cb-config.toml:ro
     command: ["/cb-config.toml"]
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8080:9999"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -45,11 +45,11 @@ services:
       - CB_CONFIG=/cb-config.toml
       - CB_MODULE_ID=${PROPOSER_MODULE_ID:-proposer-module}
       - CB_SIGNER_JWT=${PROPOSER_JWT}
-      - CB_SIGNER_URL=${CB_SIGNER_URL:-http://localhost:20000}
+      - CB_SIGNER_URL=http://signer:20000
       - PROPOSER_METRICS_ADDR=0.0.0.0:9902
       - PROPOSER_DEFAULT_BLS_KEY=${PROPOSER_DEFAULT_BLS_KEY}
     volumes:
-      - ./config/proposer.config.toml:/cb-config.toml:ro
+      - ./config/proposer.docker.toml:/cb-config.toml:ro
     ports:
       - "127.0.0.1:9902:9902"
 
@@ -58,7 +58,7 @@ services:
     image: preconfirmation-gateway/spammer:${VERSION:-dev}
     container_name: spammer
     volumes:
-      - ./config/spammer.config.toml:/app/spammer-config.toml:ro
+      - ./config/spammer.docker.toml:/app/spammer-config.toml:ro
 
   signer:
     <<: *bin-base
@@ -69,10 +69,10 @@ services:
       - CB_JWTS=${CB_JWTS}
       - CB_SIGNER_ADMIN_JWT=${CB_SIGNER_ADMIN_JWT}
     volumes:
-      - ./config/signer.config.toml:/cb-config.toml:ro
-      - ./tests/data/keystores/keys:/app/tests/data/keystores/keys:ro
-      - ./tests/data/keystores/secrets:/app/tests/data/keystores/secrets:ro
-      - ./tests/data/proxy:/app/tests/data/proxy
+      - ./config/signer.docker.toml:/cb-config.toml:ro
+      - ./tests/data/keystores/keys:/app/keys:ro
+      - ./tests/data/keystores/secrets:/app/secrets:ro
+      - ./tests/data/proxy:/app/proxy
     ports:
       - "127.0.0.1:20000:20000"
 
