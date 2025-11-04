@@ -69,4 +69,3 @@ impl<T> CommitmentsServerState<T> {
 		&self.slot_timer
 	}
 }
-
