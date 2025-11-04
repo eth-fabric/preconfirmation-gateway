@@ -1,6 +1,6 @@
 [relay]
 port = 9999
-database_path = "data/relay-rocksdb"
+database_path = "./data/relay-rocksdb"
 log_level = "info"
 constraint_capabilities = [1]
 chain = "Hoodi"

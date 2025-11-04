@@ -1,10 +1,91 @@
+# Display help information about available commands
+help:
+	@echo "Preconfirmation Gateway - Justfile Commands"
+	@echo "==========================================="
+	@echo ""
+	@echo "QUICK START"
+	@echo "  just build-all dev      - Build all Docker images with 'dev' tag"
+	@echo "  just setup-and-run      - Setup simulation and run all services"
+	@echo ""
+	@echo "DOCKER COMPOSE WORKFLOW"
+	@echo "  just up [SERVICE] [ENV_FILE]  - Start services (optionally with env file)"
+	@echo "  just down                     - Stop all services"
+	@echo "  just build [SERVICE]          - Build Docker images via docker-compose"
+	@echo "  just logs SERVICE             - View logs for a service"
+	@echo ""
+	@echo "BUILD DOCKER IMAGES (VERSION = Docker image tag, e.g., 'dev', 'v1.0.0', 'latest')"
+	@echo "  just build-gateway VERSION       - Build gateway Docker image"
+	@echo "  just build-proposer VERSION      - Build proposer Docker image"
+	@echo "  just build-relay VERSION         - Build relay Docker image"
+	@echo "  just build-spammer VERSION       - Build spammer Docker image"
+	@echo "  just build-signer VERSION        - Build signer Docker image"
+	@echo "  just build-beacon-mock VERSION   - Build beacon-mock Docker image"
+	@echo "  just build-all VERSION           - Build all Docker images"
+	@echo "  Example: just build-all dev      - Builds all images tagged as 'dev'"
+	@echo ""
+	@echo "SIMULATION SETUP"
+	@echo "  just setup-simulation            - Generate .simulation.env with JWTs"
+	@echo ""
+	@echo "LOCAL BINARY EXECUTION (No Docker)"
+	@echo "  just run-local-signer            - Run local signer module"
+	@echo "  just run-local-gateway           - Run local gateway module"
+	@echo "  just run-local-proposer          - Run local proposer daemon"
+	@echo "  just run-local-relay             - Run local relay"
+	@echo "  just run-local-spammer           - Run local spammer"
+	@echo "  just run-local-beacon-mock       - Run local mock beacon node"
+	@echo ""
+	@echo "DOCKERIZED EXECUTION (requires building images first with VERSION tag)"
+	@echo "  just run-docker-signer [ENV_FILE] [VERSION]      - Run dockerized signer"
+	@echo "  just run-docker-beacon-mock [ENV_FILE] [VERSION] - Run dockerized beacon mock"
+	@echo "  just run-docker-gateway [ENV_FILE] [VERSION]     - Run dockerized gateway"
+	@echo "  just run-docker-proposer [ENV_FILE] [VERSION]    - Run dockerized proposer"
+	@echo "  just run-docker-relay [ENV_FILE] [VERSION]       - Run dockerized relay"
+	@echo "  just run-docker-spammer [ENV_FILE] [VERSION]     - Run dockerized spammer"
+	@echo "  just run-docker-all [ENV_FILE] [VERSION]         - Run all dockerized services"
+	@echo "  just setup-and-run [ENV_FILE] [VERSION]          - Setup and run all services"
+	@echo "  Default ENV_FILE: .simulation.env, Default VERSION: dev"
+	@echo ""
+	@echo "PROPOSER OPERATIONS"
+	@echo "  just proposer-register URC KEYSTORE [PWD]           - Register proposer BLS keys"
+	@echo "  just proposer-opt-in URC ROOT SLASHER COMMITTER KEYSTORE [PWD] - Opt-in"
+	@echo "  just proposer-opt-out URC ROOT SLASHER KEYSTORE [PWD]          - Opt-out"
+	@echo ""
+	@echo "EXAMPLES"
+	@echo "  # Build and run locally (no Docker)"
+	@echo "  just setup-simulation && just run-local-signer"
+	@echo ""
+	@echo "  # Build Docker images and run in containers"
+	@echo "  just build-all dev && just setup-and-run"
+	@echo ""
+	@echo "  # Use production tag"
+	@echo "  just build-all v1.0.0 && just setup-and-run .simulation.env v1.0.0"
+	@echo ""
+	@echo "NOTES"
+	@echo "  - VERSION is the Docker image tag (e.g., dev, v1.0.0, latest)"
+	@echo "  - ENV_FILE defaults to .simulation.env if not specified"
+	@echo "  - Images are tagged as: preconfirmation-gateway/<service>:<VERSION>"
+	@echo ""
+
 # Simple Docker Compose workflow
 
-up SERVICE="":
-	@if [ -z "{{SERVICE}}" ]; then \
-	  docker compose up -d; \
+up SERVICE="" ENV_FILE="" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ -n "{{ENV_FILE}}" ]; then \
+		if [ ! -f "{{ENV_FILE}}" ]; then \
+			echo "Error: Environment file {{ENV_FILE}} not found"; \
+			exit 1; \
+		fi; \
+		set -a; \
+		source "{{ENV_FILE}}"; \
+		set +a; \
+		echo "Loaded environment from {{ENV_FILE}}"; \
+	fi
+	export VERSION={{VERSION}}
+	if [ -z "{{SERVICE}}" ]; then \
+		docker compose up -d; \
 	else \
-	  docker compose up -d {{SERVICE}}; \
+		docker compose up -d {{SERVICE}}; \
 	fi
 
 build SERVICE="":
@@ -57,12 +138,16 @@ build-gateway version: (_docker-build-binary version "gateway") (_docker-build-i
 build-relay version:   (_docker-build-binary version "relay")   (_docker-build-image version "relay")
 build-proposer version:(_docker-build-binary version "proposer")(_docker-build-image version "proposer")
 build-spammer version: (_docker-build-binary version "spammer") (_docker-build-image version "spammer")
+build-signer version:  (_docker-build-binary version "local-signer-module") (_docker-build-image version "signer")
+build-beacon-mock version: (_docker-build-binary version "beacon-mock") (_docker-build-image version "beacon-mock")
 
 build-all version:
 	just build-gateway {{version}} && \
 	just build-relay {{version}} && \
 	just build-proposer {{version}} && \
-	just build-spammer {{version}}
+	just build-spammer {{version}} && \
+	just build-signer {{version}} && \
+	just build-beacon-mock {{version}}
 
 # ===============================
 # Local binary execution (without Docker)
@@ -378,3 +463,132 @@ generate-proxy-key-proposer-bls:
 		echo "$BODY"; \
 		exit 1; \
 	fi
+
+# ===============================
+# Docker execution (with simulation environment)
+# ===============================
+
+# Run dockerized signer module
+run-docker-signer ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting dockerized signer (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d signer
+
+# Run dockerized beacon mock
+run-docker-beacon-mock ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	# Extract beacon_api_url from simulation.config.toml
+	export BEACON_API_URL=$(grep '^beacon_api_url' config/simulation.config.toml | cut -d'"' -f2)
+	echo "Starting dockerized beacon mock (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	echo "Beacon API URL: $BEACON_API_URL"
+	echo "Proposer BLS Key: $PROPOSER_DEFAULT_BLS_KEY"
+	docker compose up -d beacon-mock
+
+# Run dockerized gateway module
+run-docker-gateway ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting dockerized gateway (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d gateway
+
+# Run dockerized proposer daemon
+run-docker-proposer ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting dockerized proposer (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d proposer
+
+# Run dockerized relay
+run-docker-relay ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting dockerized relay (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d relay
+
+# Run dockerized spammer
+run-docker-spammer ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting dockerized spammer (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d spammer
+
+# Run all dockerized services
+run-docker-all ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	if [ ! -f "{{ENV_FILE}}" ]; then \
+		echo "Error: Environment file {{ENV_FILE}} not found"; \
+		echo "Run 'just setup-simulation' first to generate .simulation.env"; \
+		exit 1; \
+	fi
+	set -a
+	source "{{ENV_FILE}}"
+	set +a
+	export VERSION={{VERSION}}
+	echo "Starting all dockerized services (version: {{VERSION}}) with environment from {{ENV_FILE}}"
+	docker compose up -d
+
+# Setup simulation environment and run all dockerized services
+setup-and-run ENV_FILE=".simulation.env" VERSION="dev":
+	#!/usr/bin/env bash
+	set -e
+	echo "Setting up simulation environment..."
+	just setup-simulation
+	echo "Starting all dockerized services..."
+	just run-docker-all "{{ENV_FILE}}" "{{VERSION}}"

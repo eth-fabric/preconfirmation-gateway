@@ -40,7 +40,7 @@ env_file = ".cb.env"
 # Commitments server configuration
 commitments_server_host = "127.0.0.1"
 commitments_server_port = 8080
-commitments_database_path = "./data/rocksdb"
+commitments_database_path = "./data/commitments-rocksdb"
 module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
 log_level = "info"
 enable_method_tracing = true

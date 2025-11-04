@@ -56,5 +56,5 @@ execution_rpc_url = "http://localhost:8545"
 registration_collateral_wei = "1000000000000000000"
 
 # Database Configuration
-delegation_db_path = "data/proposer-delegations-rocksdb"
+delegation_db_path = "./data/proposer-delegations-rocksdb"
 
