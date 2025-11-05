@@ -1,0 +1,10 @@
+/target
+/.git
+**/*.rs.bk
+**/*.swp
+**/*.log
+**/node_modules
+**/dist
+**/.DS_Store
+**/.env
+**/.env.*

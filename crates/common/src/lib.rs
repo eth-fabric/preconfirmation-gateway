@@ -1,0 +1,21 @@
+//! Common utilities, types, and infrastructure shared across preconfirmation-gateway crates.
+//!
+//! This crate centralizes:
+//! - Database setup (`rocksdb`) and health checks
+//! - Reusable types for commitments, constraints, and URC interactions
+//! - Execution/beacon helpers, slot timing, and signing utilities
+//! - Logging helpers used by binaries and services
+pub mod beacon;
+pub mod config;
+pub mod constants;
+pub mod db;
+pub mod execution;
+pub mod logging;
+pub mod signer;
+pub mod slot_timer;
+pub mod types;
+pub mod utils;
+
+// Re-export commonly used types and functions for easier access
+pub use db::{create_database, db_healthcheck};
+pub use types::{Commitment, CommitmentRequest, DatabaseContext, FeeInfo, SignedCommitment, SlotInfoResponse};

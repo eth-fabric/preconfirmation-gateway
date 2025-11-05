@@ -1,0 +1,321 @@
+use alloy::primitives::{Address, Bytes, B256};
+use cb_common::types::BlsPublicKey;
+use commit_boost::prelude::StartCommitModuleConfig;
+use common::beacon::{BeaconApiClient, HttpClient};
+use common::config::ProposerConfig as ProposerConfigTrait;
+use common::signer::call_bls_signer;
+use common::types::beacon::BeaconTiming;
+use common::types::constraints::{Delegation, SignedDelegation};
+use constraints::client::ConstraintsClientTrait;
+use eyre::{Context, Result};
+use tracing::{debug, info, warn};
+
+use crate::config::ProposerConfig;
+use crate::metrics::{TASK_LATENCY_SECONDS, TASK_RUNS_TOTAL};
+use std::time::Instant;
+
+/// Get all consensus BLS public keys from the signer client
+pub async fn get_consensus_keys<T>(commit_config: &mut StartCommitModuleConfig<T>) -> Result<Vec<BlsPublicKey>> {
+	let response = commit_config.signer_client.get_pubkeys().await.context("Failed to get public keys from signer")?;
+
+	Ok(response.keys.iter().map(|map| map.consensus.clone()).collect())
+}
+
+/// Process proposer lookahead to find upcoming duties and sign delegations
+///
+/// This function checks the beacon chain for proposer duties in the current and next epoch.
+/// If the configured proposer is assigned to a slot, it creates, signs, and posts a delegation
+/// to the relay.
+pub async fn process_lookahead<H: HttpClient, C: ConstraintsClientTrait>(
+	beacon_client: &BeaconApiClient<H>,
+	constraints_client: &C,
+	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
+	current_slot: u64,
+	database: &common::types::database::DatabaseContext,
+) -> Result<()> {
+	let task_label = "process_lookahead";
+	let start = Instant::now();
+	// Get all consensus BLS public keys from the signer
+	let our_pubkeys = match get_consensus_keys(commit_config).await {
+		Ok(keys) => keys,
+		Err(e) => {
+			TASK_RUNS_TOTAL.with_label_values(&[task_label, "error"]).inc();
+			TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
+			return Err(e);
+		}
+	};
+
+	if our_pubkeys.is_empty() {
+		warn!("No consensus keys found in signer");
+		TASK_RUNS_TOTAL.with_label_values(&[task_label, "ok"]).inc();
+		TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
+		return Ok(());
+	}
+
+	info!("Processing lookahead for {} consensus key(s)", our_pubkeys.len());
+
+	// Calculate current and next epoch
+	let current_epoch = BeaconTiming::slot_to_epoch(current_slot);
+	let next_epoch = current_epoch + 1;
+
+	// Check duties for both current and next epoch
+	for epoch in [current_epoch, next_epoch] {
+		match process_epoch_duties(
+			beacon_client,
+			constraints_client,
+			commit_config,
+			epoch,
+			current_slot,
+			&our_pubkeys,
+			database,
+		)
+		.await
+		{
+			Ok(posted_count) => {
+				if posted_count > 0 {
+					info!("Posted {} delegation(s) for epoch {}", posted_count, epoch);
+				} else {
+					debug!("No duties found for our proposers in epoch {}", epoch);
+				}
+			}
+			Err(e) => {
+				warn!("Error processing epoch {} duties: {}", epoch, e);
+			}
+		}
+	}
+
+	TASK_RUNS_TOTAL.with_label_values(&[task_label, "ok"]).inc();
+	TASK_LATENCY_SECONDS.with_label_values(&[task_label]).observe(start.elapsed().as_secs_f64());
+	Ok(())
+}
+
+/// Process duties for a specific epoch
+async fn process_epoch_duties<H: HttpClient, C: ConstraintsClientTrait>(
+	beacon_client: &BeaconApiClient<H>,
+	constraints_client: &C,
+	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
+	epoch: u64,
+	current_slot: u64,
+	our_pubkeys: &[BlsPublicKey],
+	database: &common::types::database::DatabaseContext,
+) -> Result<usize> {
+	// Get proposer duties for this epoch
+	let duties = match beacon_client.get_proposer_duties(epoch).await {
+		Ok(d) => d,
+		Err(e) => {
+			return Err(eyre::eyre!("Failed to get proposer duties for epoch {}: {}", epoch, e));
+		}
+	};
+
+	info!("Received {} proposer duties for epoch {}", duties.data.len(), epoch);
+
+	let mut posted_count = 0;
+	let mut errors: Vec<String> = Vec::new();
+
+	// Parse module_signing_id from config
+	let module_signing_id = match commit_config.extra.module_signing_id().parse::<B256>() {
+		Ok(id) => id,
+		Err(e) => {
+			return Err(eyre::eyre!("Failed to parse module_signing_id from config: {}", e));
+		}
+	};
+
+	// Check each duty to see if it's for one of our proposers
+	for duty in duties.data {
+		let duty_pubkey = match duty.parse_pubkey() {
+			Ok(pk) => pk,
+			Err(e) => {
+				errors.push(format!("Failed to parse duty pubkey: {}", e));
+				continue;
+			}
+		};
+
+		let duty_slot = match duty.parse_slot() {
+			Ok(slot) => slot,
+			Err(e) => {
+				errors.push(format!("Failed to parse duty slot: {}", e));
+				continue;
+			}
+		};
+
+		info!("Duty pubkey: {:?}, Duty slot: {}", duty_pubkey, duty_slot);
+
+		// Only process duties that:
+		// 1. Match one of our proposer keys
+		// 2. Are in the future (slot > current_slot)
+		if our_pubkeys.contains(&duty_pubkey) && duty_slot > current_slot {
+			info!("Found proposer duty for slot {}", duty_slot);
+
+			// Check if we've already posted a delegation for this slot (equivocation prevention)
+			match database.get_delegation_for_slot(duty_slot) {
+				Ok(Some(existing_delegation)) => {
+					warn!(
+						"Delegation already exists for slot {}. Skipping to prevent equivocation. Existing delegation: proposer={:?}",
+						duty_slot,
+						existing_delegation.message.proposer
+					);
+					continue;
+				}
+				Ok(None) => {
+					// No existing delegation, proceed
+				}
+				Err(e) => {
+					errors.push(format!("Failed to check existing delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			}
+
+			// Create and sign delegation
+			let delegation = match create_delegation(&commit_config.extra, &duty_pubkey, duty_slot) {
+				Ok(d) => d,
+				Err(e) => {
+					errors.push(format!("Failed to create delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			};
+
+			let signed_delegation = match sign_delegation(commit_config, &delegation, &module_signing_id).await {
+				Ok(sd) => sd,
+				Err(e) => {
+					errors.push(format!("Failed to sign delegation for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			};
+
+			info!("Signed delegation: {:?}", signed_delegation);
+
+			// Post to relay
+			match constraints_client.post_delegation(&signed_delegation).await {
+				Ok(_) => {
+					info!("Successfully posted delegation for slot {}", duty_slot);
+
+					// Store the delegation in the database to prevent future equivocation
+					if let Err(e) = database.store_delegation(duty_slot, &signed_delegation) {
+						warn!("Failed to store delegation for slot {} in database: {}. Delegation was posted successfully but equivocation prevention may not work for this slot.", duty_slot, e);
+					} else {
+						info!("Stored delegation for slot {} in database", duty_slot);
+					}
+
+					posted_count += 1;
+				}
+				Err(e) => {
+					errors.push(format!("Failed to post delegation to relay for slot {}: {}", duty_slot, e));
+					continue;
+				}
+			}
+		}
+	}
+
+	// Return error if any errors occurred during processing
+	if !errors.is_empty() {
+		return Err(eyre::eyre!("Failed to process {} duties: {}", errors.len(), errors.join("; ")));
+	}
+
+	Ok(posted_count)
+}
+
+/// Create a delegation message from configuration
+fn create_delegation(config: &ProposerConfig, proposer_pubkey: &BlsPublicKey, slot: u64) -> Result<Delegation> {
+	let delegate =
+		parse_bls_public_key(&config.delegate_bls_public_key).context("Failed to parse delegate BLS public key")?;
+
+	let committer: Address = config.committer_address.parse().context("Failed to parse committer address")?;
+
+	Ok(Delegation { proposer: proposer_pubkey.clone(), delegate, committer, slot, metadata: Bytes::new() })
+}
+
+/// Sign a delegation message using the consensus BLS key
+async fn sign_delegation(
+	commit_config: &mut StartCommitModuleConfig<ProposerConfig>,
+	delegation: &Delegation,
+	module_signing_id: &B256,
+) -> Result<SignedDelegation> {
+	// Get the delegation message hash
+	let message_hash = delegation.to_message_hash().context("Failed to compute delegation message hash")?;
+
+	// Sign using the consensus BLS signer
+	let bls_response = call_bls_signer(commit_config, message_hash, delegation.proposer.clone(), module_signing_id)
+		.await
+		.context("Failed to sign delegation with BLS signer")?;
+
+	Ok(SignedDelegation {
+		message: delegation.clone(),
+		nonce: bls_response.nonce,
+		signing_id: bls_response.module_signing_id,
+		signature: bls_response.signature,
+	})
+}
+
+/// Parse a BLS public key from hex string
+fn parse_bls_public_key(hex_str: &str) -> Result<BlsPublicKey> {
+	let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+	let bytes = hex::decode(hex_str).context("Failed to decode BLS public key hex")?;
+
+	if bytes.len() != 48 {
+		eyre::bail!("Invalid BLS public key length: expected 48 bytes, got {}", bytes.len());
+	}
+
+	let mut pubkey_bytes = [0u8; 48];
+	pubkey_bytes.copy_from_slice(&bytes);
+
+	BlsPublicKey::deserialize(&pubkey_bytes).map_err(|e| eyre::eyre!("Failed to deserialize BLS public key: {:?}", e))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	const TEST_PROPOSER_KEY: &str =
+		"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6";
+	const TEST_DELEGATE_KEY: &str =
+		"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754";
+	const TEST_COMMITTER: &str = "0x1111111111111111111111111111111111111111";
+
+	#[test]
+	fn test_parse_bls_public_key() {
+		let key = parse_bls_public_key(TEST_PROPOSER_KEY).unwrap();
+		assert_eq!(key.serialize().len(), 48);
+
+		// Test without 0x prefix
+		let key_no_prefix = parse_bls_public_key(TEST_PROPOSER_KEY.strip_prefix("0x").unwrap()).unwrap();
+		assert_eq!(key, key_no_prefix);
+	}
+
+	#[test]
+	fn test_parse_bls_public_key_invalid() {
+		// Too short
+		assert!(parse_bls_public_key("0xaf6e96").is_err());
+
+		// Invalid hex
+		assert!(parse_bls_public_key("0xZZZZ").is_err());
+	}
+
+	#[test]
+	fn test_create_delegation() {
+		let config = ProposerConfig {
+			delegate_bls_public_key: TEST_DELEGATE_KEY.to_string(),
+			committer_address: TEST_COMMITTER.to_string(),
+			relay_url: "http://localhost:3001".to_string(),
+			relay_api_key: None,
+			beacon_api_url: "https://test.com".to_string(),
+			beacon_genesis_timestamp: 1606824023,
+			poll_interval_seconds: 60,
+			module_signing_id: "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+			urc_owner: "0x1111111111111111111111111111111111111111".to_string(),
+			execution_rpc_url: "http://localhost:8545".to_string(),
+			registration_collateral_wei: "1000000000000000000".to_string(),
+			delegation_db_path: "data/test-proposer-delegations-rocksdb".to_string(),
+		};
+
+		let proposer_key = parse_bls_public_key(TEST_PROPOSER_KEY).unwrap();
+		let delegation = create_delegation(&config, &proposer_key, 12345).unwrap();
+
+		assert_eq!(delegation.slot, 12345);
+		assert_eq!(delegation.proposer, proposer_key);
+		assert_eq!(delegation.delegate, parse_bls_public_key(TEST_DELEGATE_KEY).unwrap());
+		assert_eq!(delegation.committer, TEST_COMMITTER.parse::<Address>().unwrap());
+	}
+
+	// Note: Full integration tests with mocked constraints client are in the integration test suite
+	// Unit tests here focus on pure functions that don't require async mocking
+}

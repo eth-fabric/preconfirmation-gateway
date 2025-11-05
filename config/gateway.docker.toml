@@ -1,0 +1,71 @@
+# Gateway Configuration (Docker)
+# This file contains configuration settings for the preconfirmation gateway service running in Docker
+
+# Chain configuration
+chain = "Hoodi"
+
+# PBS (Proposer-Builder Separation) configuration
+[pbs]
+port = 18550
+with_signer = true
+
+# Relays configuration
+[[relays]]
+url = "https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"
+
+# Metrics configuration
+[metrics]
+enabled = true
+
+# Signer configuration
+[signer]
+port = 20000
+
+[signer.local.loader]
+format = "lighthouse"
+keys_path = "./tests/data/keystores/keys"
+secrets_path = "./tests/data/keystores/secrets"
+
+[signer.local.store]
+proxy_dir = "./tests/data/proxy"
+
+# Gateway Module configuration
+[[modules]]
+id = "gateway-module"
+signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Commitments server configuration
+commitments_server_host = "0.0.0.0"
+commitments_server_port = 8080
+commitments_database_path = "./data/commitments-rocksdb"
+module_signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
+log_level = "info"
+enable_method_tracing = true
+traced_methods = ["commitmentRequest", "commitmentResult", "slots", "fee"]
+
+# Gateway orchestration configuration
+relay_url = "http://relay:9999"
+constraints_api_key = ""
+genesis_timestamp = 1606824023 # mainnet
+delegation_database_path = "./data/delegations-rocksdb"
+
+# Execution client configuration
+execution_endpoint_url = "http://localhost:8545"
+execution_request_timeout_secs = 10
+execution_max_retries = 3
+
+# Constraints receivers configuration
+constraints_receivers = ["0x883827193f7627cd04e621e1e8d56498362a52b2a30c9a1c72036eb935c4278dee23d38a24d2f7dda62689886f0c39f4"]
+
+# The gateway's BLS public key for signing constraints
+delegate_public_key = "0xa6bf34f124537d044446171c7ad042eab8c605bdce05cdf161c94ccb8809fd7a394cd87780ceddaa497a3a4f5948cb1c"
+
+# Delegation task configuration
+delegation_check_interval_seconds = 6
+delegation_lookahead_window = 64
+
+
+

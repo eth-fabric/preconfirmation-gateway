@@ -1,0 +1,89 @@
+x-bin-base: &bin-base
+  restart: unless-stopped
+  environment:
+    - RUST_LOG=${RUST_LOG:-info}
+
+services:
+  gateway:
+    <<: *bin-base
+    image: preconfirmation-gateway/gateway:${VERSION:-dev}
+    container_name: gateway
+    environment:
+      - CB_CONFIG=/cb-config.toml
+      - CB_MODULE_ID=${GATEWAY_MODULE_ID:-gateway-module}
+      - CB_SIGNER_JWT=${GATEWAY_JWT}
+      - CB_SIGNER_URL=http://signer:20000
+      - GATEWAY_DEFAULT_BLS_KEY=${GATEWAY_DEFAULT_BLS_KEY}
+    volumes:
+      - ./config/gateway.docker.toml:/cb-config.toml:ro
+    ports:
+      - "127.0.0.1:18080:8080"
+
+  relay:
+    <<: *bin-base
+    image: preconfirmation-gateway/relay:${VERSION:-dev}
+    container_name: relay
+    environment:
+      - RELAY_JWT=${RELAY_JWT}
+    volumes:
+      - ./config/relay.docker.toml:/cb-config.toml:ro
+    command: ["/cb-config.toml"]
+    ports:
+      - "127.0.0.1:8080:9999"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9999/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  proposer:
+    <<: *bin-base
+    image: preconfirmation-gateway/proposer:${VERSION:-dev}
+    container_name: proposer
+    environment:
+      - CB_CONFIG=/cb-config.toml
+      - CB_MODULE_ID=${PROPOSER_MODULE_ID:-proposer-module}
+      - CB_SIGNER_JWT=${PROPOSER_JWT}
+      - CB_SIGNER_URL=http://signer:20000
+      - PROPOSER_METRICS_ADDR=0.0.0.0:9902
+      - PROPOSER_DEFAULT_BLS_KEY=${PROPOSER_DEFAULT_BLS_KEY}
+    volumes:
+      - ./config/proposer.docker.toml:/cb-config.toml:ro
+    ports:
+      - "127.0.0.1:9902:9902"
+
+  spammer:
+    <<: *bin-base
+    image: preconfirmation-gateway/spammer:${VERSION:-dev}
+    container_name: spammer
+    volumes:
+      - ./config/spammer.docker.toml:/app/spammer-config.toml:ro
+
+  signer:
+    <<: *bin-base
+    image: preconfirmation-gateway/signer:${VERSION:-dev}
+    container_name: signer
+    environment:
+      - CB_CONFIG=/cb-config.toml
+      - CB_JWTS=${CB_JWTS}
+      - CB_SIGNER_ADMIN_JWT=${CB_SIGNER_ADMIN_JWT}
+    volumes:
+      - ./config/signer.docker.toml:/cb-config.toml:ro
+      - ./tests/data/keystores/keys:/app/keys:ro
+      - ./tests/data/keystores/secrets:/app/secrets:ro
+      - ./tests/data/proxy:/app/proxy
+    ports:
+      - "127.0.0.1:20000:20000"
+
+  beacon-mock:
+    <<: *bin-base
+    image: preconfirmation-gateway/beacon-mock:${VERSION:-dev}
+    container_name: beacon-mock
+    environment:
+      - BEACON_API_URL=${BEACON_API_URL:-http://0.0.0.0:5052}
+      - PROPOSER_BLS_KEY=${PROPOSER_DEFAULT_BLS_KEY}
+    command: ["--url", "${BEACON_API_URL:-http://0.0.0.0:5052}", "${PROPOSER_DEFAULT_BLS_KEY}"]
+    ports:
+      - "127.0.0.1:5052:5052"
+

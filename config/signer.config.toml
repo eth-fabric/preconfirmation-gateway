@@ -1,0 +1,54 @@
+# Signer Configuration
+# This file contains configuration settings for the preconfirmation gateway service
+
+# Chain configuration
+chain = "Hoodi"
+
+# PBS configuration
+[pbs]
+port = 18550
+with_signer = true
+
+# Relays configuration (required by commit-boost config structure)
+[[relays]]
+url = "https://0xafa4c6985aa049fb79dd37010438cfebeb0f2bd42b115b89dd678dab0670c1de38da0c4e9138c9290a398ecd9a0b3110@boost-relay-hoodi.flashbots.net"
+
+# Metrics configuration
+[metrics]
+enabled = true
+
+# Signer configuration
+[signer]
+port = 20000
+
+[signer.local.loader]
+format = "lighthouse"
+keys_path = "./tests/data/keystores/keys"
+secrets_path = "./tests/data/keystores/secrets"
+
+[signer.local.store]
+proxy_dir = "./tests/data/proxy"
+
+# Gateway Module configuration
+[[modules]]
+id = "gateway-module"
+signing_id = "0x1111111111111111111111111111111111111111111111111111111111111111"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Proposer Module configuration
+[[modules]]
+id = "proposer-module"
+signing_id = "0x2222222222222222222222222222222222222222222222222222222222222222"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
+
+# Relay Module configuration
+[[modules]]
+id = "relay-module"
+signing_id = "0x3333333333333333333333333333333333333333333333333333333333333333"
+type = "commit"
+docker_image = "todo"
+env_file = ".cb.env"
