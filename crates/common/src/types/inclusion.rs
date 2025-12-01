@@ -1,10 +1,8 @@
-use alloy::primitives::{Address, B256, Bytes, Signature};
+use alloy::consensus::{Signed, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip7702, TxLegacy};
+use alloy::primitives::{B256, Bytes};
 use alloy::sol_types::SolValue;
-use alloy_primitives::keccak256;
-use eyre::{Result, WrapErr};
+use eyre::{Result, WrapErr, bail};
 use serde::{Deserialize, Serialize};
-
-use super::MessageType;
 
 /// Payload for commitments/constraints
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,7 +12,7 @@ pub struct InclusionPayload {
 }
 
 impl InclusionPayload {
-	/// ABI-encodes the InclusionPayload struct
+	/// ABI-encodes the InclusionPayload struct for signing commitments
 	pub fn abi_encode(&self) -> Result<Bytes> {
 		alloy::sol! {
 			struct SolInclusionPayload {
@@ -42,12 +40,94 @@ impl InclusionPayload {
 
 		Ok(InclusionPayload { slot: decoded.slot, signed_tx: decoded.signed_tx })
 	}
+
+	/// Returns the transaction hash by trying each supported transaction type
+	/// This hash includes the signature of the transaction so is not the same
+	/// as the hash of the unsigned transaction / the hash for signing commitments
+	pub fn tx_hash(&self) -> Result<B256> {
+		if let Ok(tx) = Signed::<TxEip1559>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(B256::from(tx.hash().as_ref()));
+		}
+
+		if let Ok(tx) = Signed::<TxLegacy>::rlp_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(B256::from(tx.hash().as_ref()));
+		}
+
+		if let Ok(tx) = Signed::<TxEip2930>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(B256::from(tx.hash().as_ref()));
+		}
+
+		if let Ok(tx) = Signed::<TxEip4844>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(B256::from(tx.hash().as_ref()));
+		}
+
+		if let Ok(tx) = Signed::<TxEip7702>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(B256::from(tx.hash().as_ref()));
+		}
+
+		bail!("Failed to decode signed transaction as any known type")
+	}
+
+	/// Returns the gas used by the transaction by trying each supported transaction type
+	pub fn gas(&self) -> Result<u64> {
+		if let Ok(tx) = Signed::<TxEip1559>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(tx.gas_limit());
+		}
+
+		if let Ok(tx) = Signed::<TxLegacy>::rlp_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(tx.gas_limit());
+		}
+
+		if let Ok(tx) = Signed::<TxEip2930>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(tx.gas_limit());
+		}
+
+		if let Ok(tx) = Signed::<TxEip4844>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(tx.gas_limit());
+		}
+
+		if let Ok(tx) = Signed::<TxEip7702>::eip2718_decode(&mut self.signed_tx.as_ref()) {
+			return Ok(tx.gas_limit());
+		}
+
+		bail!("Failed to decode signed transaction as any known type")
+	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use alloy::primitives::keccak256;
+
+	pub fn create_valid_signed_transaction() -> Bytes {
+		use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
+		use alloy::eips::eip2718::Encodable2718;
+		use alloy::primitives::{Address, Bytes, TxKind, U256};
+		use alloy::signers::{SignerSync, local::PrivateKeySigner};
+		use alloy_consensus::SignableTransaction;
+
+		let signer = PrivateKeySigner::random();
+		let tx = TxEip1559 {
+			chain_id: 1,
+			nonce: 0,
+			gas_limit: 21000,
+			max_fee_per_gas: 20_000_000_000u128,
+			max_priority_fee_per_gas: 2_000_000_000u128,
+			to: TxKind::Call(Address::from([0x01; 20])),
+			value: U256::from(1_000_000_000_000_000_000u64),
+			input: Bytes::new(),
+			access_list: Default::default(),
+		};
+
+		// Create a mock signature that will pass the format validation
+		let encoded_tx = tx.encoded_for_signing();
+		let signature = signer.sign_message_sync(&encoded_tx).expect("Failed to sign message");
+		let signed_tx = Signed::new_unhashed(tx, signature);
+		let tx_envelope = TxEnvelope::Eip1559(signed_tx);
+		let mut encoded_tx = Vec::new();
+		tx_envelope.encode_2718(&mut encoded_tx);
+		Bytes::from(encoded_tx)
+	}
 
 	#[test]
 	fn test_abi_encode_inclusion_payload() -> Result<()> {
@@ -82,6 +162,15 @@ mod tests {
 
 		println!("Original: {:?}", original_payload);
 		println!("Decoded: {:?}", decoded);
+		Ok(())
+	}
+
+	#[test]
+	fn test_tx_helpers() -> Result<()> {
+		let signed_tx = create_valid_signed_transaction();
+		let payload = InclusionPayload { slot: 12345, signed_tx };
+		payload.tx_hash().unwrap();
+		payload.gas().unwrap();
 		Ok(())
 	}
 }

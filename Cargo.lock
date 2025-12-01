@@ -2140,6 +2140,7 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "alloy",
+ "alloy-consensus",
  "alloy-primitives 1.4.0",
  "blst",
  "cb-common",

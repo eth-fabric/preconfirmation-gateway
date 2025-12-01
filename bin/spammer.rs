@@ -12,8 +12,8 @@ use tokio::time;
 use tracing::{error, info};
 
 use alloy::consensus::{SignableTransaction, Signed, TxEip1559, TxEnvelope};
+use alloy::eips::eip2718::Encodable2718;
 use alloy::primitives::{Address, Bytes, TxKind, U256};
-use alloy::rlp::Encodable;
 use alloy::signers::{SignerSync, local::PrivateKeySigner};
 use lazy_static::lazy_static;
 use prometheus::{IntCounter, Registry, opts};
@@ -80,7 +80,7 @@ fn generate_signed_transaction(config: &SpammerConfig, signer: &PrivateKeySigner
 
 	// RLP encode
 	let mut encoded = Vec::new();
-	tx_envelope.encode(&mut encoded);
+	tx_envelope.encode_2718(&mut encoded);
 
 	Ok(Bytes::from(encoded))
 }

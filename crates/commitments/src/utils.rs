@@ -434,8 +434,8 @@ pub fn verify_commitment_signature(
 /// This can be reused across tests to generate properly formatted signed transactions
 pub fn create_valid_signed_transaction() -> Bytes {
 	use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
+	use alloy::eips::eip2718::Encodable2718;
 	use alloy::primitives::{Address, Bytes, TxKind, U256};
-	use alloy::rlp::Encodable;
 	use alloy::signers::{SignerSync, local::PrivateKeySigner};
 
 	let signer = PrivateKeySigner::random();
@@ -457,7 +457,7 @@ pub fn create_valid_signed_transaction() -> Bytes {
 	let signed_tx = Signed::new_unhashed(tx, signature);
 	let tx_envelope = TxEnvelope::Eip1559(signed_tx);
 	let mut encoded_tx = Vec::new();
-	tx_envelope.encode(&mut encoded_tx);
+	tx_envelope.encode_2718(&mut encoded_tx);
 	Bytes::from(encoded_tx)
 }
 
