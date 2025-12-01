@@ -57,7 +57,7 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<Inclus
 			}
 
 			// Validate signed_tx format and signature
-			verify_signed_tx(&inclusion_payload.signed_tx)?;
+			inclusion_payload.verify_signature()?;
 
 			debug!("Commitment request validation passed");
 			Ok(inclusion_payload)
@@ -66,40 +66,6 @@ pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<Inclus
 			return Err(eyre::eyre!("Invalid payload format: {}", e));
 		}
 	}
-}
-
-/// Decodes an RLP-encoded signed transaction into a TxEnvelope
-///
-/// This helper function extracts the transaction decoding logic so it can be reused
-/// for both verification and conversion to RPC requests.
-///
-/// # Parameters
-///
-/// * `signed_tx` - The RLP-encoded signed transaction bytes
-///
-/// # Returns
-///
-/// The decoded `TxEnvelope` containing the transaction data and signature
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - The signed transaction is empty
-/// - The transaction cannot be decoded (invalid RLP format)
-pub fn decode_signed_tx(signed_tx: &Bytes) -> Result<TxEnvelope> {
-	debug!("Decoding signed transaction");
-
-	// Basic validation: ensure the transaction is not empty
-	if signed_tx.is_empty() {
-		return Err(eyre::eyre!("Signed transaction cannot be empty"));
-	}
-
-	// Try to decode the transaction using Alloy's consensus types
-	let tx_envelope =
-		TxEnvelope::decode(&mut signed_tx.as_ref()).wrap_err("Failed to decode transaction from RLP bytes")?;
-
-	debug!("Successfully decoded transaction envelope, type: {:?}", tx_envelope.tx_type());
-	Ok(tx_envelope)
 }
 
 /// Converts a TxEnvelope to a TransactionRequest suitable for eth_estimateGas
@@ -239,21 +205,6 @@ pub fn tx_envelope_to_rpc_request(tx_envelope: &TxEnvelope) -> Result<alloy::rpc
 	Ok(tx_request)
 }
 
-/// Verifies a signed transaction by decoding it and validating the signature
-pub fn verify_signed_tx(signed_tx: &Bytes) -> Result<()> {
-	debug!("Verifying signed transaction");
-
-	// Decode the transaction
-	let tx_envelope = decode_signed_tx(signed_tx)?;
-
-	// Verify the signature by recovering the signer
-	// This will return an error if the signature is invalid
-	tx_envelope.recover_signer().map_err(|e| eyre::eyre!("Failed to recover signer - invalid signature: {}", e))?;
-
-	debug!("Transaction signature verified");
-	Ok(())
-}
-
 /// Calculates fee information for a commitment request using RPC calls
 ///
 /// This function:
@@ -283,7 +234,7 @@ pub async fn calculate_fee_info<T: GatewayConfig>(
 		InclusionPayload::abi_decode(&request.payload).wrap_err("Failed to decode InclusionPayload from request")?;
 
 	// 2. Decode the signed transaction
-	let tx_envelope = decode_signed_tx(&inclusion_payload.signed_tx)?;
+	let tx_envelope = inclusion_payload.decode_transaction()?;
 
 	// 3. Convert to TransactionRequest for gas estimation
 	let tx_request = tx_envelope_to_rpc_request(&tx_envelope)?;
@@ -606,15 +557,15 @@ mod tests {
 	fn test_verify_signed_tx() -> Result<()> {
 		// Test with empty transaction (should fail)
 		let empty_tx = Bytes::new();
-		assert!(verify_signed_tx(&empty_tx).is_err());
+		assert!(InclusionPayload { slot: 100, signed_tx: empty_tx }.verify_signature().is_err());
 
 		// Test with invalid transaction data (should fail)
 		let invalid_tx = Bytes::from(vec![0x01, 0x02, 0x03]);
-		assert!(verify_signed_tx(&invalid_tx).is_err());
+		assert!(InclusionPayload { slot: 100, signed_tx: invalid_tx }.verify_signature().is_err());
 
 		// Test with a properly RLP-encoded transaction (should pass)
 		let valid_tx = create_valid_signed_transaction();
-		assert!(verify_signed_tx(&valid_tx).is_ok());
+		assert!(InclusionPayload { slot: 100, signed_tx: valid_tx }.verify_signature().is_ok());
 
 		println!("verify_signed_tx tests passed");
 		Ok(())

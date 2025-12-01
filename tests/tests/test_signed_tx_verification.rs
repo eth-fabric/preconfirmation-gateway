@@ -1,5 +1,5 @@
 use alloy::primitives::Bytes;
-use commitments::utils::verify_signed_tx;
+use common::types::InclusionPayload;
 use eyre::Result;
 use integration_tests::test_common::TestHarness;
 
@@ -12,8 +12,10 @@ async fn test_create_signed_tx_passes_verification() -> Result<()> {
 	let signed_tx_bytes = harness.create_signed_tx();
 	let signed_tx = Bytes::from(signed_tx_bytes);
 
+	let inclusion_payload = InclusionPayload { slot: 12345, signed_tx: signed_tx };
+
 	// Verify it passes the signature verification
-	let result = verify_signed_tx(&signed_tx);
+	let result = inclusion_payload.verify_signature();
 	assert!(result.is_ok(), "Signed transaction should pass verification: {:?}", result);
 
 	println!("Signed transaction passed verification");

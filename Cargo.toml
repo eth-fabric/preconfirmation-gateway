@@ -46,10 +46,18 @@ color-eyre = "0.6"
 urc = { path = "./crates/common/bindings/urc" }
 hex = "0.4"
 axum = { version = "0.8", features = ["macros", "multipart"] }
+reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
 tempfile = "3.8"
 prometheus = "0.14.0"
 lazy_static = "1.5.0"
 indexmap = "2.2.6"
+
+# for merkle proofs
+reth-trie = { git = "https://github.com/paradigmxyz/reth", rev = "42197415102b7a20be42e4fe919f024b81ceb55b" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "42197415102b7a20be42e4fe919f024b81ceb55b" }
+eth_trie = "0.4.0"
+ethereum-types = "0.14.1"
+alloy-rlp = "0.3.10"
 
 [patch.crates-io]
 blstrs_plus = { git = "https://github.com/Commit-Boost/blstrs" }

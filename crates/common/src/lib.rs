@@ -11,6 +11,7 @@ pub mod constants;
 pub mod db;
 pub mod execution;
 pub mod logging;
+pub mod proofs;
 pub mod signer;
 pub mod slot_timer;
 pub mod types;

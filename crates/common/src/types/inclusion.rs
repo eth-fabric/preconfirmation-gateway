@@ -1,7 +1,12 @@
-use alloy::consensus::{Signed, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip7702, TxLegacy};
+use alloy::consensus::{
+	Signed, Transaction, TxEip1559, TxEip2930, TxEip4844, TxEip7702, TxEnvelope, TxLegacy,
+	transaction::SignerRecoverable,
+};
 use alloy::primitives::{B256, Bytes};
 use alloy::sol_types::SolValue;
+use alloy_rlp::Decodable;
 use eyre::{Result, WrapErr, bail};
+use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 
 /// Payload for commitments/constraints
@@ -39,6 +44,24 @@ impl InclusionPayload {
 		let decoded = SolInclusionPayload::abi_decode(data).wrap_err("Failed to decode InclusionPayload")?;
 
 		Ok(InclusionPayload { slot: decoded.slot, signed_tx: decoded.signed_tx })
+	}
+
+	/// Decodes an RLP-encoded signed transaction into a TxEnvelope
+	pub fn decode_transaction(&self) -> Result<TxEnvelope> {
+		let tx_envelope =
+			TxEnvelope::decode(&mut self.signed_tx.as_ref()).wrap_err("Failed to decode transaction from RLP bytes")?;
+		Ok(tx_envelope)
+	}
+
+	pub fn decode_transaction_signed(&self) -> Result<TransactionSigned> {
+		let signed = TransactionSigned::from(self.decode_transaction()?);
+		Ok(signed)
+	}
+
+	pub fn verify_signature(&self) -> Result<()> {
+		let tx_envelope = self.decode_transaction()?;
+		tx_envelope.recover_signer().wrap_err("Failed to recover signer - invalid signature")?;
+		Ok(())
 	}
 
 	/// Returns the transaction hash by trying each supported transaction type
@@ -92,19 +115,13 @@ impl InclusionPayload {
 
 		bail!("Failed to decode signed transaction as any known type")
 	}
-}
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	use alloy::primitives::keccak256;
-
-	pub fn create_valid_signed_transaction() -> Bytes {
-		use alloy::consensus::{Signed, TxEip1559, TxEnvelope};
+	/// Useful for testing
+	pub fn random() -> Self {
+		use alloy::consensus::{SignableTransaction, Signed, TxEip1559, TxEnvelope};
 		use alloy::eips::eip2718::Encodable2718;
 		use alloy::primitives::{Address, Bytes, TxKind, U256};
 		use alloy::signers::{SignerSync, local::PrivateKeySigner};
-		use alloy_consensus::SignableTransaction;
 
 		let signer = PrivateKeySigner::random();
 		let tx = TxEip1559 {
@@ -126,8 +143,15 @@ mod tests {
 		let tx_envelope = TxEnvelope::Eip1559(signed_tx);
 		let mut encoded_tx = Vec::new();
 		tx_envelope.encode_2718(&mut encoded_tx);
-		Bytes::from(encoded_tx)
+		InclusionPayload { slot: 12345, signed_tx: Bytes::from(encoded_tx) }
 	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use alloy::primitives::keccak256;
+	use alloy_consensus::TxType;
 
 	#[test]
 	fn test_abi_encode_inclusion_payload() -> Result<()> {
@@ -167,10 +191,14 @@ mod tests {
 
 	#[test]
 	fn test_tx_helpers() -> Result<()> {
-		let signed_tx = create_valid_signed_transaction();
-		let payload = InclusionPayload { slot: 12345, signed_tx };
+		let payload = InclusionPayload::random();
 		payload.tx_hash().unwrap();
 		payload.gas().unwrap();
+
+		let decoded_tx = payload.decode_transaction().unwrap();
+		assert_eq!(decoded_tx.tx_type(), TxType::Eip1559);
+
+		payload.verify_signature().unwrap();
 		Ok(())
 	}
 }
