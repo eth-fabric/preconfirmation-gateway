@@ -2,7 +2,6 @@ pub mod beacon;
 pub mod commitments;
 pub mod constraints;
 pub mod database;
-pub mod requests;
 pub mod responses;
 pub mod urc;
 
@@ -16,7 +15,6 @@ pub use constraints::{
 	ExecutionPayload, SignedConstraints, SignedDelegation, SubmitBlockRequest, SubmitBlockRequestWithProofs,
 };
 pub use database::DatabaseContext;
-pub use requests::{ProcessConstraintsRequest, ProcessDelegationsRequest};
 pub use responses::{
 	GetDelegationsResponse, HealthResponse, ProcessConstraintsResponse, ProcessDelegationsResponse, SlotInfoResponse,
 };
