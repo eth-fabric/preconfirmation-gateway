@@ -1,7 +1,7 @@
 use common::constants::COMMITMENT_TYPE;
 use common::types::CommitmentRequest;
+use common::types::InclusionPayload;
 use common::types::beacon::BeaconTiming;
-use common::types::commitments::InclusionPayload;
 use eyre::{Result, WrapErr};
 use jsonrpsee::core::client::ClientT;
 use jsonrpsee::http_client::HttpClientBuilder;

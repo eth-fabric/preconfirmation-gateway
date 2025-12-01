@@ -13,7 +13,8 @@ use tracing::{debug, info};
 
 use common::constants::{COMMITMENT_TYPE, CONSTRAINT_TYPE};
 use common::signer;
-use common::types::commitments::{FeePayload, InclusionPayload};
+use common::types::InclusionPayload;
+use common::types::commitments::FeePayload;
 use common::types::{Commitment, CommitmentRequest, Constraint, FeeInfo, SignedCommitment};
 
 /// Helper functions for RPC business logic

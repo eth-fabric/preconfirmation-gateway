@@ -8,7 +8,7 @@ use commit_boost::prelude::StartCommitModuleConfig;
 use commitments::CommitmentsServerState;
 use common::config::InclusionGatewayConfig;
 use common::slot_timer::SlotTimer;
-use common::types::commitments::InclusionPayload;
+use common::types::InclusionPayload;
 use common::types::{Commitment, CommitmentRequest, DatabaseContext, SignedCommitment};
 use eyre::Result;
 use rand::Rng;
@@ -673,7 +673,7 @@ impl TestHarness {
 		signed_tx: Vec<u8>,
 		slasher: Address,
 	) -> Result<common::types::CommitmentRequest> {
-		use common::types::commitments::InclusionPayload;
+		use common::types::InclusionPayload;
 
 		let inclusion_payload = InclusionPayload { slot, signed_tx: signed_tx.into() };
 		let payload = inclusion_payload.abi_encode()?;
