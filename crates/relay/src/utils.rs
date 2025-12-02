@@ -1,5 +1,3 @@
-use alloy::consensus::TxEnvelope;
-use alloy::eips::eip2718::Decodable2718;
 use alloy::primitives::Address;
 use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey, Chain};
 use common::constants::{INCLUSION_CONSTRAINT_TYPE, MAX_CONSTRAINTS_PER_SLOT};
@@ -10,7 +8,6 @@ use common::types::{
 	SignedDelegation, SubmitBlockRequestWithProofs,
 };
 use eyre::{eyre, Result};
-use reth_primitives::TransactionSigned;
 use tracing::{debug, error, info};
 
 /// Verify BLS signature on a SignedConstraints message using the delegate public key from the message
@@ -132,8 +129,8 @@ pub fn validate_is_proposer(
 	}
 }
 
-pub fn handle_proof_validation<T: cb_common::pbs::EthSpec>(
-	block_request: &SubmitBlockRequestWithProofs<T>,
+pub fn handle_proof_validation(
+	block_request: &SubmitBlockRequestWithProofs,
 	signed_constraints: &[SignedConstraints],
 ) -> Result<()> {
 	if block_request.proofs.constraint_types.len() != block_request.proofs.payloads.len() {
@@ -151,7 +148,7 @@ pub fn handle_proof_validation<T: cb_common::pbs::EthSpec>(
 	// Only one signed constraint is checked
 	// Extra signed constraints only exist in DB as evidence to slash for equivocation
 	if signed_constraints.len() == 0 {
-		return Err(eyre!("No signed constraints found for slot {}", block_request.message.slot));
+		return Err(eyre!("No signed constraints found for slot {}", block_request.slot()));
 	}
 
 	// We first verify the proof corresponds to the constraints
@@ -160,16 +157,7 @@ pub fn handle_proof_validation<T: cb_common::pbs::EthSpec>(
 
 	// We then verify the validity of the proofs
 	// For now we assume all constraints are inclusion constraints
-	// Decode raw transaction bytes from execution payload into TransactionSigned
-	let transactions: Vec<TransactionSigned> = block_request
-		.execution_payload
-		.transactions
-		.iter()
-		.map(|tx_bytes| {
-			let tx_envelope = TxEnvelope::decode_2718(&mut tx_bytes.as_ref())?;
-			Ok(TransactionSigned::from(tx_envelope))
-		})
-		.collect::<Result<Vec<_>>>()?;
+	let transactions = block_request.transactions()?;
 
 	// Reconstruct transaction trie and verify merkle inclusion proofs
 	let mut builder = TransactionTrieBuilder::build(&transactions)?;

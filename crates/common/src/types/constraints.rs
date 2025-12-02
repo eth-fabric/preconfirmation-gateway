@@ -1,17 +1,17 @@
+use alloy::eips::eip2718::Decodable2718;
 use alloy::primitives::{Address, B256, Bytes};
 use alloy::sol_types::SolValue;
 use alloy_primitives::keccak256;
+use alloy_rpc_types_beacon::relay::SubmitBlockRequest as AlloySubmitBlockRequest;
 use eyre::Result;
+use eyre::eyre;
+use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use ::urc::registry::BLS::G1Point;
 use commit_boost::prelude::BlsPublicKey;
 use urc::registry::ISlasher::Delegation as SolDelegation;
-
-// Import PBS types from commit-boost common crate
-// ExecutionPayload and BlobsBundle are generic over EthSpec for different fork versions
-pub use cb_common::pbs::{BlobsBundle, ExecutionPayload};
 
 use super::{MessageType, convert_pubkey_to_g1_point};
 
@@ -144,10 +144,6 @@ pub struct ConstraintCapabilities {
 	pub constraint_types: Vec<u64>,
 }
 
-// ===== Block submission types for relay API =====
-// These types match the relay-specs API and are JSON-compatible.
-// They align with commit-boost's ExecutionPayload structure.
-
 /// Proofs of constraint validity for a block
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstraintProofs {
@@ -156,79 +152,52 @@ pub struct ConstraintProofs {
 	pub payloads: Vec<Bytes>,
 }
 
-/// BidTrace message from builder block submission (relay-specs)
-/// Contains the bid metadata for a block submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BidTrace {
-	pub slot: String,
-	pub parent_hash: String,
-	pub block_hash: String,
-	pub builder_pubkey: String,
-	pub proposer_pubkey: String,
-	pub proposer_fee_recipient: String,
-	pub gas_limit: String,
-	pub gas_used: String,
-	pub value: String,
-}
-
-/// Block submission request using commit-boost types
-/// Generic over EthSpec to support different fork versions (Bellatrix, Capella, Deneb, Electra)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitBlockRequest<T: cb_common::pbs::EthSpec> {
-	/// Bid trace with block metadata
-	pub message: BidTrace,
-	/// Execution payload from commit-boost (fork-specific via EthSpec)
-	pub execution_payload: ExecutionPayload<T>,
-	/// Builder's BLS signature
-	pub signature: String,
-	/// Blobs bundle (Deneb+, optional for earlier forks)
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub blobs_bundle: Option<BlobsBundle<T>>,
-}
-
-impl<T: cb_common::pbs::EthSpec> SubmitBlockRequest<T> {
-	/// Extract the slot from the BidTrace message
-	pub fn slot(&self) -> Result<u64, eyre::Error> {
-		self.message.slot.parse().map_err(|e| eyre::eyre!("Failed to parse slot: {}", e))
-	}
-}
-
-/// Block submission request with proofs of constraint validity
-/// Extends SubmitBlockRequest with constraint proofs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubmitBlockRequestWithProofs<T: cb_common::pbs::EthSpec> {
-	/// Bid trace with block metadata
-	pub message: BidTrace,
-	/// Execution payload from commit-boost (fork-specific via EthSpec)
-	pub execution_payload: ExecutionPayload<T>,
-	/// Builder's BLS signature
-	pub signature: String,
-	/// Blobs bundle (Deneb+, optional for earlier forks)
-	#[serde(skip_serializing_if = "Option::is_none")]
-	pub blobs_bundle: Option<BlobsBundle<T>>,
-	/// Proofs of constraint validity for this block
+pub struct SubmitBlockRequestWithProofs {
+	#[serde(flatten)]
+	pub message: AlloySubmitBlockRequest,
 	pub proofs: ConstraintProofs,
 }
 
-impl<T: cb_common::pbs::EthSpec> SubmitBlockRequestWithProofs<T> {
-	/// Extract the slot from the BidTrace message
-	pub fn slot(&self) -> Result<u64, eyre::Error> {
-		self.message.slot.parse().map_err(|e| eyre::eyre!("Failed to parse slot: {}", e))
+impl SubmitBlockRequestWithProofs {
+	pub fn slot(&self) -> u64 {
+		self.message.bid_trace().slot
 	}
 
-	/// Get reference to the proofs
-	pub fn proofs(&self) -> &ConstraintProofs {
-		&self.proofs
+	pub fn into_block_request(self) -> AlloySubmitBlockRequest {
+		self.message
 	}
 
-	/// Convert to standard SubmitBlockRequest (without proofs) for upstream relay
-	pub fn into_block_request(self) -> SubmitBlockRequest<T> {
-		SubmitBlockRequest {
-			message: self.message,
-			execution_payload: self.execution_payload,
-			signature: self.signature,
-			blobs_bundle: self.blobs_bundle,
+	pub fn transactions(&self) -> Result<Vec<TransactionSigned>> {
+		// Extract transaction bytes from the appropriate variant
+		let tx_bytes_list = match &self.message {
+			AlloySubmitBlockRequest::Electra(request) => {
+				&request.execution_payload.payload_inner.payload_inner.transactions
+			}
+			AlloySubmitBlockRequest::Fulu(request) => {
+				&request.execution_payload.payload_inner.payload_inner.transactions
+			}
+			AlloySubmitBlockRequest::Deneb(request) => {
+				&request.execution_payload.payload_inner.payload_inner.transactions
+			}
+			AlloySubmitBlockRequest::Capella(request) => &request.execution_payload.payload_inner.transactions,
+		};
+
+		// Decode transactions
+		let mut transactions = Vec::new();
+
+		for tx_bytes in tx_bytes_list {
+			// Decode directly as reth TransactionSigned
+			let tx = TransactionSigned::decode_2718(&mut tx_bytes.as_ref())
+				.map_err(|e| eyre!("Failed to decode transaction: {}", e))?;
+			transactions.push(tx);
 		}
+
+		if transactions.is_empty() {
+			return Err(eyre!("No transactions in execution payload"));
+		}
+
+		Ok(transactions)
 	}
 }
 

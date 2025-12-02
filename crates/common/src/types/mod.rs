@@ -12,8 +12,8 @@ pub use beacon::{
 };
 pub use commitments::{Commitment, CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo};
 pub use constraints::{
-	BidTrace, BlobsBundle, Constraint, ConstraintCapabilities, ConstraintProofs, ConstraintsMessage, Delegation,
-	ExecutionPayload, SignedConstraints, SignedDelegation, SubmitBlockRequest, SubmitBlockRequestWithProofs,
+	Constraint, ConstraintCapabilities, ConstraintProofs, ConstraintsMessage, Delegation, SignedConstraints,
+	SignedDelegation, SubmitBlockRequestWithProofs,
 };
 
 pub use database::DatabaseContext;

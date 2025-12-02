@@ -506,11 +506,11 @@ pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<Heal
 }
 
 /// POST /constraints/v0/relay/blocks_with_proofs - Submit block with proofs
-pub async fn submit_blocks_with_proofs_handler<T: cb_common::pbs::EthSpec + serde::Serialize>(
+pub async fn submit_blocks_with_proofs_handler(
 	State(state): State<RelayState>,
 	axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 	headers: HeaderMap,
-	Json(block_request): Json<SubmitBlockRequestWithProofs<T>>,
+	Json(block_request): Json<SubmitBlockRequestWithProofs>,
 ) -> StatusCode {
 	const EP: &str = common::constants::routes::relay::BLOCKS_WITH_PROOFS;
 	const METHOD: &str = "POST";
@@ -521,16 +521,7 @@ pub async fn submit_blocks_with_proofs_handler<T: cb_common::pbs::EthSpec + serd
 	let cancellations = params.get("cancellations").and_then(|v| v.parse::<bool>().ok()).unwrap_or(false);
 
 	// Get the slot
-	let slot = match block_request.slot() {
-		Ok(slot) => slot,
-		Err(e) => {
-			error!("Failed to parse slot: {}", e);
-			let code = StatusCode::BAD_REQUEST;
-			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
-			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
-			return code;
-		}
-	};
+	let slot = block_request.slot();
 
 	info!("Received block submission with proofs for slot {}, cancellations: {}", slot, cancellations);
 

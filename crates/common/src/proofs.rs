@@ -6,7 +6,7 @@ use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::types::{Constraint, ConstraintProofs};
+use crate::types::ConstraintProofs;
 
 /// Merkle inclusion proof for an inclusion payload
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -30,6 +30,8 @@ cb-common = { workspace = true }
 # Alloy for primitives
 alloy = { workspace = true }
 
+alloy-rpc-types-beacon = { workspace = true }
+
 # For transaction decoding
 reth-primitives = { workspace = true }
 

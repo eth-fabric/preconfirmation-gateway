@@ -1,16 +1,18 @@
 use eyre::Result;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 use alloy::primitives::B256;
 use commit_boost::prelude::{BlsPublicKey, StartCommitModuleConfig};
+
 use common::config::{GatewayConfig, InclusionGatewayConfig};
 use common::slot_timer::{SlotTimer, CONSTRAINT_TRIGGER_OFFSET, SLOT_TIME_SECONDS};
 use common::types::{DatabaseContext, ProcessConstraintsResponse};
 use constraints::client::ConstraintsClient;
 use constraints::utils::{create_constraints_message, create_signed_constraints};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use crate::metrics::{CONSTRAINTS_DB_OPERATIONS_TOTAL, CONSTRAINTS_POSTS_TOTAL, CONSTRAINTS_POST_LATENCY_SECONDS};
 

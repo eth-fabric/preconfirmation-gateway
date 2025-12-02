@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use common::constants::{INCLUSION_CONSTRAINT_TYPE, INCLUSION_INCLUSION_COMMITMENT_TYPE};
+use common::constants::{INCLUSION_COMMITMENT_TYPE, INCLUSION_CONSTRAINT_TYPE};
 use integration_tests::test_common::TestHarness;
 
 /// End-to-end integration tests with both commitments and relay services running
