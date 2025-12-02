@@ -1,5 +1,5 @@
 use alloy::primitives::{Address, B256};
-use common::constants::COMMITMENT_TYPE;
+use common::constants::INCLUSION_COMMITMENT_TYPE;
 use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Tests for the commitmentResult RPC handler
@@ -53,7 +53,7 @@ async fn test_retrieve_commitment_by_request_hash() {
 
 	assert!(retrieved.is_some());
 	let retrieved_commitment = retrieved.unwrap();
-	assert_eq!(retrieved_commitment.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(retrieved_commitment.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(retrieved_commitment.commitment.slasher, slasher);
 	assert_eq!(retrieved_commitment.commitment.request_hash, signed_commitment.commitment.request_hash);
 	assert_eq!(retrieved_commitment.nonce, signed_commitment.nonce);

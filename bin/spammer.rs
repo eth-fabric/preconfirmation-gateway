@@ -1,4 +1,4 @@
-use common::constants::COMMITMENT_TYPE;
+use common::constants::INCLUSION_COMMITMENT_TYPE;
 use common::types::CommitmentRequest;
 use common::types::InclusionPayload;
 use common::types::beacon::BeaconTiming;
@@ -103,7 +103,7 @@ fn create_commitment_request(config: &SpammerConfig, signed_tx: Bytes) -> Result
 		Address::random()
 	};
 
-	Ok(CommitmentRequest { commitment_type: COMMITMENT_TYPE, payload, slasher })
+	Ok(CommitmentRequest { commitment_type: INCLUSION_COMMITMENT_TYPE, payload, slasher })
 }
 
 /// Send a commitment request via RPC

@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use common::constants::{COMMITMENT_TYPE, CONSTRAINT_TYPE};
+use common::constants::{INCLUSION_CONSTRAINT_TYPE, INCLUSION_INCLUSION_COMMITMENT_TYPE};
 use integration_tests::test_common::TestHarness;
 
 /// End-to-end integration tests with both commitments and relay services running
@@ -52,7 +52,7 @@ async fn test_complete_preconfirmation_workflow() {
 
 	let commitment_result = client.commitment_request(&commitment_request).await.unwrap();
 
-	assert_eq!(commitment_result.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(commitment_result.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(commitment_result.commitment.slasher, slasher);
 	assert!(commitment_result.nonce > 0);
 	println!("Commitment created with hash: {:?}", commitment_result.commitment.request_hash);
@@ -110,7 +110,7 @@ async fn test_complete_preconfirmation_workflow() {
 
 	// Verify constraint details
 	let constraint = &signed_constraints.message.constraints[0];
-	assert_eq!(constraint.constraint_type, CONSTRAINT_TYPE);
+	assert_eq!(constraint.constraint_type, INCLUSION_CONSTRAINT_TYPE);
 	assert!(!constraint.payload.is_empty());
 	println!("Constraint type and payload verified");
 

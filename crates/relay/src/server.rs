@@ -7,6 +7,7 @@ use axum::{
 	routing::{get, post},
 	Router,
 };
+use cb_common::pbs::ElectraSpec;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -151,7 +152,7 @@ pub async fn run_relay_server(config: RelayConfig, database: DatabaseContext) ->
 		.route(relay::DELEGATIONS_SLOT, get(get_delegations_handler))
 		.route(relay::CONSTRAINTS, post(store_constraints_handler))
 		.route(relay::CONSTRAINTS_SLOT, get(get_constraints_for_slot_handler))
-		.route(relay::BLOCKS_WITH_PROOFS, post(submit_blocks_with_proofs_handler))
+		.route(relay::BLOCKS_WITH_PROOFS, post(submit_blocks_with_proofs_handler::<ElectraSpec>))
 		.route(constraints::BUILDER_CAPABILITIES, get(capabilities_handler))
 		.route(relay::HEALTH, get(health_handler))
 		.route("/metrics", get(metrics_handler))

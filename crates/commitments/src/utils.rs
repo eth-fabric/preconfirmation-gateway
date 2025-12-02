@@ -1,9 +1,7 @@
 use alloy::consensus::TxEnvelope;
 use alloy::network::TransactionBuilder;
 use alloy::primitives::{Address, B256, Bytes, U256, keccak256};
-use alloy::rlp::Decodable;
 use alloy_consensus::SignableTransaction;
-use alloy_consensus::transaction::SignerRecoverable;
 use commit_boost::prelude::StartCommitModuleConfig;
 use common::config::GatewayConfig;
 use eyre::{Result, WrapErr};
@@ -11,7 +9,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
-use common::constants::{COMMITMENT_TYPE, CONSTRAINT_TYPE};
+use common::constants::{INCLUSION_COMMITMENT_TYPE, INCLUSION_CONSTRAINT_TYPE};
 use common::signer;
 use common::types::InclusionPayload;
 use common::types::commitments::FeePayload;
@@ -22,10 +20,10 @@ use common::types::{Commitment, CommitmentRequest, Constraint, FeeInfo, SignedCo
 
 /// Validates a commitment request and returns the decoded InclusionPayload
 pub fn validate_commitment_request(request: &CommitmentRequest) -> Result<InclusionPayload> {
-	if request.commitment_type != COMMITMENT_TYPE {
+	if request.commitment_type != INCLUSION_COMMITMENT_TYPE {
 		return Err(eyre::eyre!(
 			"Invalid commitment type: expected {}, got {}",
-			COMMITMENT_TYPE,
+			INCLUSION_COMMITMENT_TYPE,
 			request.commitment_type
 		));
 	}
@@ -316,7 +314,7 @@ pub fn create_constraint_from_commitment_request(request: &CommitmentRequest, sl
 	info!("Creating constraint from commitment request for slot {}", slot);
 
 	// Create the constraint with the same payload but constraint type
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: request.payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: request.payload.clone() };
 
 	info!(
 		"Created constraint with type {} and payload length {} for slot {}",

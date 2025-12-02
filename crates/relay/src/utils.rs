@@ -1,8 +1,16 @@
+use alloy::consensus::TxEnvelope;
+use alloy::eips::eip2718::Decodable2718;
 use alloy::primitives::Address;
 use commit_boost::prelude::{verify_proposer_commitment_signature_bls_for_message, BlsPublicKey, Chain};
+use common::constants::{INCLUSION_CONSTRAINT_TYPE, MAX_CONSTRAINTS_PER_SLOT};
+use common::proofs::{InclusionProof, TransactionTrieBuilder};
 use common::slot_timer::SlotTimer;
-use common::types::{ConstraintsMessage, Delegation, SignedConstraints, SignedDelegation};
-use eyre::Result;
+use common::types::{
+	Constraint, ConstraintProofs, ConstraintsMessage, Delegation, InclusionPayload, SignedConstraints,
+	SignedDelegation, SubmitBlockRequestWithProofs,
+};
+use eyre::{eyre, Result};
+use reth_primitives::TransactionSigned;
 use tracing::{debug, error, info};
 
 /// Verify BLS signature on a SignedConstraints message using the delegate public key from the message
@@ -122,6 +130,86 @@ pub fn validate_is_proposer(
 			Ok(false)
 		}
 	}
+}
+
+pub fn handle_proof_validation<T: cb_common::pbs::EthSpec>(
+	block_request: &SubmitBlockRequestWithProofs<T>,
+	signed_constraints: &[SignedConstraints],
+) -> Result<()> {
+	if block_request.proofs.constraint_types.len() != block_request.proofs.payloads.len() {
+		return Err(eyre!("Constraint types and payloads length mismatch"));
+	}
+
+	if block_request.proofs.constraint_types.len() > MAX_CONSTRAINTS_PER_SLOT {
+		return Err(eyre!(
+			"Too many proofs: {} exceeds maximum of {}",
+			block_request.proofs.constraint_types.len(),
+			MAX_CONSTRAINTS_PER_SLOT
+		));
+	}
+
+	// Only one signed constraint is checked
+	// Extra signed constraints only exist in DB as evidence to slash for equivocation
+	if signed_constraints.len() == 0 {
+		return Err(eyre!("No signed constraints found for slot {}", block_request.message.slot));
+	}
+
+	// We first verify the proof corresponds to the constraints
+	verify_proof_completeness(&block_request.proofs, &signed_constraints[0].message.constraints)?;
+	info!("Proofs correspond to constraints");
+
+	// We then verify the validity of the proofs
+	// For now we assume all constraints are inclusion constraints
+	// Decode raw transaction bytes from execution payload into TransactionSigned
+	let transactions: Vec<TransactionSigned> = block_request
+		.execution_payload
+		.transactions
+		.iter()
+		.map(|tx_bytes| {
+			let tx_envelope = TxEnvelope::decode_2718(&mut tx_bytes.as_ref())?;
+			Ok(TransactionSigned::from(tx_envelope))
+		})
+		.collect::<Result<Vec<_>>>()?;
+
+	// Reconstruct transaction trie and verify merkle inclusion proofs
+	let mut builder = TransactionTrieBuilder::build(&transactions)?;
+	builder.verify_batch(&block_request.proofs)?;
+
+	info!("Proofs verified successfully");
+
+	Ok(())
+}
+
+/// Verifies that the proofs cover all the constraints
+/// Assumes that the constraints are sorted by constraint type
+pub fn verify_proof_completeness(proofs: &ConstraintProofs, constraints: &[Constraint]) -> Result<()> {
+	if proofs.constraint_types.len() != constraints.len() {
+		return Err(eyre!("Constraint types length mismatch"));
+	}
+
+	let matching_constraint_types =
+		proofs.constraint_types.iter().zip(constraints.iter()).all(|(n, t)| *n == t.constraint_type);
+
+	if !matching_constraint_types {
+		return Err(eyre!("Constraint types mismatch"));
+	}
+
+	for (proof, constraint) in proofs.payloads.iter().zip(constraints.iter()) {
+		match constraint.constraint_type {
+			INCLUSION_CONSTRAINT_TYPE => {
+				let proof = InclusionProof::from_bytes(proof)?;
+				let payload = InclusionPayload::abi_decode(&constraint.payload)?;
+				let tx_hash = payload.tx_hash()?;
+				if proof.tx_hash != tx_hash {
+					return Err(eyre!("Transaction hash mismatch"));
+				}
+			}
+			_ => {
+				return Err(eyre!("Unsupported constraint type {:?}", constraint.constraint_type));
+			}
+		}
+	}
+	Ok(())
 }
 
 #[cfg(test)]

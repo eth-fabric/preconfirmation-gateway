@@ -1,5 +1,5 @@
 use alloy::primitives::{B256, Bytes};
-use common::constants::CONSTRAINT_TYPE;
+use common::constants::INCLUSION_CONSTRAINT_TYPE;
 use common::types::constraints::Constraint;
 use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
@@ -99,7 +99,8 @@ async fn test_post_constraints_success() {
 	client.post_delegation(&signed_delegation).await.unwrap();
 
 	// Step 2: Store constraints in local database
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
+	let constraint =
+		Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
@@ -119,7 +120,7 @@ async fn test_post_constraints_without_delegation() {
 	let slot = harness.context.slot_timer.get_current_slot() + 100000000; // No delegation for this slot
 
 	// Store constraints in local database without posting delegation first
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
@@ -145,7 +146,8 @@ async fn test_post_constraints_multiple_same_slot() {
 
 	// Store multiple constraints for same slot
 	for i in 0..3 {
-		let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
+		let constraint =
+			Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
 		let constraint_id = B256::random();
 		harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 	}
@@ -171,7 +173,7 @@ async fn test_get_constraints_success() {
 
 	// Store and process constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: payload.clone() };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
@@ -204,7 +206,8 @@ async fn test_get_constraints_multiple() {
 
 	// Store multiple constraints
 	for i in 0..3 {
-		let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
+		let constraint =
+			Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
 		let constraint_id = B256::random();
 		harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 	}
@@ -265,7 +268,7 @@ async fn test_full_relay_workflow() {
 
 	// Step 2: Store and process constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5, 6, 7, 8]);
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: payload.clone() };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 
@@ -298,7 +301,8 @@ async fn test_concurrent_constraint_posts() {
 		client.post_delegation(&signed_delegation).await.unwrap();
 
 		// Store constraint for this slot
-		let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
+		let constraint =
+			Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
 		let constraint_id = B256::random();
 		harness.context.commitments_database.store_constraint(slot, &constraint_id, &constraint).unwrap();
 	}
@@ -346,7 +350,7 @@ async fn test_relay_server_handles_errors_gracefully() {
 
 	// 1. Process constraints without delegation
 	let invalid_slot = harness.context.slot_timer.get_current_slot() + 100000000;
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(invalid_slot, &constraint_id, &constraint).unwrap();
 
@@ -386,7 +390,7 @@ async fn test_get_constraints_current_slot_requires_authentication() {
 
 	// Store and process constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: payload.clone() };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(current_slot, &constraint_id, &constraint).unwrap();
 
@@ -418,7 +422,7 @@ async fn test_get_constraints_future_slot_requires_authentication() {
 
 	// Store and process constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: payload.clone() };
 	let constraint_id = B256::random();
 	harness.context.commitments_database.store_constraint(future_slot, &constraint_id, &constraint).unwrap();
 

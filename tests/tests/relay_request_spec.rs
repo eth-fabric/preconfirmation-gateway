@@ -1,5 +1,5 @@
 use alloy::primitives::Bytes;
-use common::constants::CONSTRAINT_TYPE;
+use common::constants::INCLUSION_CONSTRAINT_TYPE;
 use common::types::constraints::{Constraint, ConstraintsMessage, SignedConstraints};
 use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
@@ -135,7 +135,8 @@ async fn test_create_signed_constraints() {
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraint
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
+	let constraint =
+		Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4, 5]) };
 
 	// Create constraints message
 	let constraints_message = ConstraintsMessage {
@@ -165,7 +166,7 @@ async fn test_create_signed_constraints() {
 	// Verify structure
 	assert_eq!(signed_constraints.message.slot, slot);
 	assert_eq!(signed_constraints.message.constraints.len(), 1);
-	assert_eq!(signed_constraints.message.constraints[0].constraint_type, CONSTRAINT_TYPE);
+	assert_eq!(signed_constraints.message.constraints[0].constraint_type, INCLUSION_CONSTRAINT_TYPE);
 	assert_ne!(signed_constraints.signature, commit_boost::prelude::BlsSignature::empty());
 
 	println!(" Signed constraints created successfully");
@@ -177,7 +178,7 @@ async fn test_constraints_signature_valid() {
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create and sign constraints
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -216,7 +217,7 @@ async fn test_store_and_retrieve_constraints() {
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraints
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3, 4]) };
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -261,7 +262,8 @@ async fn test_multiple_constraints_same_slot() {
 
 	// Store multiple different constraints for same slot
 	for i in 0..3 {
-		let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
+		let constraint =
+			Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![i as u8; 5]) };
 		let constraints_message = ConstraintsMessage {
 			proposer: harness.proposer_bls_public_key.clone(),
 			delegate: harness.gateway_bls_one.clone(),
@@ -306,9 +308,9 @@ async fn test_constraints_with_multiple_constraint_items() {
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create constraints message with multiple constraints
-	let constraint1 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
-	let constraint2 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![4, 5, 6]) };
-	let constraint3 = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![7, 8, 9]) };
+	let constraint1 = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint2 = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![4, 5, 6]) };
+	let constraint3 = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![7, 8, 9]) };
 
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
@@ -344,7 +346,7 @@ async fn test_public_vs_private_constraints() {
 	let slot = harness.context.slot_timer.get_current_slot() + 1;
 
 	// Create public constraints (empty receivers)
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let public_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -437,7 +439,7 @@ async fn test_delegation_required_for_constraints() {
 	harness.context.delegations_database.store_delegation(slot, &signed_delegation).unwrap();
 
 	// Now create constraints
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -483,7 +485,7 @@ async fn test_constraint_without_delegation() {
 	assert!(delegation.is_none());
 
 	// Can still create constraints (validation happens in handler)
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: Bytes::from(vec![1, 2, 3]) };
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -547,7 +549,7 @@ async fn test_constraints_fields_preserved() {
 
 	// Create constraints
 	let payload = Bytes::from(vec![1, 2, 3, 4, 5]);
-	let constraint = Constraint { constraint_type: CONSTRAINT_TYPE, payload: payload.clone() };
+	let constraint = Constraint { constraint_type: INCLUSION_CONSTRAINT_TYPE, payload: payload.clone() };
 	let constraints_message = ConstraintsMessage {
 		proposer: harness.proposer_bls_public_key.clone(),
 		delegate: harness.gateway_bls_one.clone(),
@@ -581,7 +583,7 @@ async fn test_constraints_fields_preserved() {
 	let retrieved_constraints = &retrieved[0];
 	assert_eq!(retrieved_constraints.message.slot, slot);
 	assert_eq!(retrieved_constraints.message.constraints.len(), 1);
-	assert_eq!(retrieved_constraints.message.constraints[0].constraint_type, CONSTRAINT_TYPE);
+	assert_eq!(retrieved_constraints.message.constraints[0].constraint_type, INCLUSION_CONSTRAINT_TYPE);
 	assert_eq!(retrieved_constraints.message.constraints[0].payload, payload);
 	assert_eq!(retrieved_constraints.message.receivers.len(), 0); // Empty receivers = public
 	assert_eq!(retrieved_constraints.nonce, signed_constraints.nonce);

@@ -3,6 +3,7 @@ use axum::{extract::Path, extract::State, http::HeaderMap, http::StatusCode, res
 use commit_boost::prelude::verify_proposer_commitment_signature_bls_for_message;
 use common::types::{
 	ConstraintCapabilities, GetDelegationsResponse, HealthResponse, SignedConstraints, SignedDelegation,
+	SubmitBlockRequestWithProofs,
 };
 use hex;
 use std::sync::Arc;
@@ -10,8 +11,8 @@ use std::time::Instant;
 use tracing::{debug, error, info};
 
 use crate::utils::{
-	validate_constraints_message, validate_delegation_message, validate_is_proposer, verify_constraints_signature,
-	verify_delegation_signature,
+	handle_proof_validation, validate_constraints_message, validate_delegation_message, validate_is_proposer,
+	verify_constraints_signature, verify_delegation_signature,
 };
 use common::types::database::DatabaseContext;
 
@@ -505,15 +506,12 @@ pub async fn health_handler(State(state): State<RelayState>) -> Result<Json<Heal
 }
 
 /// POST /constraints/v0/relay/blocks_with_proofs - Submit block with proofs
-/// Accepts blocks from any fork version (Bellatrix, Capella, Deneb, Electra)
-pub async fn submit_blocks_with_proofs_handler(
+pub async fn submit_blocks_with_proofs_handler<T: cb_common::pbs::EthSpec + serde::Serialize>(
 	State(state): State<RelayState>,
 	axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 	headers: HeaderMap,
-	Json(request): Json<serde_json::Value>,
+	Json(block_request): Json<SubmitBlockRequestWithProofs<T>>,
 ) -> StatusCode {
-	use common::constants::MAX_CONSTRAINTS_PER_SLOT;
-
 	const EP: &str = common::constants::routes::relay::BLOCKS_WITH_PROOFS;
 	const METHOD: &str = "POST";
 	REQUESTS_TOTAL.with_label_values(&[EP, METHOD]).inc();
@@ -522,27 +520,11 @@ pub async fn submit_blocks_with_proofs_handler(
 	// Extract cancellations query parameter (default to false)
 	let cancellations = params.get("cancellations").and_then(|v| v.parse::<bool>().ok()).unwrap_or(false);
 
-	// Extract slot and proofs from the JSON request
-	let slot = request
-		.get("message")
-		.and_then(|m| m.get("slot"))
-		.and_then(|s| s.as_str())
-		.and_then(|s| s.parse::<u64>().ok())
-		.unwrap_or(0);
-
-	let proofs = match request.get("proofs") {
-		Some(p) => match serde_json::from_value::<common::types::ConstraintProofs>(p.clone()) {
-			Ok(proofs) => proofs,
-			Err(e) => {
-				error!("Failed to parse proofs: {}", e);
-				let code = StatusCode::BAD_REQUEST;
-				RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
-				REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
-				return code;
-			}
-		},
-		None => {
-			error!("Missing proofs field");
+	// Get the slot
+	let slot = match block_request.slot() {
+		Ok(slot) => slot,
+		Err(e) => {
+			error!("Failed to parse slot: {}", e);
 			let code = StatusCode::BAD_REQUEST;
 			RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
 			REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
@@ -552,35 +534,20 @@ pub async fn submit_blocks_with_proofs_handler(
 
 	info!("Received block submission with proofs for slot {}, cancellations: {}", slot, cancellations);
 
-	// Validate proofs structure
-	if proofs.constraint_types.len() != proofs.payloads.len() {
-		error!(
-			"Constraint types and payloads length mismatch: {} vs {}",
-			proofs.constraint_types.len(),
-			proofs.payloads.len()
-		);
-		let code = StatusCode::BAD_REQUEST;
-		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
-		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
-		return code;
-	}
-
-	if proofs.constraint_types.len() > MAX_CONSTRAINTS_PER_SLOT {
-		error!("Too many proofs: {} exceeds maximum of {}", proofs.constraint_types.len(), MAX_CONSTRAINTS_PER_SLOT);
-		let code = StatusCode::BAD_REQUEST;
-		RESPONSES_TOTAL.with_label_values(&[EP, METHOD, &code.as_u16().to_string()]).inc();
-		REQUEST_LATENCY_SECONDS.with_label_values(&[EP, METHOD]).observe(start.elapsed().as_secs_f64());
-		return code;
-	}
-
 	// Fetch constraints from database for the slot
 	let constraints_result = state.database.get_signed_constraints_for_slot(slot);
 	match constraints_result {
 		Ok(constraints) => {
 			info!("Retrieved {} constraints for slot {} from database", constraints.len(), slot);
-			// TODO: Validate proofs against constraints
-			// For now, we just log that we would validate the proofs here
-			debug!("TODO: Implement proof validation for {} constraints", constraints.len());
+			match handle_proof_validation(&block_request, &constraints) {
+				Ok(()) => {
+					info!("Proof valid against constraints and block");
+				}
+				Err(e) => {
+					error!("Failed to validate proofs: {}", e);
+				}
+			}
+			info!("Proof valid against constraints and block");
 		}
 		Err(e) => {
 			error!("Failed to retrieve constraints for slot {}: {}", slot, e);
@@ -588,9 +555,9 @@ pub async fn submit_blocks_with_proofs_handler(
 		}
 	}
 
-	// Remove proofs field for upstream proxy
-	let mut block_request_json = request.clone();
-	block_request_json.as_object_mut().and_then(|obj| obj.remove("proofs"));
+	// ---- Remove proofs field to resubmit vanilla block request to upstream proxy ----
+
+	let block_request_without_proofs = block_request.into_block_request();
 
 	// Proxy to upstream relay if configured
 	if let (Some(client), Some(upstream_url)) = (&state.proxy_client, &state.upstream_relay_url) {
@@ -614,8 +581,8 @@ pub async fn submit_blocks_with_proofs_handler(
 		// Set content type
 		upstream_req = upstream_req.header("Content-Type", "application/json");
 
-		// Send request without proofs (raw JSON)
-		match upstream_req.json(&block_request_json).send().await {
+		// Send block request without proofs to upstream relay
+		match upstream_req.json(&block_request_without_proofs).send().await {
 			Ok(response) => {
 				let status = response.status();
 				info!("Upstream relay responded with status: {}", status);

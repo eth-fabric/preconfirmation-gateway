@@ -678,7 +678,11 @@ impl TestHarness {
 		let inclusion_payload = InclusionPayload { slot, signed_tx: signed_tx.into() };
 		let payload = inclusion_payload.abi_encode()?;
 
-		Ok(common::types::CommitmentRequest { commitment_type: common::constants::COMMITMENT_TYPE, payload, slasher })
+		Ok(common::types::CommitmentRequest {
+			commitment_type: common::constants::INCLUSION_COMMITMENT_TYPE,
+			payload,
+			slasher,
+		})
 	}
 
 	// ===== Helper methods for headers =====
@@ -1122,7 +1126,7 @@ impl Default for ClientHarness {
 /// This module provides shared helper functions for both commitment_request and commitment_result tests
 pub mod test_helpers {
 	use super::*;
-	use common::constants::COMMITMENT_TYPE;
+	use common::constants::INCLUSION_COMMITMENT_TYPE;
 
 	/// Creates a valid inclusion payload
 	pub fn create_valid_inclusion_payload(slot: u64, signed_tx: Vec<u8>) -> eyre::Result<Bytes> {
@@ -1181,7 +1185,7 @@ pub mod test_helpers {
 	}
 
 	pub fn create_valid_commitment_type() -> u64 {
-		COMMITMENT_TYPE
+		INCLUSION_COMMITMENT_TYPE
 	}
 
 	/// Creates an invalid slasher address (zero address)
@@ -1191,7 +1195,7 @@ pub mod test_helpers {
 
 	/// Creates an invalid commitment type
 	pub fn create_invalid_commitment_type() -> u64 {
-		COMMITMENT_TYPE + 1 // Invalid commitment type
+		INCLUSION_COMMITMENT_TYPE + 1 // Invalid commitment type
 	}
 
 	/// Creates an empty payload

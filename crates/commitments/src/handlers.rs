@@ -9,7 +9,7 @@ use crate::CommitmentsServerState;
 use alloy::primitives::B256;
 use commit_boost::prelude::commit::request::EncryptionScheme;
 use common::config::GatewayConfig;
-use common::constants::COMMITMENT_TYPE;
+use common::constants::INCLUSION_COMMITMENT_TYPE;
 use common::types::commitments::Offering;
 use common::types::{CommitmentRequest, FeeInfo, SignedCommitment, SlotInfo, SlotInfoResponse};
 
@@ -242,7 +242,7 @@ pub fn slots_handler<T>(
 		info!("Found delegation for slot {}", slot);
 
 		// Create offering with chain ID and commitment type
-		let offering = Offering { chain_id, commitment_types: vec![COMMITMENT_TYPE] };
+		let offering = Offering { chain_id, commitment_types: vec![INCLUSION_COMMITMENT_TYPE] };
 
 		// Create slot info
 		let slot_info = SlotInfo { slot, offerings: vec![offering] };

@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use common::constants::COMMITMENT_TYPE;
+use common::constants::INCLUSION_COMMITMENT_TYPE;
 use integration_tests::test_common::{SIGNING_ID, TestHarness};
 
 /// Tests for the commitmentRequest workflow
@@ -43,7 +43,7 @@ async fn test_valid_commitment_request() {
 	.unwrap();
 
 	// Verify response structure
-	assert_eq!(signed_commitment.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(signed_commitment.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(signed_commitment.commitment.slasher, request.slasher);
 	assert!(signed_commitment.nonce > 0);
 	assert!(!signed_commitment.signature.to_string().is_empty());
@@ -96,7 +96,7 @@ async fn test_commitment_request_stores_in_database() {
 
 	assert!(stored.is_some());
 	let stored_commitment = stored.unwrap();
-	assert_eq!(stored_commitment.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(stored_commitment.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(stored_commitment.commitment.slasher, request.slasher);
 
 	println!(" Commitment correctly stored in database");

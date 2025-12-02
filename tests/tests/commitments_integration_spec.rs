@@ -1,5 +1,5 @@
 use alloy::primitives::Address;
-use common::constants::COMMITMENT_TYPE;
+use common::constants::INCLUSION_COMMITMENT_TYPE;
 use integration_tests::test_common::TestHarness;
 
 /// Integration tests for commitments RPC server
@@ -34,7 +34,7 @@ async fn test_commitment_request_rpc_success() {
 	let result = client.commitment_request(&request).await.unwrap();
 
 	// Assert: Verify response
-	assert_eq!(result.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(result.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(result.commitment.slasher, slasher);
 	assert!(result.nonce > 0);
 	assert!(!result.signature.to_string().is_empty());
@@ -190,7 +190,7 @@ async fn test_commitment_result_rpc_success() {
 	let result = client.commitment_result(&commitment_result.commitment.request_hash).await.unwrap();
 
 	// Assert: Verify response matches the created commitment
-	assert_eq!(result.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(result.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(result.commitment.slasher, slasher);
 	assert_eq!(result.commitment.request_hash, commitment_result.commitment.request_hash);
 	assert_eq!(result.nonce, commitment_result.nonce);
@@ -267,7 +267,7 @@ async fn test_fee_rpc_success() {
 	// Assert: Verify response or handle execution client unavailability
 	match result {
 		Ok(fee_info) => {
-			assert_eq!(fee_info.commitment_type, COMMITMENT_TYPE);
+			assert_eq!(fee_info.commitment_type, INCLUSION_COMMITMENT_TYPE);
 			assert!(!fee_info.fee_payload.is_empty());
 			println!("fee RPC successful");
 		}
@@ -327,7 +327,7 @@ async fn test_fee_rpc_calculates_via_execution_client() {
 	// Fee should be calculated from gas price and gas estimate from execution client
 	match result {
 		Ok(fee_info) => {
-			assert_eq!(fee_info.commitment_type, COMMITMENT_TYPE);
+			assert_eq!(fee_info.commitment_type, INCLUSION_COMMITMENT_TYPE);
 			println!("fee RPC calculates fee via execution client");
 		}
 		Err(e) => println!("Fee RPC error (execution client may not be available): {}", e),
@@ -357,7 +357,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 
 	match fee_result {
 		Ok(fee_info) => {
-			assert_eq!(fee_info.commitment_type, COMMITMENT_TYPE);
+			assert_eq!(fee_info.commitment_type, INCLUSION_COMMITMENT_TYPE);
 			println!("Fee calculation successful");
 		}
 		Err(_) => {
@@ -367,7 +367,7 @@ async fn test_full_commitment_workflow_via_rpc() {
 
 	// Step 2: Create commitment (should work regardless of fee calculation)
 	let commitment_result = client.commitment_request(&request).await.unwrap();
-	assert_eq!(commitment_result.commitment.commitment_type, COMMITMENT_TYPE);
+	assert_eq!(commitment_result.commitment.commitment_type, INCLUSION_COMMITMENT_TYPE);
 	assert_eq!(commitment_result.commitment.slasher, slasher);
 
 	// Step 3: Retrieve commitment

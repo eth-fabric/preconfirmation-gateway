@@ -1,4 +1,4 @@
-use alloy_primitives::{B256, U256};
+use alloy_primitives::{B256, Bytes, U256};
 use eth_trie::{EthTrie, MemoryDB, Trie};
 use ethereum_types::H256;
 use eyre::{Context, Result, eyre};
@@ -6,52 +6,41 @@ use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-/// Represents a Merkle inclusion proof for a constraint transaction
+use crate::types::{Constraint, ConstraintProofs};
+
+/// Merkle inclusion proof for an inclusion payload
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ConstraintProof {
+pub struct InclusionProof {
 	/// Transaction hash
 	pub tx_hash: B256,
 	/// Index of the transaction in the block
 	pub tx_index: usize,
-	/// Merkle proof nodes (hex-encoded)
-	#[serde(with = "hex_vec")]
+	/// Merkle proof nodes
 	pub proof: Vec<Vec<u8>>,
-	/// Transaction root hash
-	pub transactions_root: B256,
-	/// Block number
-	pub block_number: u64,
-	/// Slot number
-	pub slot: u64,
 }
 
-/// Serde helper for hex encoding Vec<Vec<u8>>
-mod hex_vec {
-	use serde::{Deserialize, Deserializer, Serializer};
+impl InclusionProof {
+	/// Creates a new InclusionProof
+	pub fn new(trie_builder: &mut TransactionTrieBuilder, tx_hash: B256) -> Result<Self> {
+		// Find the transaction index
+		let tx_index = trie_builder.find_tx_index(&tx_hash)?;
 
-	pub fn serialize<S>(data: &Vec<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		use serde::ser::SerializeSeq;
-		let mut seq = serializer.serialize_seq(Some(data.len()))?;
-		for item in data {
-			seq.serialize_element(&format!("0x{}", hex::encode(item)))?;
-		}
-		seq.end()
+		// Generate the proof
+		let proof = trie_builder.get_proof(tx_index)?;
+
+		Ok(InclusionProof { tx_hash, tx_index, proof })
 	}
 
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<Vec<u8>>, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		let strings: Vec<String> = Vec::deserialize(deserializer)?;
-		strings
-			.into_iter()
-			.map(|s| {
-				let s = s.strip_prefix("0x").unwrap_or(&s);
-				hex::decode(s).map_err(serde::de::Error::custom)
-			})
-			.collect()
+	/// Serializes the InclusionProof to Bytes
+	pub fn to_bytes(&self) -> Result<Bytes> {
+		let buf = bincode::serialize(self).wrap_err("failed to serialize InclusionProof")?;
+		Ok(Bytes::from(buf))
+	}
+
+	pub fn from_bytes(bytes: &Bytes) -> Result<Self> {
+		let proof: InclusionProof =
+			bincode::deserialize(bytes.as_ref()).wrap_err("failed to deserialize InclusionProof")?;
+		Ok(proof)
 	}
 }
 
@@ -88,6 +77,32 @@ impl TransactionTrieBuilder {
 		}
 
 		Ok(builder)
+	}
+
+	/// Proves inclusion of a batch of transactions and returns an encoded ConstraintProofs
+	pub fn prove_batch(&mut self, tx_hashes: &[B256]) -> Result<ConstraintProofs> {
+		let payloads: Vec<Bytes> = tx_hashes
+			.iter()
+			.map(|tx_hash| InclusionProof::new(self, *tx_hash)?.to_bytes())
+			.collect::<Result<Vec<_>>>()?;
+
+		let constraint_types = vec![crate::constants::INCLUSION_CONSTRAINT_TYPE; payloads.len()];
+
+		Ok(ConstraintProofs { constraint_types, payloads })
+	}
+
+	/// Verifies a batch of inclusion proofs, errors if any proof is invalid
+	pub fn verify_batch(&mut self, proofs: &ConstraintProofs) -> Result<()> {
+		let transactions_root = self.root()?;
+		for (constraint_type, payload) in proofs.constraint_types.iter().zip(proofs.payloads.iter()) {
+			if *constraint_type != crate::constants::INCLUSION_CONSTRAINT_TYPE {
+				return Err(eyre!("Invalid constraint type {constraint_type}"));
+			}
+
+			let proof = InclusionProof::from_bytes(payload)?;
+			self.verify_proof(proof.tx_index, &proof.proof, &transactions_root)?;
+		}
+		Ok(())
 	}
 
 	/// Get the root hash of the trie
@@ -146,6 +161,16 @@ mod tests {
 
 	use super::*;
 	use crate::types::InclusionPayload;
+
+	#[test]
+	fn test_inclusion_proof_serialization() {
+		let proof = InclusionProof { tx_hash: B256::random(), tx_index: 0, proof: vec![vec![0x01, 0x02, 0x03]] };
+		let bytes = proof.to_bytes().unwrap();
+		let proof2 = InclusionProof::from_bytes(&bytes).unwrap();
+		assert_eq!(proof.tx_hash, proof2.tx_hash);
+		assert_eq!(proof.tx_index, proof2.tx_index);
+		assert_eq!(proof.proof.len(), proof2.proof.len());
+	}
 
 	#[test]
 	fn test_build_trie_and_generate_proof() {
