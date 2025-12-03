@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-common = { path = "../crates/common", features = ["test-utils"] }
-commitments = { path = "../crates/commitments" }
-constraints = { path = "../crates/constraints" }
-relay = { path = "../crates/relay" }
-gateway = { path = "../crates/gateway" }
-proposer = { path = "../crates/proposer" }
+common = { package = "fabric-common", path = "../crates/common", features = ["test-utils"] }
+commitments = { package = "fabric-commitments", path = "../crates/commitments" }
+constraints = { package = "fabric-constraints", path = "../crates/constraints" }
+relay = { package = "fabric-relay", path = "../crates/relay" }
+gateway = { package = "fabric-gateway", path = "../crates/gateway" }
+proposer = { package = "fabric-proposer", path = "../crates/proposer" }
 anyhow = { workspace = true }
 eyre = { workspace = true }
 config = { workspace = true }
@@ -25,16 +25,15 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
 commit-boost = { workspace = true }
-cb-tests = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
-cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
-cb-signer = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
+cb-tests = { workspace = true }
+cb-common = { workspace = true }
+cb-signer = { workspace = true }
 urc = { workspace = true }
-reqwest = { version = "0.12.4", features = ["json", "rustls-tls"] }
-tempfile = "3.8"
-tokio-test = "0.4"
-rand = "0.8"
-axum = "0.8"
-hex = "0.4"
+reqwest = { workspace = true }
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
+rand = { workspace = true }
+axum = { workspace = true }
+hex = { workspace = true }
 sha2 = "0.10"

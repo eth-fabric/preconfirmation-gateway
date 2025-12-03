@@ -1,6 +1,5 @@
-use alloy::primitives::{Address, B256, Bytes};
+use alloy::primitives::{Address, B256, Bytes, keccak256};
 use alloy::sol_types::{SolCall, SolValue};
-use alloy_primitives::keccak256;
 use commit_boost::prelude::{BlsPublicKey, BlsSignature};
 use eyre::Result;
 

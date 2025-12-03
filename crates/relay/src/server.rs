@@ -7,7 +7,6 @@ use axum::{
 	routing::{get, post},
 	Router,
 };
-use cb_common::pbs::ElectraSpec;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{

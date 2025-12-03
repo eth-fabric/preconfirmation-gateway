@@ -1,5 +1,5 @@
 [package]
-name = "common"
+name = "fabric-common"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,7 +7,7 @@ edition = "2024"
 test-utils = ["mockall"]
 
 [dependencies]
-mockall = { version = "0.13", optional = true }
+mockall = { workspace = true, optional = true }
 eyre = { workspace = true }
 config = { workspace = true }
 rocksdb = { workspace = true }
@@ -17,28 +17,24 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
-alloy-rpc-types-beacon = { workspace = true }
 commit-boost = { workspace = true }
 hex = { workspace = true }
 urc = { workspace = true }
 reqwest = { workspace = true }
-cb-common = {workspace = true }
-blst = "0.3"
+blst = { workspace = true }
 
 # for merkle proofs
 reth-trie = { workspace = true }
 reth-primitives = { workspace = true }
 eth_trie = { workspace = true }
 ethereum-types = { workspace = true }
-alloy-rlp = { workspace = true }
 bincode = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.8"
-tokio-test = "0.4"
-rand = "0.8"
-mockall = "0.13"
-cb-tests = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
-cb-signer = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
-alloy-consensus = { workspace = true }
+tempfile = { workspace = true }
+tokio-test = { workspace = true }
+rand = { workspace = true }
+mockall = { workspace = true }
+cb-tests = { workspace = true }
+cb-signer = { workspace = true }
+cb-common = {workspace = true }

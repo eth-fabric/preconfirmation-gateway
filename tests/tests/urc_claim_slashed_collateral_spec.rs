@@ -1,9 +1,8 @@
 use alloy::network::EthereumWallet;
 use alloy::node_bindings::Anvil;
-use alloy::primitives::U256;
+use alloy::primitives::{U256, address};
 use alloy::providers::ProviderBuilder;
 use alloy::signers::local::PrivateKeySigner;
-use alloy_primitives::address;
 use commit_boost::prelude::Chain;
 use eyre::Result;
 

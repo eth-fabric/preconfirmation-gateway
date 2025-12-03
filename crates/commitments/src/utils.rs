@@ -1,14 +1,14 @@
-use alloy::consensus::TxEnvelope;
-use alloy::network::TransactionBuilder;
-use alloy::primitives::{Address, B256, Bytes, U256, keccak256};
-use alloy_consensus::SignableTransaction;
-use commit_boost::prelude::StartCommitModuleConfig;
-use common::config::GatewayConfig;
 use eyre::{Result, WrapErr};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, info};
 
+use alloy::consensus::{SignableTransaction, TxEnvelope};
+use alloy::network::TransactionBuilder;
+use alloy::primitives::{Address, B256, Bytes, U256, keccak256};
+use commit_boost::prelude::StartCommitModuleConfig;
+
+use common::config::GatewayConfig;
 use common::constants::{INCLUSION_COMMITMENT_TYPE, INCLUSION_CONSTRAINT_TYPE};
 use common::signer;
 use common::types::InclusionPayload;

@@ -1,4 +1,4 @@
-use alloy_primitives::{B256, Bytes, U256};
+use alloy::primitives::{B256, Bytes, U256};
 use eth_trie::{EthTrie, MemoryDB, Trie};
 use ethereum_types::H256;
 use eyre::{Context, Result, eyre};
@@ -64,10 +64,10 @@ impl TransactionTrieBuilder {
 
 		for (idx, tx) in transactions.iter().enumerate() {
 			// Key is RLP-encoded index
-			let key = alloy_rlp::encode(U256::from(idx));
+			let key = alloy::rlp::encode(U256::from(idx));
 
 			// Value is RLP-encoded signed transaction
-			let tx_bytes = alloy_rlp::encode(tx);
+			let tx_bytes = alloy::rlp::encode(tx);
 
 			builder
 				.trie
@@ -117,7 +117,7 @@ impl TransactionTrieBuilder {
 			return Err(eyre!("Transaction not found at index {tx_index}"));
 		}
 
-		let key = alloy_rlp::encode(U256::from(tx_index));
+		let key = alloy::rlp::encode(U256::from(tx_index));
 		let proof = self
 			.trie
 			.get_proof(key.as_slice())
@@ -135,7 +135,7 @@ impl TransactionTrieBuilder {
 
 	/// Verify a proof for a transaction at the given index
 	pub fn verify_proof(&self, tx_index: usize, proof: &[Vec<u8>], root: &B256) -> Result<Vec<u8>> {
-		let key = alloy_rlp::encode(U256::from(tx_index));
+		let key = alloy::rlp::encode(U256::from(tx_index));
 		let root_hash = H256::from_slice(root.as_slice());
 
 		self.trie

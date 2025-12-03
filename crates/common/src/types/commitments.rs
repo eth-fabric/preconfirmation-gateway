@@ -1,6 +1,6 @@
+use alloy::primitives::keccak256;
 use alloy::primitives::{Address, B256, Bytes, Signature};
 use alloy::sol_types::SolValue;
-use alloy_primitives::keccak256;
 use eyre::{Result, WrapErr};
 use serde::{Deserialize, Serialize};
 

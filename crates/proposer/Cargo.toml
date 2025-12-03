@@ -1,5 +1,5 @@
 [package]
-name = "proposer"
+name = "fabric-proposer"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,9 +13,8 @@ hex = { workspace = true }
 commit-boost = { workspace = true }
 cb-common = { workspace = true }
 alloy = { workspace = true }
-eth-keystore = "0.5"
-common = { path = "../common" }
-constraints = { path = "../constraints" }
+common = { package = "fabric-common", path = "../common" }
+constraints = { package = "fabric-constraints", path = "../constraints" }
 urc = { workspace = true }
 rocksdb = { workspace = true }
 
@@ -23,10 +22,10 @@ prometheus = { workspace = true }
 lazy_static = { workspace = true }
 axum = { workspace = true }
 
+eth-keystore = "0.5"
 clap = { version = "4.0", features = ["derive"] }
 rpassword = "7.0"
 
 [dev-dependencies]
 mockall = "0.12"
-common = { path = "../common", features = ["test-utils"] }
-
+common = { package = "fabric-common", path = "../common", features = ["test-utils"] }

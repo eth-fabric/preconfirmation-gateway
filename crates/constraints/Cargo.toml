@@ -1,31 +1,31 @@
 [package]
-name = "constraints"
+name = "fabric-constraints"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-common = { path = "../common" }
+common = { package = "fabric-common", path = "../common" }
 urc = { workspace = true }
 alloy = { workspace = true }
 commit-boost = { workspace = true }
 eyre = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-blst = "0.3"
+blst = { workspace = true }
 
 # HTTP client for relay communication
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { workspace = true }
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Metrics
 prometheus = { workspace = true }
 lazy_static = { workspace = true }
 
 #  todo eventually remove
-cb-common = { git = "https://github.com/Commit-Boost/commit-boost-client", branch = "fabric" }
+cb-common = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }

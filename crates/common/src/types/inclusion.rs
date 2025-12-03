@@ -3,8 +3,8 @@ use alloy::consensus::{
 	transaction::SignerRecoverable,
 };
 use alloy::primitives::{B256, Bytes};
+use alloy::rlp::Decodable;
 use alloy::sol_types::SolValue;
-use alloy_rlp::Decodable;
 use eyre::{Result, WrapErr, bail};
 use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
@@ -150,8 +150,8 @@ impl InclusionPayload {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use alloy::consensus::TxType;
 	use alloy::primitives::keccak256;
-	use alloy_consensus::TxType;
 
 	#[test]
 	fn test_abi_encode_inclusion_payload() -> Result<()> {

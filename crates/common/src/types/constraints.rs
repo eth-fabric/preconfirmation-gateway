@@ -1,8 +1,7 @@
 use alloy::eips::eip2718::Decodable2718;
-use alloy::primitives::{Address, B256, Bytes};
+use alloy::primitives::{Address, B256, Bytes, keccak256};
+use alloy::rpc::types::beacon::relay::SubmitBlockRequest as AlloySubmitBlockRequest;
 use alloy::sol_types::SolValue;
-use alloy_primitives::keccak256;
-use alloy_rpc_types_beacon::relay::SubmitBlockRequest as AlloySubmitBlockRequest;
 use eyre::Result;
 use eyre::eyre;
 use reth_primitives::TransactionSigned;

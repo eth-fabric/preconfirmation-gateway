@@ -32,12 +32,12 @@ name = "beacon-mock"
 path = "beacon_mock.rs"
 
 [dependencies]
-common = { path = "../crates/common" }
-commitments = { path = "../crates/commitments" }
-constraints = { path = "../crates/constraints" }
-gateway = { path = "../crates/gateway" }
-relay = { path = "../crates/relay" }
-proposer = { path = "../crates/proposer" }
+common = { package = "fabric-common", path = "../crates/common" }
+commitments = { package = "fabric-commitments", path = "../crates/commitments" }
+constraints = { package = "fabric-constraints", path = "../crates/constraints" }
+gateway = { package = "fabric-gateway", path = "../crates/gateway" }
+relay = { package = "fabric-relay", path = "../crates/relay" }
+proposer = { package = "fabric-proposer", path = "../crates/proposer" }
 cb-common = { workspace = true }
 cb-signer = { workspace = true }
 clap = { workspace = true }

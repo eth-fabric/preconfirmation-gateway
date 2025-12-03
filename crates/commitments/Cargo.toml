@@ -1,10 +1,10 @@
 [package]
-name = "commitments"
+name = "fabric-commitments"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-common = { path = "../common" }
+common = { package = "fabric-common", path = "../common" }
 eyre = { workspace = true }
 futures = { workspace = true }
 http-body = { workspace = true }
@@ -16,8 +16,6 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 alloy = { workspace = true }
-alloy-primitives = { workspace = true }
-alloy-consensus = { workspace = true }
 commit-boost = { workspace = true }
 cb-common = { workspace = true }
 prometheus = { workspace = true }
@@ -25,6 +23,6 @@ lazy_static = { workspace = true }
 axum = { workspace = true }
 
 [dev-dependencies]
-common = { path = "../common", features = ["test-utils"] }
+common = { package = "fabric-common", path = "../common", features = ["test-utils"] }
 rocksdb = { workspace = true }
 tempfile = { workspace = true }
