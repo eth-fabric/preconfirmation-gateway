@@ -6,7 +6,6 @@ use alloy::primitives::{B256, Bytes};
 use alloy::rlp::Decodable;
 use alloy::sol_types::SolValue;
 use eyre::{Result, WrapErr, bail};
-use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 
 /// Payload for commitments/constraints
@@ -51,11 +50,6 @@ impl InclusionPayload {
 		let tx_envelope =
 			TxEnvelope::decode(&mut self.signed_tx.as_ref()).wrap_err("Failed to decode transaction from RLP bytes")?;
 		Ok(tx_envelope)
-	}
-
-	pub fn decode_transaction_signed(&self) -> Result<TransactionSigned> {
-		let signed = TransactionSigned::from(self.decode_transaction()?);
-		Ok(signed)
 	}
 
 	pub fn verify_signature(&self) -> Result<()> {

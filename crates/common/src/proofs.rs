@@ -1,8 +1,8 @@
+use alloy::consensus::TxEnvelope;
 use alloy::primitives::{B256, Bytes, U256};
 use eth_trie::{EthTrie, MemoryDB, Trie};
 use ethereum_types::H256;
 use eyre::{Context, Result, eyre};
-use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -59,7 +59,7 @@ impl TransactionTrieBuilder {
 	}
 
 	/// Build the transaction trie from a list of signed transactions
-	pub fn build(transactions: &[TransactionSigned]) -> Result<Self> {
+	pub fn build(transactions: &[TxEnvelope]) -> Result<Self> {
 		let mut builder = Self::new();
 
 		for (idx, tx) in transactions.iter().enumerate() {
@@ -176,9 +176,9 @@ mod tests {
 	fn test_build_trie_and_generate_proof() {
 		// Create some test transactions
 		let payload1 = InclusionPayload::random();
-		let tx1 = payload1.decode_transaction_signed().unwrap();
+		let tx1 = payload1.decode_transaction().unwrap();
 		let payload2 = InclusionPayload::random();
-		let tx2 = payload2.decode_transaction_signed().unwrap();
+		let tx2 = payload2.decode_transaction().unwrap();
 		let transactions = vec![tx1, tx2];
 
 		// // Build trie

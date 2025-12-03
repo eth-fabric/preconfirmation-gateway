@@ -29,9 +29,6 @@ cb-common = { workspace = true }
 # Alloy for primitives
 alloy = { workspace = true }
 
-# For transaction decoding
-reth-primitives = { workspace = true }
-
 # Common types (reuse from our common crate)
 common = { package = "fabric-common", path = "../common" }
 

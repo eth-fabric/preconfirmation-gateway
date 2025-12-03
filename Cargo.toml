@@ -67,8 +67,6 @@ cb-tests = { path = "../../commit-boost/commit-boost-client/tests" }
 
 
 # for merkle proofs
-reth-trie = { git = "https://github.com/paradigmxyz/reth", rev = "42197415102b7a20be42e4fe919f024b81ceb55b" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "42197415102b7a20be42e4fe919f024b81ceb55b" }
 eth_trie = "0.4.0"
 ethereum-types = "0.14.1"
 bincode = "1.3"

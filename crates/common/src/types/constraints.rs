@@ -1,10 +1,10 @@
-use alloy::eips::eip2718::Decodable2718;
+use alloy::consensus::TxEnvelope;
 use alloy::primitives::{Address, B256, Bytes, keccak256};
+use alloy::rlp::Decodable;
 use alloy::rpc::types::beacon::relay::SubmitBlockRequest as AlloySubmitBlockRequest;
 use alloy::sol_types::SolValue;
 use eyre::Result;
 use eyre::eyre;
-use reth_primitives::TransactionSigned;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -167,7 +167,7 @@ impl SubmitBlockRequestWithProofs {
 		self.message
 	}
 
-	pub fn transactions(&self) -> Result<Vec<TransactionSigned>> {
+	pub fn transactions(&self) -> Result<Vec<TxEnvelope>> {
 		// Extract transaction bytes from the appropriate variant
 		let tx_bytes_list = match &self.message {
 			AlloySubmitBlockRequest::Electra(request) => {
@@ -186,9 +186,8 @@ impl SubmitBlockRequestWithProofs {
 		let mut transactions = Vec::new();
 
 		for tx_bytes in tx_bytes_list {
-			// Decode directly as reth TransactionSigned
-			let tx = TransactionSigned::decode_2718(&mut tx_bytes.as_ref())
-				.map_err(|e| eyre!("Failed to decode transaction: {}", e))?;
+			let tx =
+				TxEnvelope::decode(&mut tx_bytes.as_ref()).map_err(|e| eyre!("Failed to decode transaction: {}", e))?;
 			transactions.push(tx);
 		}
 
@@ -205,17 +204,8 @@ impl SubmitBlockRequestWithProofs {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::utils::bls_pubkey_from_hex;
 	use alloy::primitives::{Bytes, U256, hex};
-
-	// Local implementation to avoid cb-common dependency
-	fn bls_pubkey_from_hex(hex_str: &str) -> BlsPublicKey {
-		let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
-		let bytes = hex::decode(hex_str).expect("Could not decode BLS hex string");
-		if bytes.len() != 48 {
-			panic!("Invalid BLS public key length: expected 48 bytes, got {}", bytes.len());
-		}
-		BlsPublicKey::deserialize(&bytes).expect("Failed to deserialize BLS public key")
-	}
 
 	#[test]
 	fn test_message_type_to_uint256() {
@@ -230,11 +220,13 @@ mod tests {
 	fn test_delegation_to_message_hash() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		);
+		)
+		.unwrap();
 
 		let delegate = bls_pubkey_from_hex(
 			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
-		);
+		)
+		.unwrap();
 
 		let delegation = Delegation {
 			proposer,
@@ -252,15 +244,20 @@ mod tests {
 	fn test_constraints_message_to_message_hash() {
 		let proposer = bls_pubkey_from_hex(
 			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		);
+		)
+		.unwrap();
 		let delegate = bls_pubkey_from_hex(
 			"0xaf53b192a82ec1229e8fce4f99cb60287ce33896192b6063ac332b36fbe87ba1b2936bbc849ec68a0132362ab11a7754",
-		);
+		)
+		.unwrap();
 
 		// Create test BLS public keys
-		let receivers = vec![bls_pubkey_from_hex(
-			"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
-		)];
+		let receivers = vec![
+			bls_pubkey_from_hex(
+				"0xaf6e96c0eccd8d4ae868be9299af737855a1b08d57bccb565ea7e69311a30baeebe08d493c3fea97077e8337e95ac5a6",
+			)
+			.unwrap(),
+		];
 
 		let constraints_message = ConstraintsMessage {
 			proposer,
